@@ -745,18 +745,18 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                     ),
                     Row(
                       children: [
-                        Text(
-                          (data.customer != null && data.customer!.isNotEmpty)
-                              ? data.customer![0].code ?? ''
-                              : (data.customerdata != null)
-                              ? data.customerdata![0].code ?? ''
-                              : '',
-                          style: TextStyle(
-                            fontSize: AppConfig.textCaption3Size,
-                            fontWeight: AppConfig.headLineWeight,
-                          ),
-                        ),
-                        Text(' | '),
+                        // Text(
+                        //   (data.customer != null && data.customer!.isNotEmpty)
+                        //       ? data.customer![0].code ?? ''
+                        //       : (data.customerdata != null)
+                        //       ? data.customerdata![0].code ?? ''
+                        //       : '',
+                        //   style: TextStyle(
+                        //     fontSize: AppConfig.textCaption3Size,
+                        //     fontWeight: AppConfig.headLineWeight,
+                        //   ),
+                        // ),
+                        // Text(' | '),
                         Text(
                           overflow: TextOverflow.fade,
                           (data.customer != null && data.customer!.isNotEmpty)
@@ -909,7 +909,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         }
 
         String logoUrl =
-            'http://68.183.92.8:3697/uploads/store/${storeDetail.logos}';
+            'https://erpadmin.mobiz.ae/uploads/store/${storeDetail.logos}';
         if (logoUrl.isNotEmpty) {
           final response = await http.get(Uri.parse(logoUrl));
           if (response.statusCode == 200) {

@@ -271,15 +271,15 @@ class _HomereturnScreenState extends State<HomereturnScreen> {
                 ),
                 Row(
                   children: [
-                    Text(
-                      (data.customer!.isNotEmpty)
-                          ? data.customer![0].code ?? ''
-                          : '',
-                      style: TextStyle(
-                          fontSize: AppConfig.textCaption3Size,
-                          fontWeight: AppConfig.headLineWeight),
-                    ),
-                    Text(' | '),
+                    // Text(
+                    //   (data.customer!.isNotEmpty)
+                    //       ? data.customer![0].code ?? ''
+                    //       : '',
+                    //   style: TextStyle(
+                    //       fontSize: AppConfig.textCaption3Size,
+                    //       fontWeight: AppConfig.headLineWeight),
+                    // ),
+                    // Text(' | '),
                     Text(
                       (data.customer!.isNotEmpty)
                           ? data.customer![0].name ?? ''
@@ -298,11 +298,26 @@ class _HomereturnScreenState extends State<HomereturnScreen> {
                 //     ),
                 //   )
 
-                Text(
-                  'Total: ${data.total}',
-                  style: TextStyle(
-                    fontSize: AppConfig.textCaption3Size,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total: ${data.total}',
+                      style: TextStyle(
+                        fontSize: AppConfig.textCaption3Size,
+                      ),
+                    ),
+                    Text(
+                      "${data.status_text}",
+                      style: TextStyle(
+                        fontSize: AppConfig.textCaption3Size,
+                        fontWeight: FontWeight.w600,
+                        color: data.status_text == "Confirm"
+                            ? Colors.green
+                            : Colors.orange,
+                      ),
+                    ),
+                  ],
                 ),
                 // : Text(
                 //     'Type:  ',
@@ -335,7 +350,7 @@ class _HomereturnScreenState extends State<HomereturnScreen> {
                           size: 30,
                         ),
                       ),
-                      // CommonWidgets.horizontalSpace(2),
+                      CommonWidgets.horizontalSpace(4),
                       InkWell(
                         onTap: () => _getInvoiceData(data.id!, false),
                         child: const Icon(
@@ -452,105 +467,86 @@ class _HomereturnScreenState extends State<HomereturnScreen> {
 
     // Load the image.
 
-    final Uint8List imageData = await _readImageData(
-        invoice.data!.store![0].logo); //invoice.data!.store![0].logo
-    print(invoice.data!.store![0].logo);
-    if (imageData.isNotEmpty) {
-      final PdfBitmap image = PdfBitmap(imageData);
+    // ====== HEADER LAYOUT (LEFT TEXT + RIGHT LOGO) ======
 
-      // Draw the image.
-      final Rect imageRect = Rect.fromCenter(
-        center: Offset(pageSize.width / 2, 50),
-        width: pageSize.width * 0.2, // Adjust width as per your requirement
-        height: pageSize.height * 0.1, // Adjust height as per your requirement
-      );
-      page.graphics.drawImage(image, imageRect);
-    }
-
-    //content
-    // page.graphics.drawString(
-    //     'TAX INVOICE', PdfStandardFont(PdfFontFamily.helvetica, 30));
-
-    //heading
-    final String head = '${invoice.data!.store![0].name}';
-    // Define the text and font
+    final double leftX = 20;            // Left column start
+    final double topY = 20;             // Starting Y position
+    double currentY = topY;
     final double pageWidth = page.getClientSize().width;
 
-    final PdfFont headfont = PdfStandardFont(
-      PdfFontFamily.helvetica,
-      25,
-    );
-    final Size headtextSize = headfont.measureString(head);
 
-    final double headxPosition = (pageWidth - headtextSize.width) / 2.0;
-    final double headyPosition = 90;
+// Load logo
+    final Uint8List? imageData = await _readImageData(invoice.data!.store![0].logo);
+    if (imageData != null && imageData.isNotEmpty) {
+      final PdfBitmap image = PdfBitmap(imageData);
+      // Position logo at top-right (adjust width/height as needed)
+      page.graphics.drawImage(
+        image,
+        Rect.fromLTWH(
+          pageWidth - 100, // Right-aligned with 100px width
+          30,             // Top margin
+          80,             // Logo width
+          80,             // Logo height
+        ),
+      );
+    }
+
+// ----- LEFT COLUMN TEXT -----
+// Store Name
     page.graphics.drawString(
-      head,
-      headfont,
-      bounds: Rect.fromLTWH(headxPosition, headyPosition, headtextSize.width,
-          headtextSize.height),
+      invoice.data!.store![0].name.toString(),
+      PdfStandardFont(PdfFontFamily.helvetica, 20, style: PdfFontStyle.bold),
+      bounds: Rect.fromLTWH(leftX, currentY, pageSize.width - 160, 25),
     );
+    currentY += 22;
 
-    final String addresss = '${invoice.data!.store![0].address ?? 'N/A'}';
-    final PdfFont addressfont = PdfStandardFont(PdfFontFamily.helvetica, 12);
+// Address
+    page.graphics.drawString(
+      invoice.data!.store![0].address ?? 'N/A',
+      PdfStandardFont(PdfFontFamily.helvetica, 12),
+      bounds: Rect.fromLTWH(leftX, currentY, pageSize.width - 160, 20),
+    );
+    currentY += 18;
 
-    final Size addresstextSize = addressfont.measureString(addresss);
-    final double addressxPosition = (pageWidth - addresstextSize.width) / 2.0;
-    final double addressyPosition = 120;
+// Email
+    page.graphics.drawString(
+      invoice.data!.store![0].email ?? 'N/A',
+      PdfStandardFont(PdfFontFamily.helvetica, 12),
+      bounds: Rect.fromLTWH(leftX, currentY, pageSize.width - 160, 20),
+    );
+    currentY += 18;
+
+// TRN
+    page.graphics.drawString(
+      'TRN: ${invoice.data!.customer![0].trn ?? 'N/A'}',
+      PdfStandardFont(PdfFontFamily.helvetica, 12),
+      bounds: Rect.fromLTWH(leftX, currentY, pageSize.width - 160, 20),
+    );
+    currentY += 30;
+
+// ===== TITLE BELOW HEADER =====
+    final title = 'TAX CREDIT NOTE';
+    final PdfFont titleFont = PdfStandardFont(PdfFontFamily.helvetica, 16, style: PdfFontStyle.bold);
+    final Size titleSize = titleFont.measureString(title);
 
     page.graphics.drawString(
-      addresss,
-      addressfont,
-      bounds: Rect.fromLTWH(addressxPosition, addressyPosition,
-          addresstextSize.width, addresstextSize.height),
-    );
-
-    final String email = '${invoice.data!.store![0].email ?? 'N/A'}';
-    final PdfFont emailfont = PdfStandardFont(PdfFontFamily.helvetica, 12);
-    final Size emailtextSize = emailfont.measureString(email);
-    final double emailxPosition = (pageWidth - emailtextSize.width) / 2.0;
-    final double emailyposition = 135;
-    page.graphics.drawString(
-      email,
-      emailfont,
-      bounds: Rect.fromLTWH(emailxPosition, emailyposition, emailtextSize.width,
-          emailtextSize.height),
-    );
-
-    final String trn = 'TRN:${invoice.data!.customer![0].trn ?? '  null'}';
-    final PdfFont trnfont = PdfStandardFont(PdfFontFamily.helvetica, 12);
-
-    final Size trntextSize = trnfont.measureString(trn);
-    final double trnxPosition = (pageWidth - trntextSize.width) / 2.1;
-    final double trnyPosition = 150;
-
-    page.graphics.drawString(
-      trn,
-      trnfont,
+      title,
+      titleFont,
       bounds: Rect.fromLTWH(
-          trnxPosition, trnyPosition, trntextSize.width, trntextSize.height),
+        (pageSize.width - titleSize.width) / 2,
+        currentY,
+        titleSize.width,
+        titleSize.height,
+      ),
     );
 
-    final String text = 'TAX CREDIT NOTE';
-
-    final PdfFont font = PdfStandardFont(PdfFontFamily.helvetica, 15);
-
-    // Calculate the width of the text
-    final Size textSize = font.measureString(text);
-
-    // Calculate the center position for the text
-    final double xPosition = (pageWidth - textSize.width) / 2;
-    final double yPosition = 165;
-
-    // Draw the centered text
-    page.graphics.drawString(
-      text,
-      font,
-      bounds:
-          Rect.fromLTWH(xPosition, yPosition, textSize.width, textSize.height),
-    );
 
     // Draw a line below the text
+    final double yPosition = 165;
+    // final double pageWidth = page.getClientSize().width;
+    final String text = 'TAX CREDIT NOTE';
+    final PdfFont font = PdfStandardFont(PdfFontFamily.helvetica, 15);
+    final Size textSize = font.measureString(text);
     final double lineYPosition =
         yPosition + textSize.height + 10; // Adjust the gap as needed
     page.graphics.drawLine(
@@ -818,7 +814,7 @@ Salesman: ${invoice.data!.user![0].name}
       }
 
       String logoUrl =
-          'http://68.183.92.8:3697/uploads/store/${invoice.data!.store![0].logo}';
+          'https://erpadmin.mobiz.ae/uploads/store/${invoice.data!.store![0].logo}';
       if (logoUrl.isNotEmpty) {
         final response = await http.get(Uri.parse(logoUrl));
         if (response.statusCode == 200) {
@@ -1079,6 +1075,7 @@ class VanReturn {
   num? otherCharge;
   num? discount;
   String? roundOff;
+  String? status_text;
   String? discount_type;
   num? total;
   num? totalTax;
@@ -1109,6 +1106,7 @@ class VanReturn {
       this.otherCharge,
       this.discount,
       this.roundOff,
+      this.status_text,
       this.total,
       this.totalTax,
       this.grandTotal,
@@ -1138,6 +1136,7 @@ class VanReturn {
     discount = json['discount'] ?? 0;
     discount_type = json['discount_type'] ?? '';
     roundOff = json['round_off'] ?? '';
+    status_text = json['status_text'] ?? '';
     total = json['total'] ?? 0;
     totalTax = json['total_tax'] ?? 0;
     grandTotal = json['grand_total'] ?? 0;

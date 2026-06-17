@@ -734,7 +734,7 @@ class User {
     departmentId = json['department_id'];
     designationId = json['designation_id'];
     storeId = json['store_id'];
-    rolId = json['rol_id'];
+    rolId = json['app_rol_id'];
     createdAt = json['created_at'];
     updatedAt = json['updated_at'];
   }
@@ -751,7 +751,7 @@ class User {
     data['department_id'] = this.departmentId;
     data['designation_id'] = this.designationId;
     data['store_id'] = this.storeId;
-    data['rol_id'] = this.rolId;
+    data['app_rol_id'] = this.rolId;
     data['created_at'] = this.createdAt;
     data['updated_at'] = this.updatedAt;
     return data;

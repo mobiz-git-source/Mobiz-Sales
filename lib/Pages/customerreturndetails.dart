@@ -322,66 +322,79 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
     double total = 0;
     for (int index = 0; index < cartItems.length; index++) {
       double rate = double.tryParse(
-              amounts[index] ?? cartItems[index].price.toString()) ??
+          amounts[index] ?? cartItems[index].price.toString()) ??
           0;
-      int quantity = int.tryParse(qtys[index] ?? '1') ?? 1;
+      // FIX: Use double.tryParse instead of int.tryParse for quantity
+      double quantity = double.tryParse(qtys[index] ?? '1') ?? 1.0;
       total += rate * quantity;
     }
     return total;
   }
 
   double calculateTax() {
-    double tax = 0;
-    for (int index = 0; index < cartItems.length; index++) {
-      String discountValue = _discountData.text.trim();
-      double totalAmount = calculateTotalRate();
-      double discountAmount = double.tryParse(discountValue) ?? 0;
-      double amt = totalAmount - discountAmount;
-      double discountfrtax = (totalAmount * discountAmount) / 100;
-      double netTotal = totalAmount - discountfrtax;
-      num taxPercentage = 5;
-      double Tax = _isPercentage
-          ? ((netTotal * taxPercentage) / 100)
-          : (amt * taxPercentage) / 100;
-      tax = Tax;
+    double totalAmount = calculateTotalRate();
+    String discountValue = _discountData.text.trim();
+    double discountAmount = double.tryParse(discountValue) ?? 0;
+    num taxPercentage = 5;
+
+    if (_isPercentage) {
+      // Percentage discount: apply discount first, then calculate tax
+      double discountedAmount = totalAmount - (totalAmount * discountAmount / 100);
+      return (discountedAmount * taxPercentage) / 100;
+    } else {
+      // Fixed amount discount: subtract discount, then calculate tax
+      double discountedAmount = totalAmount - discountAmount;
+      return (discountedAmount * taxPercentage) / 100;
     }
-    return tax;
   }
 
   Map<String, dynamic> grandTotal() {
+    double totalAmount = calculateTotalRate();
     double taxamt = calculateTax();
-    roundoff = _roundoff.text;
-    double rundff = double.tryParse(roundoff) ?? 0;
     String discountValue = _discountData.text.trim();
     double discountAmount = double.tryParse(discountValue) ?? 0;
-    double totalTax = 5;
-    double totalAmount = calculateTotalRate();
-    double discountinpercent = (totalAmount * discountAmount) / 100;
-    double nettotal = totalAmount - discountinpercent;
-    double taxamtperc = (nettotal * totalTax) / 100;
-    double grandTotal = _ifVat == 1
-        ? _isPercentage
-            ? totalAmount - ((totalAmount * discountAmount) / 100) + taxamtperc
-            : (totalAmount - discountAmount) + taxamt
-        : _isPercentage
-            ? totalAmount - (totalAmount * discountAmount) / 100
-            : totalAmount - discountAmount;
-    num roundedGrandTotal1 =
-        roundoff == '' ? customRound(grandTotal) : grandTotal + rundff;
-    double roundOffValue = roundedGrandTotal1 - grandTotal;
+
+    // Calculate net amount after discount
+    double netAmount;
+    if (_isPercentage) {
+      netAmount = totalAmount - (totalAmount * discountAmount / 100);
+    } else {
+      netAmount = totalAmount - discountAmount;
+    }
+
+    // Calculate grand total
+    double grandTotal = _ifVat == 1 ? netAmount + taxamt : netAmount;
+
+    // Handle round off
+    String roundoffText = _roundoff.text.trim();
+    double roundOffInput = double.tryParse(roundoffText) ?? 0.0;
+
+    double roundedGrandTotal;
+    double roundOffValue;
+
+    if (roundoffText.isEmpty) {
+      // Auto round off
+      roundedGrandTotal = customRound(grandTotal).toDouble();
+      roundOffValue = roundedGrandTotal - grandTotal;
+    } else {
+      // Manual round off
+      roundedGrandTotal = grandTotal + roundOffInput;
+      roundOffValue = roundOffInput;
+    }
+
     return {
-      'rounded': roundedGrandTotal1,
+      'rounded': roundedGrandTotal,
       'roundOffValue': roundOffValue,
     };
   }
 
-  int customRound(double value) {
-    double fractionalPart = value - value.toInt();
+  double customRound(double value) {
+    double fractionalPart = value - value.floorToDouble();
 
     if (fractionalPart >= 0.5) {
-      return value.ceil();
+      return value.ceilToDouble();
     } else {
-      return value.floor();
+      return value.floorToDouble();
     }
   }
 

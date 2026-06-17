@@ -25,7 +25,6 @@ class _PickingAddPageState extends State<PickingAddPage> {
   final TextEditingController qtyController = TextEditingController();
   final FocusNode barcodeFocusNode = FocusNode();
   int currentDetailIndex = 0;
-  // ✅ List of scanned item maps
   final List<Map<String, dynamic>> scannedItems = [];
 
   @override

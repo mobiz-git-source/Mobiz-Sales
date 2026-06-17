@@ -336,14 +336,15 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
                       ),
                       Row(
                         children: [
+                          // Text(
+                          //   (data.customer!.isNotEmpty)
+                          //       ? data.customer![0].code ?? ''
+                          //       : '',
+                          //   style: TextStyle(
+                          //       fontSize: AppConfig.textCaption3Size,
+                          //       fontWeight: AppConfig.headLineWeight),
+                          // ),Text(' | '),
                           Text(
-                            (data.customer!.isNotEmpty)
-                                ? data.customer![0].code ?? ''
-                                : '',
-                            style: TextStyle(
-                                fontSize: AppConfig.textCaption3Size,
-                                fontWeight: AppConfig.headLineWeight),
-                          ),Text(' | '), Text(
                             (data.customer!.isNotEmpty)
                                 ? data.customer![0].name ?? ''
                                 : '',

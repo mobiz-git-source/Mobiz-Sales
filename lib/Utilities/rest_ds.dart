@@ -22,7 +22,7 @@ class RestDatasource {
 
   RestDatasource() {
     BASE_URL = "http://68.183.92.8:3699";
-    Image_URL = "http://68.183.92.8:3697";
+    Image_URL = "https://erpadmin.mobiz.ae";
     Product_URL = "http://68.183.92.8:3696";
     //BASE_URL = "https://unistageapi.cianlogic.com";
   }
@@ -81,22 +81,20 @@ class RestDatasource {
             "?timeZone=${extradetails["Time_zone"]}&appVersion=${extradetails["App_Version"]}";
     print("Get_URL   $DETAILS_URL");
     try {
-      final result = await InternetAddress.lookup('cianlogic.com');
-      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
-        print('connected');
-        return _netUtil
-            .get(
-          DETAILS_URL,
-          header: header,
-        )
-            .then((Map<String, dynamic> resJson) {
-          return resJson;
-        });
-      }
-    } on SocketException catch (_) {
-      print('not connected');
+      // Removed unreliable internet check
+      return _netUtil
+          .get(
+        DETAILS_URL,
+        header: header,
+      )
+          .then((Map<String, dynamic> resJson) {
+        return resJson;
+      });
+    } catch (e) {
+      print('Get Details Error: $e');
       Fluttertoast.showToast(
           msg: "No Internet Connection", backgroundColor: Colors.black);
+      return {};
     }
   }
 
@@ -132,30 +130,27 @@ class RestDatasource {
             "?timeZone=${extradetails["Time_zone"]}&appVersion=${extradetails["App_Version"]}";
     print("$SIGN_UP_URL");
     try {
-      final result = await InternetAddress.lookup('cianlogic.com');
-      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
-        print('connected');
-        if (bodyJson != null) {
-          print("then $bodyJson");
-          return _netUtil
-              .post(SIGN_UP_URL, headers: header, body: bodyJson)
-              .then((Map<String, dynamic> resJson) {
-            return resJson;
-          });
-        } else {
-          return _netUtil
-              .post(SIGN_UP_URL, headers: header)
-              .then((Map<String, dynamic> resJson) {
-            return resJson;
-          });
-        }
+      // Removed unreliable internet check
+      if (bodyJson != null) {
+        print("then $bodyJson");
+        return _netUtil
+            .post(SIGN_UP_URL, headers: header, body: bodyJson)
+            .then((Map<String, dynamic> resJson) {
+          return resJson;
+        });
+      } else {
+        return _netUtil
+            .post(SIGN_UP_URL, headers: header)
+            .then((Map<String, dynamic> resJson) {
+          return resJson;
+        });
       }
-    } on SocketException catch (_) {
-      print('not connected');
+    } catch (e) {
+      print('SendData Error: $e');
       Fluttertoast.showToast(
-          msg: "No Internet Connection", backgroundColor: Colors.black);
+          msg: "Connection Error", backgroundColor: Colors.black);
+      return {};
     }
-    return {};
   }
 
   Future<Response> customerRegister(String? token, dynamic bodyJson,

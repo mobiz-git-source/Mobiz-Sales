@@ -12,6 +12,7 @@ import 'package:mobizapp/Pages/BankReconciliation/BankReconciliationScreen.dart'
 import 'package:mobizapp/Pages/DayClose.dart';
 import 'package:mobizapp/Pages/ExpensesPage.dart';
 import 'package:mobizapp/Pages/Group_Print.dart';
+import 'package:mobizapp/Pages/Notifications/notifications.dart';
 import 'package:mobizapp/Pages/Stock/StockName_RequestScreen.dart';
 import 'package:mobizapp/Pages/VIsitsPage.dart';
 import 'package:mobizapp/Pages/customerscreen.dart';
@@ -45,6 +46,7 @@ import '../selectproduct.dart';
 import 'Customer Dues/Customer Dues.dart';
 import 'Picking/pickingList.dart';
 import 'Production/ProductionOrder.dart';
+import 'Quotation/QuotationHome.dart';
 import 'Stock/StockTransfer_Page.dart';
 import 'TestExpensePage.dart';
 import 'Cheque/Cheque_Colection.dart';
@@ -130,6 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
+      print(response.request);
       final Map<String, dynamic> jsonResponse = json.decode(response.body);
       if (jsonResponse['success']) {
         setState(() {
@@ -291,6 +294,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return Icons.transfer_within_a_station;
         case 'production_quantity_limits_outlined':
         return Icons.production_quantity_limits_outlined;
+        case 'quora':
+        return Icons.quora;
       default:
         return Icons.help;
     }
@@ -318,751 +323,764 @@ class _HomeScreenState extends State<HomeScreen> {
     String currentDate = DateFormat('dd-MMM-yyyy').format(DateTime.now());
     // final paginatedIcons = paginateIcons(appIcons, 15);
 
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 40,
-        centerTitle: false,
-        iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
-        backgroundColor: AppConfig.colorPrimary,
-        titleSpacing: 0,
-        title: RichText(
-          text: TextSpan(
-            text: 'Hello ',
-            style: TextStyle(
-                color: AppConfig.backgroundColor,
-                fontSize: AppConfig.textSubtitle3Size),
-            children: <TextSpan>[
-              TextSpan(
-                text: '${AppState().name}',
-                style: TextStyle(
-                    color: AppConfig.backgroundColor,
-                    fontSize: AppConfig.textSubtitle3Size),
-              ),
-            ],
-          ),
-        ),
-      ),
-      drawer: SizedBox(
-        width: SizeConfig.blockSizeHorizontal * 50,
-        child: Drawer(
-          child: Padding(
-            padding: const EdgeInsets.only(left: 10.0),
-            child: Column(
-              children: [
-                CommonWidgets.verticalSpace(8),
-                CircleAvatar(
-                    radius: 70.0,
-                    backgroundColor: Colors.transparent,
-                    child: Lottie.asset(
-                        'Assets/Images/Animation - 1722081243637.json',
-                        fit: BoxFit.cover,
-                        width: 70)),
-                ListTile(
-                  leading: Icon(Icons.drive_file_rename_outline),
-                  title: const Text('Edit Profile'),
-                  onTap: () {
-                    print(AppState().routeId);
-                    print(AppState().vanId);
-                  },
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        appBar: AppBar(
+          toolbarHeight: 40,
+          centerTitle: false,
+          iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
+          backgroundColor: AppConfig.colorPrimary,
+          titleSpacing: 0,
+          title: RichText(
+            text: TextSpan(
+              text: 'Hello ',
+              style: TextStyle(
+                  color: AppConfig.backgroundColor,
+                  fontSize: AppConfig.textSubtitle3Size),
+              children: <TextSpan>[
+                TextSpan(
+                  text: '${AppState().name}',
+                  style: TextStyle(
+                      color: AppConfig.backgroundColor,
+                      fontSize: AppConfig.textSubtitle3Size),
                 ),
-                ListTile(
-                  leading: Icon(Icons.call),
-                  title: const Text('Contact Us'),
-                  onTap: () {},
-                ),
-                ListTile(
-                  leading: Icon(Icons.print),
-                  title: const Text('Printer'),
-                  onTap: () {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PrinterTest(),
-                        ));
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.logout),
-                  title: Text('Log Out'),
-                  onTap: () {
-                    conformation(context);
-                    clearSharedPreferences();
-                  },
-                ),
-                const Divider(),
-                Text('v$_appVersion'),
               ],
             ),
           ),
+          actions: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: InkWell(onTap: () {
+                Navigator.pushNamed(context, NotificationPage.routeName);
+              },child: Icon(Icons.notifications)),
+            )
+          ],
         ),
-      ),
-      body: Container(
-        height: MediaQuery.of(context).size.height * 1,
-        child: PageView(
-          children: [
-            Container(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    CommonWidgets.verticalSpace(2),
-                    isLoading
-                        ? Padding(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: SizeConfig.blockSizeHorizontal * 3,
-                                vertical: SizeConfig.blockSizeVertical * 1),
-                            child: Shimmer.fromColors(
-                              baseColor: Colors.grey[300]!,
-                              highlightColor: Colors.grey[100]!,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    width: SizeConfig.safeBlockHorizontal! * 30,
-                                    height: SizeConfig.safeBlockVertical! * 5,
-                                    color: Colors.white,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : storeDetail == null
-                            ? const Center(child: Text("No data found"))
-                            : Center(
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal:
-                                          SizeConfig.blockSizeHorizontal * 3,
-                                      vertical:
-                                          SizeConfig.blockSizeVertical * 1),
-                                  child: Text(
-                                    "${storeDetail!.name}",
-                                    style: TextStyle(
-                                        fontSize: AppConfig.textCaptionSize,
-                                        fontWeight: FontWeight.w900,
-                                        color: AppConfig.colorPrimary),
-                                  ),
+        drawer: SizedBox(
+          width: SizeConfig.blockSizeHorizontal * 50,
+          child: Drawer(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 10.0),
+              child: Column(
+                children: [
+                  CommonWidgets.verticalSpace(8),
+                  CircleAvatar(
+                      radius: 70.0,
+                      backgroundColor: Colors.transparent,
+                      child: Lottie.asset(
+                          'Assets/Images/Animation - 1722081243637.json',
+                          fit: BoxFit.cover,
+                          width: 70)),
+                  ListTile(
+                    leading: Icon(Icons.drive_file_rename_outline),
+                    title: const Text('Edit Profile'),
+                    onTap: () {
+                      print(AppState().routeId);
+                      print(AppState().vanId);
+                    },
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.call),
+                    title: const Text('Contact Us'),
+                    onTap: () {},
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.print),
+                    title: const Text('Printer'),
+                    onTap: () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PrinterTest(),
+                          ));
+                    },
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.logout),
+                    title: Text('Log Out'),
+                    onTap: () {
+                      conformation(context);
+                      clearSharedPreferences();
+                    },
+                  ),
+                  const Divider(),
+                  Text('v$_appVersion'),
+                ],
+              ),
+            ),
+          ),
+        ),
+        body: Container(
+          height: MediaQuery.of(context).size.height * 1,
+          child: PageView(
+            children: [
+              Container(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      CommonWidgets.verticalSpace(2),
+                      isLoading
+                          ? Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: SizeConfig.blockSizeHorizontal * 3,
+                                  vertical: SizeConfig.blockSizeVertical * 1),
+                              child: Shimmer.fromColors(
+                                baseColor: Colors.grey[300]!,
+                                highlightColor: Colors.grey[100]!,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: SizeConfig.safeBlockHorizontal! * 30,
+                                      height: SizeConfig.safeBlockVertical! * 5,
+                                      color: Colors.white,
+                                    ),
+                                  ],
                                 ),
                               ),
-                    Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Column(
-                        children: [
-                          // CommonWidgets.verticalSpace(2),
-                          Center(
-                            child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Image.asset(
-                                    'Assets/Images/main logo.png',
-                                    fit: BoxFit.cover,
-                                    width: SizeConfig.blockSizeHorizontal * 18,
-                                    height: SizeConfig.blockSizeVertical * 8,
+                            )
+                          : storeDetail == null
+                              ? const Center(child: Text("No data found"))
+                              : Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal:
+                                            SizeConfig.blockSizeHorizontal * 3,
+                                        vertical:
+                                            SizeConfig.blockSizeVertical * 1),
+                                    child: Text(
+                                      "${storeDetail!.name}",
+                                      style: TextStyle(
+                                          fontSize: AppConfig.textCaptionSize,
+                                          fontWeight: FontWeight.w900,
+                                          color: AppConfig.colorPrimary),
+                                    ),
                                   ),
-                                ]),
-                          ),
-                          CommonWidgets.verticalSpace(3.8),
-                          Container(
-                            height: MediaQuery.of(context).size.height * 0.68,
-                            child: paginatedIcons.isNotEmpty
-                                ? PageView.builder(
-                                    itemCount: paginatedIcons.length,
-                                    itemBuilder: (context, pageIndex) {
-                                      final pageData =
-                                          paginatedIcons[pageIndex];
-                                      return SingleChildScrollView(
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 15),
-                                          child: GridView.builder(
-                                            shrinkWrap: true,
-                                            physics:
-                                                NeverScrollableScrollPhysics(),
-                                            gridDelegate:
-                                                SliverGridDelegateWithFixedCrossAxisCount(
-                                              crossAxisCount: 3,
-                                              crossAxisSpacing: 13,
-                                              childAspectRatio: .95,
-                                              mainAxisSpacing: 10,
-                                            ),
-                                            itemCount: pageData.length,
-                                            itemBuilder: (context, index) {
-                                              final iconData = pageData[index];
-                                              final iconList = iconData['icon']
-                                                  as List<dynamic>?;
-                                              final firstIconObject =
-                                                  iconList != null &&
-                                                          iconList.isNotEmpty
-                                                      ? iconList[0]
-                                                      : null;
-
-                                              final iconName =
-                                                  firstIconObject != null
-                                                      ? firstIconObject['icon']
-                                                          as String?
-                                                      : null;
-                                              final name =
-                                                  firstIconObject != null
-                                                      ? firstIconObject['name']
-                                                          as String?
-                                                      : 'Unknown';
-                                              final url =
-                                                  firstIconObject != null
-                                                      ? firstIconObject['url']
-                                                          as String?
-                                                      : '';
-
-                                              return _iconButtons(
-                                                title: name ?? 'Unknown',
-                                                routeName: url ?? '',
-                                                icon: getIconData(iconName),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  )
-                                : Center(
-                                    child: Shimmer.fromColors(
-                                      baseColor: Colors.grey.shade300,
-                                      highlightColor: Colors.white,
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(35.0),
-                                        child: Column(
-                                          children: [
-                                            Expanded(
-                                              child: GridView.builder(
-                                                scrollDirection: Axis.vertical,
-                                                shrinkWrap: true,
-                                                physics:
-                                                    BouncingScrollPhysics(),
-                                                itemCount: 12,
-                                                gridDelegate:
-                                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                                  crossAxisCount: 3,
-                                                  mainAxisExtent: 120,
-                                                  crossAxisSpacing: 20,
-                                                  mainAxisSpacing: 30,
-                                                ),
-                                                itemBuilder: (context, index) {
-                                                  return Container(
-                                                    decoration: BoxDecoration(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              10),
-                                                      color:
-                                                          Colors.grey.shade200,
-                                                    ),
-                                                  );
-                                                },
+                                ),
+                      Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          children: [
+                            // CommonWidgets.verticalSpace(2),
+                            Center(
+                              child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Image.asset(
+                                      'Assets/Images/main logo.png',
+                                      fit: BoxFit.cover,
+                                      width: SizeConfig.blockSizeHorizontal * 18,
+                                      height: SizeConfig.blockSizeVertical * 8,
+                                    ),
+                                  ]),
+                            ),
+                            CommonWidgets.verticalSpace(3.8),
+                            Container(
+                              height: MediaQuery.of(context).size.height * 0.68,
+                              child: paginatedIcons.isNotEmpty
+                                  ? PageView.builder(
+                                      itemCount: paginatedIcons.length,
+                                      itemBuilder: (context, pageIndex) {
+                                        final pageData =
+                                            paginatedIcons[pageIndex];
+                                        return SingleChildScrollView(
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 15),
+                                            child: GridView.builder(
+                                              shrinkWrap: true,
+                                              physics:
+                                                  NeverScrollableScrollPhysics(),
+                                              gridDelegate:
+                                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                                crossAxisCount: 3,
+                                                crossAxisSpacing: 13,
+                                                childAspectRatio: .95,
+                                                mainAxisSpacing: 10,
                                               ),
+                                              itemCount: pageData.length,
+                                              itemBuilder: (context, index) {
+                                                final iconData = pageData[index];
+                                                final iconList = iconData['icon']
+                                                    as List<dynamic>?;
+                                                final firstIconObject =
+                                                    iconList != null &&
+                                                            iconList.isNotEmpty
+                                                        ? iconList[0]
+                                                        : null;
+
+                                                final iconName =
+                                                    firstIconObject != null
+                                                        ? firstIconObject['icon']
+                                                            as String?
+                                                        : null;
+                                                final name =
+                                                    firstIconObject != null
+                                                        ? firstIconObject['name']
+                                                            as String?
+                                                        : 'Unknown';
+                                                final url =
+                                                    firstIconObject != null
+                                                        ? firstIconObject['url']
+                                                            as String?
+                                                        : '';
+
+                                                return _iconButtons(
+                                                  title: name ?? 'Unknown',
+                                                  routeName: url ?? '',
+                                                  icon: getIconData(iconName),
+                                                );
+                                              },
                                             ),
-                                          ],
+                                          ),
+                                        );
+                                      },
+                                    )
+                                  : Center(
+                                      child: Shimmer.fromColors(
+                                        baseColor: Colors.grey.shade300,
+                                        highlightColor: Colors.white,
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(35.0),
+                                          child: Column(
+                                            children: [
+                                              Expanded(
+                                                child: GridView.builder(
+                                                  scrollDirection: Axis.vertical,
+                                                  shrinkWrap: true,
+                                                  physics:
+                                                      BouncingScrollPhysics(),
+                                                  itemCount: 12,
+                                                  gridDelegate:
+                                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                                    crossAxisCount: 3,
+                                                    mainAxisExtent: 120,
+                                                    crossAxisSpacing: 20,
+                                                    mainAxisSpacing: 30,
+                                                  ),
+                                                  itemBuilder: (context, index) {
+                                                    return Container(
+                                                      decoration: BoxDecoration(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                                10),
+                                                        color:
+                                                            Colors.grey.shade200,
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                          )
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Container(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    SizedBox(
-                      height: SizeConfig.safeBlockVertical! * 7,
-                    ),
-                    Container(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: SizeConfig.blockSizeHorizontal * 3),
-                        child: Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Container(
-                                  height: SizeConfig.safeBlockVertical! * 22,
-                                  width: SizeConfig.blockSizeHorizontal * 45,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(5),
-                                    color: AppConfig.colorPrimary,
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      SizedBox(
-                                        height:
-                                            SizeConfig.safeBlockVertical! * 2.5,
-                                      ),
-                                      Text(
-                                        'TODAY\'S SCHEDULE',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          // fontWeight: FontWeight.w700
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        height:
-                                            SizeConfig.safeBlockVertical! * 2.5,
-                                      ),
-                                      CircularPercentIndicator(
-                                        radius: 50.0,
-                                        lineWidth: 10.0,
-                                        percent: completedTodaySchedule /
-                                            totalTodaySchedule,
-                                        center: Text(
-                                          "$completedTodaySchedule/$totalTodaySchedule", // Text inside the circle
-                                          style: TextStyle(
-                                              fontSize:
-                                                  AppConfig.textSubtitle3Size,
-                                              color: Colors.white),
-                                        ),
-                                        progressColor: Colors
-                                            .green, // Color of the progress line
-                                        backgroundColor: Colors
-                                            .blueAccent, // Background color of the circle
-                                        circularStrokeCap: CircularStrokeCap
-                                            .round, // Rounded edges of the stroke
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  height: SizeConfig.safeBlockVertical! * 22,
-                                  width: SizeConfig.blockSizeHorizontal * 45,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(5),
-                                    color: AppConfig.colorPrimary,
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      SizedBox(
-                                        height:
-                                            SizeConfig.safeBlockVertical! * 2.5,
-                                      ),
-                                      Text(
-                                        'EMERGENCY SCHEDULE',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          // fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        height:
-                                            SizeConfig.safeBlockVertical! * 2.5,
-                                      ),
-                                      CircularPercentIndicator(
-                                        radius: 50.0, // Size of the circle
-                                        lineWidth:
-                                            10.0, // Width of the circle's stroke
-                                        percent: completedEmergencySchedule /
-                                            totalEmergencySchedule, // Progress percentage (2 out of 70)
-                                        center: Text(
-                                          "$completedEmergencySchedule/$totalEmergencySchedule", // Text inside the circle
-                                          style: TextStyle(
-                                              fontSize:
-                                                  AppConfig.textSubtitle3Size,
-                                              color: Colors.white),
-                                        ),
-                                        progressColor: Colors
-                                            .green, // Color of the progress line
-                                        backgroundColor: Colors
-                                            .blueAccent, // Background color of the circle
-                                        circularStrokeCap: CircularStrokeCap
-                                            .round, // Rounded edges of the stroke
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(
-                              height: SizeConfig.safeBlockVertical! * 3,
-                            ),
-                            Row(
-                              children: [
-                                Container(
-                                  height: SizeConfig.safeBlockVertical! * 7,
-                                  width:
-                                      SizeConfig.safeBlockHorizontal! * 30.52,
-                                  decoration: BoxDecoration(
-                                      color: AppConfig.colorPrimary,
-                                      borderRadius: BorderRadius.circular(5)),
-                                  child: Column(
-                                    children: [
-                                      SizedBox(
-                                        height: 7,
-                                      ),
-                                      Text(
-                                        'COUPON SALE',
-                                        style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize:
-                                                AppConfig.textCaption3Size),
-                                      ),
-                                      Text(
-                                        couponSale.toStringAsFixed(
-                                            2), // Converts double to a string with 2 decimal places
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: AppConfig.textCaption2Size,
-                                        ),
-                                      )
-                                    ],
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 5,
-                                ),
-                                Container(
-                                  height: SizeConfig.safeBlockVertical! * 7,
-                                  width:
-                                      SizeConfig.safeBlockHorizontal! * 30.52,
-                                  decoration: BoxDecoration(
-                                      color: AppConfig.colorPrimary,
-                                      borderRadius: BorderRadius.circular(5)),
-                                  child: Column(
-                                    children: [
-                                      SizedBox(
-                                        height: 7,
-                                      ),
-                                      Text(
-                                        'USED COUPONS',
-                                        style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize:
-                                                AppConfig.textCaption3Size),
-                                      ),
-                                      Text(
-                                        usedCoupons
-                                            .toString(), // Converts double to a string with 2 decimal places
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: AppConfig.textCaption2Size,
-                                        ),
-                                      )
-                                    ],
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 5,
-                                ),
-                                Container(
-                                  height: SizeConfig.safeBlockVertical! * 7,
-                                  width:
-                                      SizeConfig.safeBlockHorizontal! * 30.52,
-                                  decoration: BoxDecoration(
-                                      color: AppConfig.colorPrimary,
-                                      borderRadius: BorderRadius.circular(5)),
-                                  child: Column(
-                                    children: [
-                                      SizedBox(
-                                        height: 7,
-                                      ),
-                                      Text(
-                                        'EXPENSES',
-                                        style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize:
-                                                AppConfig.textCaption3Size),
-                                      ),
-                                      Text(expenses.toStringAsFixed(2),
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize:
-                                                  AppConfig.textCaption2Size))
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(
-                                height: SizeConfig.safeBlockVertical! * 1.5),
-                            Row(
-                              children: [
-                                Container(
-                                  height: SizeConfig.safeBlockVertical! * 7,
-                                  width:
-                                      SizeConfig.safeBlockHorizontal! * 30.52,
-                                  decoration: BoxDecoration(
-                                      color: AppConfig.colorPrimary,
-                                      borderRadius: BorderRadius.circular(5)),
-                                  child: Column(
-                                    children: [
-                                      SizedBox(
-                                        height: 7,
-                                      ),
-                                      Text(
-                                        'FILLED BOTTLE',
-                                        style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize:
-                                                AppConfig.textCaption3Size),
-                                      ),
-                                      Text(filledBottle.toString(),
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize:
-                                                  AppConfig.textCaption2Size))
-                                    ],
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 5,
-                                ),
-                                Container(
-                                  height: SizeConfig.safeBlockVertical! * 7,
-                                  width:
-                                      SizeConfig.safeBlockHorizontal! * 30.52,
-                                  decoration: BoxDecoration(
-                                      color: AppConfig.colorPrimary,
-                                      borderRadius: BorderRadius.circular(5)),
-                                  child: Column(
-                                    children: [
-                                      SizedBox(
-                                        height: 7,
-                                      ),
-                                      Text(
-                                        'EMPTY BOTTLE',
-                                        style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize:
-                                                AppConfig.textCaption3Size),
-                                      ),
-                                      Text(emptyBottle.toString(),
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize:
-                                                  AppConfig.textCaption2Size))
-                                    ],
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 5,
-                                ),
-                                Container(
-                                  height: SizeConfig.safeBlockVertical! * 7,
-                                  width:
-                                      SizeConfig.safeBlockHorizontal! * 30.52,
-                                  decoration: BoxDecoration(
-                                      color: AppConfig.colorPrimary,
-                                      borderRadius: BorderRadius.circular(5)),
-                                  child: Column(
-                                    children: [
-                                      SizedBox(
-                                        height: 7,
-                                      ),
-                                      Text(
-                                        'CASH IN HAND',
-                                        style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize:
-                                                AppConfig.textCaption3Size),
-                                      ),
-                                      Text(cashInHand.toStringAsFixed(2),
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize:
-                                                  AppConfig.textCaption2Size))
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(
-                              height: SizeConfig.safeBlockVertical! * 3,
-                            ),
-                            Container(
-                              height: SizeConfig.safeBlockVertical! * 37,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                  color: AppConfig.colorPrimary,
-                                  borderRadius: BorderRadius.circular(8)),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    children: [
-                                      Padding(
-                                        padding: EdgeInsets.symmetric(
-                                            horizontal: 10),
-                                        child: Column(
-                                          children: [
-                                            SizedBox(
-                                              height: SizeConfig
-                                                      .safeBlockVertical! *
-                                                  2,
-                                            ),
-                                            Container(
-                                              padding: EdgeInsets.symmetric(
-                                                  horizontal: SizeConfig
-                                                          .blockSizeHorizontal! *
-                                                      8,
-                                                  vertical: SizeConfig
-                                                          .blockSizeVertical! *
-                                                      1.2),
-                                              decoration: BoxDecoration(
-                                                color: Colors.indigo.shade300,
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                              ),
-                                              child: Text(
-                                                'CASH SALES', // Show the current date
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                            SizedBox(
-                                              height: 15,
-                                            ),
-                                            Container(
-                                              height: SizeConfig
-                                                      .safeBlockVertical! *
-                                                  24,
-                                              width: SizeConfig
-                                                      .safeBlockHorizontal! *
-                                                  50,
-                                              child: PieChart(
-                                                dataMap: dataMap,
-                                                colorList: colorList,
-                                                chartRadius:
-                                                    MediaQuery.of(context)
-                                                            .size
-                                                            .width *
-                                                        .5,
-                                                centerText: "",
-                                                chartValuesOptions:
-                                                    ChartValuesOptions(
-                                                  showChartValues: true,
-                                                  showChartValuesInPercentage:
-                                                      false,
-                                                  showChartValuesOutside: false,
-                                                  chartValueStyle: TextStyle(
-                                                    color: Colors.black,
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                                ringStrokeWidth: 30,
-                                                legendOptions: LegendOptions(
-                                                    showLegends: false),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          // SizedBox(height: 10,),
-                                          Text(
-                                            'CREDIT SALES',
-                                            style: TextStyle(
-                                                color: Colors.grey,
-                                                fontWeight: FontWeight.w900),
-                                          ),
-                                          SizedBox(
-                                            height: 110,
-                                          ),
-                                          Row(
-                                            children: [
-                                              CircleAvatar(
-                                                radius:
-                                                    10, // Size of the circle
-                                                backgroundColor: Colors
-                                                    .greenAccent, // Green color for "Amount Pending"
-                                              ),
-                                              SizedBox(width: 10),
-                                              Text(
-                                                'AMOUNT PENDING',
-                                                style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 12),
-                                              ),
-                                            ],
-                                          ),
-                                          SizedBox(
-                                              height: 15), // Space between rows
-
-                                          // Amount Collected
-                                          Row(
-                                            children: [
-                                              CircleAvatar(
-                                                radius:
-                                                    10, // Size of the circle
-                                                backgroundColor: Colors
-                                                    .blue, // Blue color for "Amount Collected"
-                                              ),
-                                              SizedBox(width: 10),
-                                              Text(
-                                                'AMOUNT COLLECTED',
-                                                style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 12),
-                                              ),
-                                            ],
-                                          ),
-                                          SizedBox(
-                                              height: 15), // Space between rows
-
-                                          // Total Sales
-                                          Row(
-                                            children: [
-                                              CircleAvatar(
-                                                radius:
-                                                    10, // Size of the circle
-                                                backgroundColor: Colors
-                                                    .white, // White color for "Total Sales"
-                                              ),
-                                              SizedBox(width: 10),
-                                              Row(
-                                                children: [
-                                                  Text(
-                                                    'Total Sales: ',
-                                                    style: TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 12),
-                                                  ),
-                                                  Text(
-                                                    totalSale
-                                                        .toStringAsFixed(2),
-                                                    style: TextStyle(
-                                                        color: Colors.white),
-                                                  )
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
                             )
                           ],
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+              Container(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: SizeConfig.safeBlockVertical! * 7,
+                      ),
+                      Container(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: SizeConfig.blockSizeHorizontal * 3),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Container(
+                                    height: SizeConfig.safeBlockVertical! * 22,
+                                    width: SizeConfig.blockSizeHorizontal * 45,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(5),
+                                      color: AppConfig.colorPrimary,
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        SizedBox(
+                                          height:
+                                              SizeConfig.safeBlockVertical! * 2.5,
+                                        ),
+                                        Text(
+                                          'TODAY\'S SCHEDULE',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            // fontWeight: FontWeight.w700
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          height:
+                                              SizeConfig.safeBlockVertical! * 2.5,
+                                        ),
+                                        CircularPercentIndicator(
+                                          radius: 50.0,
+                                          lineWidth: 10.0,
+                                          percent: completedTodaySchedule /
+                                              totalTodaySchedule,
+                                          center: Text(
+                                            "$completedTodaySchedule/$totalTodaySchedule", // Text inside the circle
+                                            style: TextStyle(
+                                                fontSize:
+                                                    AppConfig.textSubtitle3Size,
+                                                color: Colors.white),
+                                          ),
+                                          progressColor: Colors
+                                              .green, // Color of the progress line
+                                          backgroundColor: Colors
+                                              .blueAccent, // Background color of the circle
+                                          circularStrokeCap: CircularStrokeCap
+                                              .round, // Rounded edges of the stroke
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    height: SizeConfig.safeBlockVertical! * 22,
+                                    width: SizeConfig.blockSizeHorizontal * 45,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(5),
+                                      color: AppConfig.colorPrimary,
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        SizedBox(
+                                          height:
+                                              SizeConfig.safeBlockVertical! * 2.5,
+                                        ),
+                                        Text(
+                                          'EMERGENCY SCHEDULE',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            // fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          height:
+                                              SizeConfig.safeBlockVertical! * 2.5,
+                                        ),
+                                        CircularPercentIndicator(
+                                          radius: 50.0, // Size of the circle
+                                          lineWidth:
+                                              10.0, // Width of the circle's stroke
+                                          percent: completedEmergencySchedule /
+                                              totalEmergencySchedule, // Progress percentage (2 out of 70)
+                                          center: Text(
+                                            "$completedEmergencySchedule/$totalEmergencySchedule", // Text inside the circle
+                                            style: TextStyle(
+                                                fontSize:
+                                                    AppConfig.textSubtitle3Size,
+                                                color: Colors.white),
+                                          ),
+                                          progressColor: Colors
+                                              .green, // Color of the progress line
+                                          backgroundColor: Colors
+                                              .blueAccent, // Background color of the circle
+                                          circularStrokeCap: CircularStrokeCap
+                                              .round, // Rounded edges of the stroke
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(
+                                height: SizeConfig.safeBlockVertical! * 3,
+                              ),
+                              Row(
+                                children: [
+                                  Container(
+                                    height: SizeConfig.safeBlockVertical! * 7,
+                                    width:
+                                        SizeConfig.safeBlockHorizontal! * 30.52,
+                                    decoration: BoxDecoration(
+                                        color: AppConfig.colorPrimary,
+                                        borderRadius: BorderRadius.circular(5)),
+                                    child: Column(
+                                      children: [
+                                        SizedBox(
+                                          height: 7,
+                                        ),
+                                        Text(
+                                          'COUPON SALE',
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize:
+                                                  AppConfig.textCaption3Size),
+                                        ),
+                                        Text(
+                                          couponSale.toStringAsFixed(
+                                              2), // Converts double to a string with 2 decimal places
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: AppConfig.textCaption2Size,
+                                          ),
+                                        )
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 5,
+                                  ),
+                                  Container(
+                                    height: SizeConfig.safeBlockVertical! * 7,
+                                    width:
+                                        SizeConfig.safeBlockHorizontal! * 30.52,
+                                    decoration: BoxDecoration(
+                                        color: AppConfig.colorPrimary,
+                                        borderRadius: BorderRadius.circular(5)),
+                                    child: Column(
+                                      children: [
+                                        SizedBox(
+                                          height: 7,
+                                        ),
+                                        Text(
+                                          'USED COUPONS',
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize:
+                                                  AppConfig.textCaption3Size),
+                                        ),
+                                        Text(
+                                          usedCoupons
+                                              .toString(), // Converts double to a string with 2 decimal places
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: AppConfig.textCaption2Size,
+                                          ),
+                                        )
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 5,
+                                  ),
+                                  Container(
+                                    height: SizeConfig.safeBlockVertical! * 7,
+                                    width:
+                                        SizeConfig.safeBlockHorizontal! * 30.52,
+                                    decoration: BoxDecoration(
+                                        color: AppConfig.colorPrimary,
+                                        borderRadius: BorderRadius.circular(5)),
+                                    child: Column(
+                                      children: [
+                                        SizedBox(
+                                          height: 7,
+                                        ),
+                                        Text(
+                                          'EXPENSES',
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize:
+                                                  AppConfig.textCaption3Size),
+                                        ),
+                                        Text(expenses.toStringAsFixed(2),
+                                            style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize:
+                                                    AppConfig.textCaption2Size))
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(
+                                  height: SizeConfig.safeBlockVertical! * 1.5),
+                              Row(
+                                children: [
+                                  Container(
+                                    height: SizeConfig.safeBlockVertical! * 7,
+                                    width:
+                                        SizeConfig.safeBlockHorizontal! * 30.52,
+                                    decoration: BoxDecoration(
+                                        color: AppConfig.colorPrimary,
+                                        borderRadius: BorderRadius.circular(5)),
+                                    child: Column(
+                                      children: [
+                                        SizedBox(
+                                          height: 7,
+                                        ),
+                                        Text(
+                                          'FILLED BOTTLE',
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize:
+                                                  AppConfig.textCaption3Size),
+                                        ),
+                                        Text(filledBottle.toString(),
+                                            style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize:
+                                                    AppConfig.textCaption2Size))
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 5,
+                                  ),
+                                  Container(
+                                    height: SizeConfig.safeBlockVertical! * 7,
+                                    width:
+                                        SizeConfig.safeBlockHorizontal! * 30.52,
+                                    decoration: BoxDecoration(
+                                        color: AppConfig.colorPrimary,
+                                        borderRadius: BorderRadius.circular(5)),
+                                    child: Column(
+                                      children: [
+                                        SizedBox(
+                                          height: 7,
+                                        ),
+                                        Text(
+                                          'EMPTY BOTTLE',
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize:
+                                                  AppConfig.textCaption3Size),
+                                        ),
+                                        Text(emptyBottle.toString(),
+                                            style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize:
+                                                    AppConfig.textCaption2Size))
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 5,
+                                  ),
+                                  Container(
+                                    height: SizeConfig.safeBlockVertical! * 7,
+                                    width:
+                                        SizeConfig.safeBlockHorizontal! * 30.52,
+                                    decoration: BoxDecoration(
+                                        color: AppConfig.colorPrimary,
+                                        borderRadius: BorderRadius.circular(5)),
+                                    child: Column(
+                                      children: [
+                                        SizedBox(
+                                          height: 7,
+                                        ),
+                                        Text(
+                                          'CASH IN HAND',
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize:
+                                                  AppConfig.textCaption3Size),
+                                        ),
+                                        Text(cashInHand.toStringAsFixed(2),
+                                            style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize:
+                                                    AppConfig.textCaption2Size))
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(
+                                height: SizeConfig.safeBlockVertical! * 3,
+                              ),
+                              Container(
+                                height: SizeConfig.safeBlockVertical! * 37,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                    color: AppConfig.colorPrimary,
+                                    borderRadius: BorderRadius.circular(8)),
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Padding(
+                                          padding: EdgeInsets.symmetric(
+                                              horizontal: 10),
+                                          child: Column(
+                                            children: [
+                                              SizedBox(
+                                                height: SizeConfig
+                                                        .safeBlockVertical! *
+                                                    2,
+                                              ),
+                                              Container(
+                                                padding: EdgeInsets.symmetric(
+                                                    horizontal: SizeConfig
+                                                            .blockSizeHorizontal! *
+                                                        8,
+                                                    vertical: SizeConfig
+                                                            .blockSizeVertical! *
+                                                        1.2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.indigo.shade300,
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                                child: Text(
+                                                  'CASH SALES', // Show the current date
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                              SizedBox(
+                                                height: 15,
+                                              ),
+                                              dataMap.isEmpty
+                                                  ? const Center(child: CircularProgressIndicator())
+                                              :Container(
+                                                height: SizeConfig
+                                                        .safeBlockVertical! *
+                                                    24,
+                                                width: SizeConfig
+                                                        .safeBlockHorizontal! *
+                                                    50,
+                                                child: PieChart(
+                                                  dataMap: dataMap,
+                                                  colorList: colorList,
+                                                  chartRadius:
+                                                      MediaQuery.of(context)
+                                                              .size
+                                                              .width *
+                                                          .5,
+                                                  centerText: "",
+                                                  chartValuesOptions:
+                                                      ChartValuesOptions(
+                                                    showChartValues: true,
+                                                    showChartValuesInPercentage:
+                                                        false,
+                                                    showChartValuesOutside: false,
+                                                    chartValueStyle: TextStyle(
+                                                      color: Colors.black,
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  ringStrokeWidth: 30,
+                                                  legendOptions: LegendOptions(
+                                                      showLegends: false),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            // SizedBox(height: 10,),
+                                            Text(
+                                              'CREDIT SALES',
+                                              style: TextStyle(
+                                                  color: Colors.grey,
+                                                  fontWeight: FontWeight.w900),
+                                            ),
+                                            SizedBox(
+                                              height: 110,
+                                            ),
+                                            Row(
+                                              children: [
+                                                CircleAvatar(
+                                                  radius:
+                                                      10, // Size of the circle
+                                                  backgroundColor: Colors
+                                                      .greenAccent, // Green color for "Amount Pending"
+                                                ),
+                                                SizedBox(width: 10),
+                                                Text(
+                                                  'AMOUNT PENDING',
+                                                  style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 12),
+                                                ),
+                                              ],
+                                            ),
+                                            SizedBox(
+                                                height: 15), // Space between rows
+
+                                            // Amount Collected
+                                            Row(
+                                              children: [
+                                                CircleAvatar(
+                                                  radius:
+                                                      10, // Size of the circle
+                                                  backgroundColor: Colors
+                                                      .blue, // Blue color for "Amount Collected"
+                                                ),
+                                                SizedBox(width: 10),
+                                                Text(
+                                                  'AMOUNT COLLECTED',
+                                                  style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 12),
+                                                ),
+                                              ],
+                                            ),
+                                            SizedBox(
+                                                height: 15), // Space between rows
+
+                                            // Total Sales
+                                            Row(
+                                              children: [
+                                                CircleAvatar(
+                                                  radius:
+                                                      10, // Size of the circle
+                                                  backgroundColor: Colors
+                                                      .white, // White color for "Total Sales"
+                                                ),
+                                                SizedBox(width: 10),
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      'Total Sales: ',
+                                                      style: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 12),
+                                                    ),
+                                                    Text(
+                                                      totalSale
+                                                          .toStringAsFixed(2),
+                                                      style: TextStyle(
+                                                          color: Colors.white),
+                                                    )
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              )
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1150,6 +1168,9 @@ class _HomeScreenState extends State<HomeScreen> {
               break;
             case 'HomeorderScreen':
               Navigator.pushNamed(context, HomeorderScreen.routeName);
+              break;
+              case 'QuotationHome':
+              Navigator.pushNamed(context, QuotationHome.routeName);
               break;
             case 'StockName_RequestScreen':
               Navigator.pushNamed(context, StockName_RequestScreen.routeName);
@@ -1334,6 +1355,26 @@ class _HomeScreenState extends State<HomeScreen> {
             msg: "Van not allocated to this user");
       }
     }
+  }
+  Future<bool> _onWillPop() async {
+    return (await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Exit App'),
+        content: Text('Are you sure you want to exit the app?'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('NO'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('YES'),
+          ),
+        ],
+      ),
+    )) ??
+        false;
   }
 }
 

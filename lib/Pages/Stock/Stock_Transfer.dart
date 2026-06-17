@@ -29,6 +29,7 @@ class _StocKTransfer_InnerState extends State<StocKTransfer_Inner> {
   final TextEditingController barcodeController = TextEditingController();
   final TextEditingController productNameController = TextEditingController();
   final TextEditingController quantityController = TextEditingController();
+  final TextEditingController remarksController = TextEditingController();
   final TextEditingController unitNameController = TextEditingController();
   final FocusNode barcodeFocusNode = FocusNode();
 
@@ -81,6 +82,7 @@ class _StocKTransfer_InnerState extends State<StocKTransfer_Inner> {
         'expiry': product["expiry"]?.toString() ?? "",
         "user_id": AppState().userId.toString(),
         "van_id": AppState().vanId.toString(),
+        'remarks': remarksController.text.trim(),
       };
 
       final url = Uri.parse("http://68.183.92.8:3699/api/store-scan");
@@ -97,6 +99,7 @@ class _StocKTransfer_InnerState extends State<StocKTransfer_Inner> {
       print("📤 Immediate Post Data: $requestData");
 
       if (response.statusCode == 201) {
+        remarksController.clear();
         print("✅ Product posted successfully: ${product['name']}");
         // Product is already in savedProducts list, no need to add again
       } else {
@@ -125,10 +128,11 @@ class _StocKTransfer_InnerState extends State<StocKTransfer_Inner> {
     if (value.isEmpty) return;
 
     try {
-      print("🔹 Scanned barcode: $value");
+      print("🔹 Scanned input: $value");
+
+      // 1. Check if it's QR format (product_id=...;unit=...)
       final parts = value.split(';');
       final Map<String, String> dataMap = {};
-
       for (var part in parts) {
         final keyValue = part.split('=');
         if (keyValue.length == 2) {
@@ -137,93 +141,69 @@ class _StocKTransfer_InnerState extends State<StocKTransfer_Inner> {
       }
 
       final productId = dataMap['product_id'];
-      final unit = dataMap['unit'];
-      final batch = dataMap['batch'];
-      final expiry = dataMap['expiry'];
+      final unitId = dataMap['unit'];
 
-      if (productId != null && unit != null) {
-        final url = Uri.parse(
-          "http://68.183.92.8:3699/api/scan-qr?product_id=$productId&unit=$unit",
-        );
+      Uri url;
+      if (productId != null && unitId != null) {
+        // Use QR API
+        url = Uri.parse("http://68.183.92.8:3699/api/scan-qr?product_id=$productId&unit=$unitId");
+      } else {
+        // Treat as normal barcode
+        url = Uri.parse("http://68.183.92.8:3699/api/stock-transfer/scan-barcode?scanData=$value");
+      }
 
-        final response = await http.get(url);
-        print("🔹 Scan-QR API Response: ${response.body}");
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        if (result["status"] == true) {
+          int enteredQty = int.tryParse(quantityController.text.trim()) ?? 1;
+          if (enteredQty <= 0) enteredQty = 1;
 
-        if (response.statusCode == 200) {
-          final result = jsonDecode(response.body);
+          final Map<String, dynamic> product = {
+            'id': result['product_id'] ?? '',
+            'name': result['product_name'] ?? '',
+            'unit_name': result['unit_name'] ?? '',
+            'unit_id': result['unit'] ?? '',
+            'quantity': enteredQty,
+            'code': result['product_id'] ?? '',
+            'batch': dataMap['batch'] ?? '',
+            'expiry': dataMap['expiry'] ?? '',
+            'type_name': "Scanned",
+          };
 
-          if (result["status"] == true) {
-            final data = result;
+          setState(() {
+            savedProducts.insert(0, product); // Add to top of list
+            productNameController.text = result['product_name'] ?? '';
+            unitNameController.text = result['unit_name'] ?? '';
+          });
 
-            // Get quantity (use entered quantity or default to 1)
-            int enteredQty = int.tryParse(quantityController.text.trim()) ?? 1;
-            if (enteredQty <= 0) enteredQty = 1; // Ensure at least 1
+          await postScannedProductImmediately(product);
 
-            // Create product object
-            final Map<String, dynamic> product = {
-              'id': data['product_id'] ?? '',
-              'name': data['product_name'] ?? '',
-              'unit_name': data['unit_name'] ?? '',
-              'unit_id': data['unit'] ?? '',
-              'quantity': enteredQty,
-              'code': data['product_id'] ?? '',
-              'batch': batch ?? '',
-              'expiry': expiry ?? '',
-              'type_name': "Scanned",
-            };
+          barcodeController.clear();
+          FocusScope.of(context).requestFocus(barcodeFocusNode);
 
-            // Add to UI list immediately
-            setState(() {
-              savedProducts.add(product);
-              productNameController.text = data['product_name'] ?? '';
-              unitNameController.text = data['unit_name'] ?? '';
-            });
-
-            // Post immediately to API
-            await postScannedProductImmediately(product);
-
-            // Clear and reset for next scan
-            barcodeController.clear();
-            FocusScope.of(context).requestFocus(barcodeFocusNode);
-
-            // Reset quantity to 1 for next scan
-            Future.delayed(const Duration(milliseconds: 100), () {
-              quantityController.text = '1';
-            });
-
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result["message"] ?? "Invalid product data"),
-                backgroundColor: Colors.redAccent,
-              ),
-            );
-          }
+          // Reset quantity for next scan
+          Future.delayed(const Duration(milliseconds: 100), () {
+            quantityController.text = '1';
+          });
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Error: ${response.statusCode}"),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
+          _showError(result["message"] ?? "Product not found");
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Invalid QR format"),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        _showError("Error: ${response.statusCode}");
       }
     } catch (e) {
-      print("Error during barcode scan: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Something went wrong: $e"),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      _showError("Something went wrong: $e");
     }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
   }
 
   void _handleQRScannerResult(Map<String, dynamic> result) async {
@@ -401,6 +381,17 @@ class _StocKTransfer_InnerState extends State<StocKTransfer_Inner> {
                 // readOnly: true,
                 decoration: InputDecoration(
                   labelText: "Quantity",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              SizedBox(height: 12.h),
+              TextFormField(
+                controller: remarksController,
+                // readOnly: true,
+                decoration: InputDecoration(
+                  labelText: "Remarks",
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),

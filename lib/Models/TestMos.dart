@@ -356,7 +356,7 @@ class User {
     _departmentId = json['department_id'];
     _designationId = json['designation_id'];
     _storeId = json['store_id'];
-    _rolId = json['rol_id'];
+    _rolId = json['app_rol_id'];
     _createdAt = json['created_at'];
     _updatedAt = json['updated_at'];
   }
@@ -426,7 +426,7 @@ User copyWith({  int? id,
     map['department_id'] = _departmentId;
     map['designation_id'] = _designationId;
     map['store_id'] = _storeId;
-    map['rol_id'] = _rolId;
+    map['app_rol_id'] = _rolId;
     map['created_at'] = _createdAt;
     map['updated_at'] = _updatedAt;
     return map;

@@ -489,18 +489,18 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
                 ),
                 Row(
                   children: [
-                    Text(
-                      (data.customer != null && data.customer!.isNotEmpty)
-                          ? data.customer![0].code ?? ''
-                          : (data.customerdata != null)
-                          ? data.customerdata![0].code ?? ''
-                          : '',
-                      style: TextStyle(
-                        fontSize: AppConfig.textCaption3Size,
-                        fontWeight: AppConfig.headLineWeight,
-                      ),
-                    ),
-                    Text(' | '),
+                    // Text(
+                    //   (data.customer != null && data.customer!.isNotEmpty)
+                    //       ? data.customer![0].code ?? ''
+                    //       : (data.customerdata != null)
+                    //       ? data.customerdata![0].code ?? ''
+                    //       : '',
+                    //   style: TextStyle(
+                    //     fontSize: AppConfig.textCaption3Size,
+                    //     fontWeight: AppConfig.headLineWeight,
+                    //   ),
+                    // ),
+                    // Text(' | '),
                     Text(
                       overflow: TextOverflow.fade,
                       (data.customer != null && data.customer!.isNotEmpty)
@@ -750,7 +750,7 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
       }
 
       String logoUrl =
-          'http://68.183.92.8:3697/uploads/store/${invoice.data!.store![0].logo}';
+          'https://erpadmin.mobiz.ae/uploads/store/${invoice.data!.store![0].logo}';
       if (logoUrl.isNotEmpty) {
         final response = await http.get(Uri.parse(logoUrl));
         if (response.statusCode == 200) {
@@ -971,56 +971,14 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
         currentY += 15; // Move down for next line
       }
     }
-    // Invoice title ("TAX INVOICE") centered with line below
-    // final String invoiceTitle = invoice.data!.store![0].invoice_heading ?? 'TAX INVOICE';
-    // final PdfFont titleFont = PdfStandardFont(PdfFontFamily.helvetica, 16, style: PdfFontStyle.bold);
-    //
-    // page.graphics.drawString(
-    //   invoiceTitle,
-    //   titleFont,
-    //   bounds: Rect.fromLTWH(0, currentY + 20, pageWidth, 30),
-    //   format: PdfStringFormat(alignment: PdfTextAlignment.center),
-    // );
-
-    // final String email = '${invoice.data!.store![0].email ?? 'N/A'}';
-    // final PdfFont emailfont = PdfStandardFont(PdfFontFamily.helvetica, 12);
-    // final Size emailtextSize = emailfont.measureString(email);
-    // final double emailxPosition = (pageWidth - emailtextSize.width) / 2.0;
-    // final double emailyposition = 135;
-    // page.graphics.drawString(
-    //   email,
-    //   emailfont,
-    //   bounds: Rect.fromLTWH(emailxPosition, emailyposition, emailtextSize.width,
-    //       emailtextSize.height),
-    // );
-    //
-    // final String trn = 'TRN:${invoice.data!.store![0].trn ?? 'N/A'}';
-    // final PdfFont trnfont = PdfStandardFont(PdfFontFamily.helvetica, 12);
-    //
-    // final Size trntextSize = trnfont.measureString(trn);
-    // final double trnxPosition = (pageWidth - trntextSize.width) / 2.1;
-    // final double trnyPosition = 150;
-    //
-    // page.graphics.drawString(
-    //   trn,
-    //   trnfont,
-    //   bounds: Rect.fromLTWH(
-    //       trnxPosition, trnyPosition, trntextSize.width, trntextSize.height),
-    // );
     final String? name = invoice.data!.store![0].invoice_heading ?? '';
     final String text = '$name';
 
     final PdfFont font = PdfStandardFont(PdfFontFamily.helvetica, 15);
-
-    // Calculate the width of the text
     final Size textSize = font.measureString(text);
-
-    // Calculate the center position for the text
     final double xPosition = (pageWidth - textSize.width) / 2;
     final double yPosition =
-        165; // Adjust this as needed for vertical positioning
-
-    // Draw the centered text
+        165;
     page.graphics.drawString(
       text,
       font,

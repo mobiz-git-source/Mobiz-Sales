@@ -286,7 +286,8 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${code ?? ''} | ${cuname ?? ''} | ${payment ?? ''}',
+                    // '${code ?? ''} | '
+                        '${cuname ?? ''} | ${payment ?? ''}',
                     style:
                         const TextStyle(color: AppConfig.buttonDeactiveColor),
                   ),
@@ -828,28 +829,30 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
                       borderRadius: BorderRadius.circular(3),
                     ),
                   ),
-                  onPressed: (PaidAmount > 0 &&
-                              (PaidAmount - roundOff == allocatedAmount) ||
-                          getBalanceAmount() == 0.0 &&
-                              !isSaving &&
-                              selectedIndex !=
-                                  null && // Ensure selectedIndex is set
-                              enteredValues[selectedIndex!]
-                                  .isNotEmpty) // Check enteredValues
-                      ? () {
-                          setState(() {
-                            isSaving = true;
-                          });
-                          postCollectionData().then((_) {
-                            setState(() {
-                              isSaving = false;
-                            });
-                          }).catchError((error) {
-                            setState(() {
-                              isSaving = false;
-                            });
-                          });
-                        }
+                  onPressed: (!isSaving &&
+                      (
+                          (PaidAmount > 0 && (PaidAmount - roundOff == allocatedAmount)) ||
+                              (getBalanceAmount() == 0.0 &&
+                                  selectedIndex != null &&
+                                  enteredValues[selectedIndex!].isNotEmpty)
+                      ))
+                      ? () async {
+                    setState(() {
+                      isSaving = true;
+                    });
+
+                    try {
+                      await postCollectionData();
+                    } catch (e) {
+                      print(e);
+                    }
+
+                    if (mounted) {
+                      setState(() {
+                        isSaving = false;
+                      });
+                    }
+                  }
                       : null,
                   child: Text(
                     isSaving ? "Saving..." : "Save",

@@ -616,7 +616,7 @@ class User {
       departmentId: json['department_id'] ?? 0,
       designationId: json['designation_id'] ?? 0,
       storeId: json['store_id'] ?? 0,
-      rolId: json['rol_id'] ?? 0,
+      rolId: json['app_rol_id'] ?? 0,
       productionStore: json['production_store'],
       glId: json['gl_id'],
       createdAt: json['created_at'] ?? '',

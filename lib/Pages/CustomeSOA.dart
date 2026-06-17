@@ -1,5 +1,6 @@
 import 'dart:io';
-
+import 'package:image/image.dart' as img;
+import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/cupertino.dart';
@@ -10,6 +11,7 @@ import 'package:intl/intl.dart';
 import 'package:mobizapp/Models/appstate.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 import 'dart:convert';
 import 'package:pdf/widgets.dart' as pw;
@@ -40,62 +42,48 @@ String? code;
 String? payment;
 
 class _SOAState extends State<SOA> {
-  // Future<void> _generateAndPrintPdf1(List<Transaction> transactions, double opening, double closing) async {
-  //   final pdf = pw.Document();
-  //   double balance = opening;
-  //
-  //   pdf.addPage(
-  //     pw.Page(
-  //       build: (pw.Context context) {
-  //         return pw.Column(
-  //           crossAxisAlignment: pw.CrossAxisAlignment.start,
-  //           children: [
-  //             pw.Text(
-  //               'Statement of Accounts',
-  //               style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
-  //             ),
-  //             pw.SizedBox(height: 20),
-  //             pw.Text(
-  //               "$code | $name | $payment",
-  //               style: pw.TextStyle(fontSize: 15, ),
-  //             ),
-  //             pw.SizedBox(height: 20),
-  //             pw.Text(
-  //               'Opening Balance: ${opening.toStringAsFixed(2)}',
-  //               style: pw.TextStyle(fontSize: 15),
-  //             ),
-  //             pw.SizedBox(height: 10),
-  //             pw.Table.fromTextArray(
-  //               headers: ['Date', 'Reference', 'Amount', 'Payment', 'Balance'],
-  //               data: List<List<String>>.generate(transactions.length, (index) {
-  //                 final transaction = transactions[index];
-  //                 double amount = transaction.receipt ?? 0.0;
-  //                 double payment = transaction.receipt ?? 0.0;
-  //                 balance += amount;
-  //                 balance -= payment;
-  //
-  //                 return [
-  //                   transaction.inDate.toString(),
-  //                   transaction.invoiceNo,
-  //                   amount.toStringAsFixed(2),
-  //                   payment.toStringAsFixed(2),
-  //                   balance.toStringAsFixed(2),
-  //                 ];
-  //               }),
-  //             ),
-  //             pw.SizedBox(height: 10),
-  //             pw.Text(
-  //               'Closing Balance: ${closing.toStringAsFixed(2)}',
-  //               style: pw.TextStyle(fontSize: 15),
-  //             ),
-  //           ],
-  //         );
-  //       },
-  //     ),
-  //   );
-  //
-  //   await Printing.layoutPdf(onLayout: (format) async => pdf.save());
-  // }
+
+  List<BluetoothDevice> _devices = [];
+  BluetoothDevice? _selectedDevice;
+  bool _connected = false;
+  BlueThermalPrinter printer = BlueThermalPrinter.instance;
+
+  void _initPrinter() async {
+    bool? isConnected = await printer.isConnected;
+    if (isConnected!) {
+      setState(() {
+        _connected = true;
+      });
+    }
+    _getBluetoothDevices();
+  }
+
+  void _getBluetoothDevices() async {
+    List<BluetoothDevice> devices = await printer.getBondedDevices();
+    BluetoothDevice? defaultDevice;
+    final prefs = await SharedPreferences.getInstance();
+    final savedDeviceAddress = prefs.getString('selected_device_address');
+    for (BluetoothDevice device in devices) {
+      if (device.address == savedDeviceAddress) {
+        defaultDevice = device;
+        break;
+      }
+    }
+    setState(() {
+      _devices = devices;
+      _selectedDevice = defaultDevice;
+    });
+  }
+
+  Future<void> _connect() async {
+    if (_selectedDevice != null) {
+      await printer.connect(_selectedDevice!);
+      setState(() {
+        _connected = true;
+      });
+    }
+  }
+
   void sortDataByDate(List<List<dynamic>> data) {
     data.sort((a, b) {
       DateTime dateA = DateTime.parse(a[0]);
@@ -110,10 +98,10 @@ class _SOAState extends State<SOA> {
     if (response.statusCode == 200) {
       // Parse JSON response into StoreDetail object
       StoreDetail storeDetail =
-          StoreDetail.fromJson(json.decode(response.body));
+      StoreDetail.fromJson(json.decode(response.body));
 
       final pdf = pw.Document();
-      double balance = opening;
+
       final String api =
           '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
       final logoResponse = await http.get(Uri.parse(api));
@@ -126,7 +114,7 @@ class _SOAState extends State<SOA> {
           ? "Address: ${storeDetail.address}, "
           : "";
       String countryText =
-          storeDetail.country != null ? "${storeDetail.country}" : "";
+      storeDetail.country != null ? "${storeDetail.country}" : "";
 
       pdf.addPage(
         pw.MultiPage(
@@ -156,14 +144,14 @@ class _SOAState extends State<SOA> {
                             ]
                         ),
                         pw.Column(
-                          children: [
-                            pw.Image(
-                              pw.MemoryImage(logoBytes),
-                              height: 100,
-                              width: 150,
-                              fit: pw.BoxFit.fitWidth,
-                            ),
-                          ]
+                            children: [
+                              pw.Image(
+                                pw.MemoryImage(logoBytes),
+                                height: 100,
+                                width: 150,
+                                fit: pw.BoxFit.fitWidth,
+                              ),
+                            ]
                         ),
                       ],
                     ),
@@ -190,7 +178,7 @@ class _SOAState extends State<SOA> {
                             width: 300,
                             child: pw.Text(
                               overflow: pw.TextOverflow.span,
-                              "Customer : ${code} | ${name}",
+                              "${name}",
                               style: pw.TextStyle(
                                 fontSize: 15,
                               ),
@@ -200,21 +188,12 @@ class _SOAState extends State<SOA> {
                             width: 300,
                             child: pw.Text(
                               overflow: pw.TextOverflow.span,
-                              "Address : $address",
+                              "$address",
                               style: pw.TextStyle(
                                 fontSize: 15,
                               ),
                             ),
                           ),
-                          // if (addressText.isNotEmpty || countryText.isNotEmpty)
-                          //   pw.SizedBox(width: 300,
-                          //     child: pw.Text(overflow: pw.TextOverflow.span,
-                          //       "${addressText.isNotEmpty ? addressText : ''} ${countryText.isNotEmpty ? countryText : ''}",
-                          //       style: pw.TextStyle(
-                          //         fontSize: 15,
-                          //       ),
-                          //     ),
-                          //   )
                         ],
                       ),
                       pw.Column(
@@ -266,12 +245,12 @@ class _SOAState extends State<SOA> {
                     ),
                     pw.Padding(
                       padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text('Amount',
+                      child: pw.Text('Debit',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                     ),
                     pw.Padding(
                       padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text('Payment',
+                      child: pw.Text('Credit',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                     ),
                     pw.Padding(
@@ -304,7 +283,7 @@ class _SOAState extends State<SOA> {
                     ),
                     pw.Padding(
                       padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text(balance.toStringAsFixed(2)),
+                      child: pw.Text(opening.toStringAsFixed(2)),
                     ),
                   ],
                 ),
@@ -312,17 +291,16 @@ class _SOAState extends State<SOA> {
                   int index = entry.key;
                   var row = entry.value;
 
-                  double amount =
-                      row[2] != null ? double.parse(row[2].toString()) : 0.0;
-                  double payment =
-                      row[3] != null ? double.parse(row[3].toString()) : 0.0;
-                  balance += amount;
-                  balance -= payment;
+                  // Use the balance from API (5th column - index 4)
+                  // Make sure to handle null cases
+                  double balance = row[4] != null
+                      ? double.parse(row[4].toString())
+                      : 0.0;
 
                   return pw.TableRow(
                     decoration: pw.BoxDecoration(
                       color:
-                          index % 2 == 0 ? PdfColors.white : PdfColors.grey200,
+                      index % 2 == 0 ? PdfColors.white : PdfColors.grey200,
                     ),
                     children: [
                       pw.Padding(
@@ -335,15 +313,19 @@ class _SOAState extends State<SOA> {
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(4),
-                        child: pw.Text(row[2].toString()),
+                        child: pw.Text(row[2] != null
+                            ? double.parse(row[2].toString()).toStringAsFixed(2)
+                            : "0.00",textAlign: pw.TextAlign.right),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(4),
-                        child: pw.Text(row[3].toString()),
+                        child: pw.Text(row[3] != null
+                            ? double.parse(row[3].toString()).toStringAsFixed(2)
+                            : "0.00",textAlign: pw.TextAlign.right),
                       ),
                       pw.Padding(
-                        padding: const pw.EdgeInsets.all(4),
-                        child: pw.Text(balance.toStringAsFixed(2)),
+                        padding:  pw.EdgeInsets.all(4),
+                        child: pw.Text(balance.toStringAsFixed(2),textAlign: pw.TextAlign.right),
                       ),
                     ],
                   );
@@ -390,6 +372,129 @@ class _SOAState extends State<SOA> {
     }
   }
 
+  void _printSOA(
+      StoreDetail store,
+      List<List<dynamic>> data,
+      double opening,
+      double closing,
+      ) async {
+    if (!_connected) {
+      await _connect();
+    }
+
+    // 1. Print LOGO
+    final logoUrl =
+        '${RestDatasource().Image_URL}/uploads/store/${store.logos}';
+    final response = await http.get(Uri.parse(logoUrl));
+
+    if (response.statusCode == 200) {
+      Uint8List imageBytes = response.bodyBytes;
+      img.Image? original = img.decodeImage(imageBytes);
+      if (original != null) {
+        img.Image mono = img.grayscale(original);
+        Uint8List finalLogo = Uint8List.fromList(img.encodePng(mono));
+        printer.printImageBytes(finalLogo);
+      }
+    }
+
+    printer.printNewLine();
+
+    // 2. Company Name + TRN + Address
+    printer.printCustom(store.name, 3, 1);
+    if (store.address != null) printer.printCustom(store.address!, 1, 1);
+    if (store.trn != null) printer.printCustom("TRN: ${store.trn}", 1, 1);
+
+    printer.printNewLine();
+
+    // 3. Title
+    printer.printCustom("STATEMENT OF ACCOUNTS", 2, 1);
+    printer.printCustom("-" * 68, 1, 1);
+
+    // 4. Customer + Date Range
+    printer.printCustom("Customer: $code | $name", 1, 0);
+    printer.printCustom("Address: $address", 1, 0);
+    printer.printCustom(
+        "From: ${DateFormat('dd MMM yyyy').format(_selectedDatefrom!)}", 1, 0);
+    printer.printCustom(
+        "To     : ${DateFormat('dd MMM yyyy').format(_selectedDateto!)}", 1, 0);
+
+    printer.printCustom("-" * 68, 1, 1);
+    const dateHeader = 'Date';
+    const refHeader = 'Ref';
+    const creditHeader = 'Credit';
+    const debitHeader = 'Debit';
+    const balHeader = 'Balance';
+
+    printer.printCustom(
+        '${dateHeader.padRight(12)}'
+            '${refHeader.padRight(8)}'
+            '${creditHeader.padLeft(9)}'
+            '${debitHeader.padLeft(9)}'
+            '${balHeader.padLeft(10)}',
+        1,
+        0);
+    printer.printCustom("-" * 68, 1, 0);
+
+    // 6. OPENING ROW
+    printer.printCustom(
+        "${''.padRight(10)} ${''.padRight(30)} ${''.padRight(7)} ${'Opening'.padRight(7)} ${opening.toStringAsFixed(2)}",
+        1,
+        0);
+
+    // 7. ALL ROWS - Use balance from API (index 4)
+    for (var row in data) {
+      String date = row[0].toString();
+      String ref = row[1].toString();
+      double amount = row[2] != null ? double.parse(row[2].toString()) : 0.0;
+      double payment = row[3] != null ? double.parse(row[3].toString()) : 0.0;
+      double balance = row[4] != null ? double.parse(row[4].toString()) : 0.0;
+
+      final dateStr = date.length > 12 ? date.substring(0, 12) : date;
+      final refStr = ref.length > 8 ? ref.substring(0, 8) : ref;
+
+      printer.printCustom(
+        '${dateStr.padRight(12)}'
+            '${refStr.padRight(8)}'
+            '${amount.toStringAsFixed(2).padLeft(9)}'
+            '${payment.toStringAsFixed(2).padLeft(9)}'
+            '${balance.toStringAsFixed(2).padLeft(10)}',
+        1,
+        0,
+      );
+    }
+
+    printer.printCustom("-" * 68, 1, 1);
+
+    // 8. CLOSING BALANCE
+    printer.printCustom(
+        "Closing Balance: ${closing.toStringAsFixed(2)}", 2, 1);
+
+    printer.printNewLine();
+
+    // FINAL CUT
+    printer.paperCut();
+  }
+
+
+  _generateAndPrintSOA(List data, double opening, double closing) async {
+    final response = await http.get(Uri.parse(
+        '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
+
+    if (response.statusCode == 200) {
+      StoreDetail storeDetail =
+      StoreDetail.fromJson(json.decode(response.body));
+
+      _printSOA(
+        storeDetail,
+        data.map<List<dynamic>>((e) => List<dynamic>.from(e)).toList(),
+        opening,
+        closing,
+      );
+    }
+  }
+
+
+
   bool isOutstandingSelected = true;
   List<Transaction> transactions = [];
 
@@ -403,13 +508,10 @@ class _SOAState extends State<SOA> {
   DateTime? _selectedDatefrom;
   DateTime? _selectedDateto;
 
-  // late List<Transaction> data;
-  // late double openingBalance;
-  // late double closingBalance;
-
   @override
   void initState() {
     super.initState();
+    _initPrinter();
     _selectedDatefrom = DateTime.now();
     _selectedDateto = DateTime.now();
     _refreshData();
@@ -443,12 +545,6 @@ class _SOAState extends State<SOA> {
     });
   }
 
-  // void _fetchtransactions() {
-  //   setState(() {
-  //     fetchTransactions();
-  //   });
-  // }
-
   Future<SOAResponse> fetchSOAData() async {
     final fromDate = _selectedDatefrom ?? DateTime.now();
     final toDate = _selectedDateto ?? DateTime.now();
@@ -470,44 +566,11 @@ class _SOAState extends State<SOA> {
     }
   }
 
-  // Future<void> fetchTransactions() async {
-  //   final fromDate = _selectedDatefrom ?? DateTime.now();
-  //   final toDate = _selectedDateto ?? DateTime.now();
-  //   final fromDateString = DateFormat('yyyy-MM-dd').format(fromDate);
-  //   final toDateString = DateFormat('yyyy-MM-dd').format(toDate);
-  //   var url = Uri.parse(
-  //      );
-  //
-  //   try {
-  //     var response = await http.get(url);
-  //     if (response.statusCode == 200) {
-  //       var jsonData = jsonDecode(response.body);
-  //       var transactionList = jsonData['data'] as List<dynamic>;
-  //       List<Transaction> tempTransactions =
-  //           transactionList.map((e) => Transaction.fromJson(e)).toList();
-  //
-  //       setState(() {
-  //         transactions = tempTransactions;
-  //       });
-  //     } else {
-  //       throw Exception('Failed to load transactions');
-  //     }
-  //   } catch (e) {
-  //     print('Error: $e');
-  //   }
-  // }
+
 
   @override
   Widget build(BuildContext context) {
-    // if (ModalRoute.of(context)!.settings.arguments != null) {
-    //   final Map<String, dynamic>? params =
-    //       ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
-    //   id = params!['customerId'];
-    //   name = params!['name'];
-    //   address = params['address'];
-    //   code = params!['code'];
-    //   payment = params!['paymentTerms'];
-    // }
+
     return Scaffold(
       appBar: AppBar(
         leading: GestureDetector(
@@ -550,7 +613,7 @@ class _SOAState extends State<SOA> {
                     Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: Text(
-                        "$code | $name | $payment",
+                        "$name | $payment",
                         style:
                             const TextStyle(color: Colors.grey, fontSize: 15),
                       ),
@@ -641,7 +704,8 @@ class _SOAState extends State<SOA> {
                             children: [
                               GestureDetector(
                                 onTap: () async {
-                                  await _generateAndPrintPdf(
+                                  print("object");
+                                  await _generateAndPrintSOA(
                                       data, opening, closing);
                                 },
                                 child: Icon(
@@ -650,6 +714,7 @@ class _SOAState extends State<SOA> {
                                   size: 30,
                                 ),
                               ),
+                              SizedBox(width: 20,),
                               GestureDetector(
                                 onTap: () async {
                                   await _generateAndPrintPdf(
@@ -746,8 +811,8 @@ class _SOAState extends State<SOA> {
                                   3: FlexColumnWidth(),
                                   4: FlexColumnWidth(),
                                 },
-                                children: [
-                                  const TableRow(
+                                children: const [
+                                  TableRow(
                                     children: [
                                       Padding(
                                         padding: EdgeInsets.symmetric(
@@ -768,13 +833,13 @@ class _SOAState extends State<SOA> {
                                             fontSize: 13),
                                       ),
                                       Text(
-                                        "Amount",
+                                        "Debit",
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 13),
                                       ),
                                       Text(
-                                        "Payment",
+                                        "Credit",
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 13),
@@ -835,34 +900,6 @@ class _SOAState extends State<SOA> {
                                     balance += amount;
                                     balance -= payment;
                                   }
-                                  // return Padding(
-                                  //   padding: const EdgeInsets.all(8.0),
-                                  //   child: Row(
-                                  //     mainAxisAlignment: MainAxisAlignment.end,
-                                  //     children: [
-                                  //       Row(
-                                  //         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                  //         children: [
-                                  //           Text(
-                                  //             "Closing Balance    ",
-                                  //             style: TextStyle(
-                                  //               fontSize: 15,
-                                  //             ),
-                                  //           ),
-                                  //           Text(
-                                  //             balance.toStringAsFixed(2),
-                                  //             style: TextStyle(
-                                  //               fontSize: 15,
-                                  //             ),
-                                  //           ),
-                                  //           SizedBox(
-                                  //             width: 40,
-                                  //           )
-                                  //         ],
-                                  //       ),
-                                  //     ],
-                                  //   ),
-                                  // );
                                 } else {
                                   final row = data[index - 1];
                                   double balance = opening;
@@ -883,15 +920,12 @@ class _SOAState extends State<SOA> {
                                   double payment = row[3] != null
                                       ? double.parse(row[3].toString())
                                       : 0.0;
-                                  // double babalance = row[5] != null
-                                  // ? double.parse(row[5].toString()):0.0;
-                                  // Adjust the balance
                                   balance += amount;
                                   balance -= payment;
 
                                   return Container(
                                     width: double.infinity,
-                                    height: 35,
+                                    height: 25,
                                     color: index % 2 == 0
                                         ? Colors.grey.shade200
                                         : Colors.white,
@@ -925,21 +959,21 @@ class _SOAState extends State<SOA> {
                                             Padding(
                                               padding: EdgeInsets.all(6.0),
                                               child: Text(
-                                                row[2].toString(),
+                                                row[2].toStringAsFixed(2),
                                                 style: TextStyle(fontSize: 13),
                                               ),
                                             ),
                                             Padding(
                                               padding: EdgeInsets.all(6.0),
                                               child: Text(
-                                                row[3].toString(),
+                                                row[3].toStringAsFixed(2),
                                                 style: TextStyle(fontSize: 13),
                                               ),
                                             ),
                                             Padding(
                                               padding: EdgeInsets.all(6.0),
                                               child: Text(
-                                                row[4].toString(),
+                                                row[4].toStringAsFixed(2),
                                                 style: TextStyle(fontSize: 13),
                                               ),
                                             ),
@@ -1010,13 +1044,13 @@ class _SOAState extends State<SOA> {
                                             fontSize: 13),
                                       ),
                                       Text(
-                                        "Amount",
+                                        "Debit",
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 13),
                                       ),
                                       Text(
-                                        "Payment",
+                                        "Credit",
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 13),
@@ -1079,34 +1113,6 @@ class _SOAState extends State<SOA> {
                                     balance += amount;
                                     balance -= payment;
                                   }
-                                  // return Padding(
-                                  //   padding: const EdgeInsets.all(8.0),
-                                  //   child: Row(
-                                  //     mainAxisAlignment: MainAxisAlignment.end,
-                                  //     children: [
-                                  //       Row(
-                                  //         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                  //         children: [
-                                  //           Text(
-                                  //             "Closing Balance    ",
-                                  //             style: TextStyle(
-                                  //               fontSize: 15,
-                                  //             ),
-                                  //           ),
-                                  //           Text(
-                                  //             balance.toStringAsFixed(2),
-                                  //             style: TextStyle(
-                                  //               fontSize: 15,
-                                  //             ),
-                                  //           ),
-                                  //           SizedBox(
-                                  //             width: 40,
-                                  //           )
-                                  //         ],
-                                  //       ),
-                                  //     ],
-                                  //   ),
-                                  // );
                                 } else {
                                   final row = data[index - 1];
                                   double balance = opening;
@@ -1120,14 +1126,12 @@ class _SOAState extends State<SOA> {
                                     balance += amount;
                                     balance -= payment;
                                   }
-                                  // Get current row's amount and payment
                                   double amount = row[2] != null
                                       ? double.parse(row[2].toString())
                                       : 0.0;
                                   double payment = row[3] != null
                                       ? double.parse(row[3].toString())
                                       : 0.0;
-                                  // Adjust the balance
                                   balance += amount;
                                   balance -= payment;
 
@@ -1234,19 +1238,6 @@ class _SOAState extends State<SOA> {
                     CommonWidgets.loadingContainers(
                         height: SizeConfig.blockSizeVertical * 60,
                         width: SizeConfig.blockSizeHorizontal * 90),
-
-                    // CommonWidgets.loadingContainers(
-                    //     height: SizeConfig.blockSizeVertical * 10,
-                    //     width: SizeConfig.blockSizeHorizontal * 90),
-                    // CommonWidgets.loadingContainers(
-                    //     height: SizeConfig.blockSizeVertical * 10,
-                    //     width: SizeConfig.blockSizeHorizontal * 90),
-                    // CommonWidgets.loadingContainers(
-                    //     height: SizeConfig.blockSizeVertical * 10,
-                    //     width: SizeConfig.blockSizeHorizontal * 90),
-                    // CommonWidgets.loadingContainers(
-                    //     height: SizeConfig.blockSizeVertical * 10,
-                    //     width: SizeConfig.blockSizeHorizontal * 90),
                   ],
                 ),
               ),

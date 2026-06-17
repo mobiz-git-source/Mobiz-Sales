@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:mobizapp/Models/appstate.dart';
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
@@ -17,6 +18,13 @@ class _ScannerScreenState extends State<ScannerScreen> {
     facing: CameraFacing.back,
   );
 
+  @override
+  void dispose() {
+    _cameraController.dispose();
+    super.dispose();
+  }
+
+  // Existing QR Fetching Logic
   Future<void> fetchProduct({
     required String productId,
     required String unit,
@@ -36,7 +44,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
         if (data["status"] == true) {
           data["batch"] = batch ?? "";
           data["expiry"] = expiry ?? "";
-          Navigator.pop(context, data,); // ✅ Return scanned data to previous page
+          if (mounted) Navigator.pop(context, data);
         } else {
           _showError("Invalid product QR code");
         }
@@ -46,12 +54,42 @@ class _ScannerScreenState extends State<ScannerScreen> {
     } catch (e) {
       _showError("Error: $e");
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> fetchBarcodeProduct(String barcode) async {
+    setState(() => isLoading = true);
+
+    final url = Uri.parse(
+      "http://68.183.92.8:3699/api/stock-transfer/scan-barcode?scanData=$barcode&store_id=${AppState().storeId}&user_id=${AppState().userId}",
+    );
+
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data["status"] == true) {
+          // Barcodes usually don't have batch/expiry encoded
+          data["batch"] = "";
+          data["expiry"] = "";
+          if (mounted) Navigator.pop(context, data);
+        } else {
+          _showError("Product not found for barcode: $barcode");
+        }
+      } else {
+        _showError("Failed: ${response.statusCode}");
+      }
+    } catch (e) {
+      _showError("Error: $e");
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
   void _showError(String message) async {
     _cameraController.stop();
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -60,7 +98,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
       ),
     );
     await Future.delayed(const Duration(seconds: 2));
-    _cameraController.start();
+    if (mounted) _cameraController.start();
   }
 
   @override
@@ -79,9 +117,9 @@ class _ScannerScreenState extends State<ScannerScreen> {
                   final String? code = barcode.rawValue;
                   if (code == null) continue;
 
-                  print("🔹 Scanned QR/Barcode: $code");
+                  print("🔹 Scanned Code: $code");
 
-                  // ✅ Parse the format: product_id=10213;unit=149;batch=1;expiry=2025-09-30
+                  // 1. Try to parse as QR format: product_id=10213;unit=149;batch=1;expiry=2025-09-30
                   final parts = code.split(';');
                   final Map<String, String> dataMap = {};
 
@@ -94,20 +132,22 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
                   final productId = dataMap['product_id'];
                   final unit = dataMap['unit'];
-                  final batch = dataMap['batch'];
-                  final expiry = dataMap['expiry'];
 
                   if (productId != null && unit != null) {
+                    // ✅ Successfully identified as QR format
                     _cameraController.stop();
                     await fetchProduct(
                       productId: productId,
                       unit: unit,
-                      batch: batch,
-                      expiry: expiry,
+                      batch: dataMap['batch'],
+                      expiry: dataMap['expiry'],
                     );
                     break;
                   } else {
-                    _showError("Invalid QR format");
+                    // 2. Treat as standard Barcode
+                    _cameraController.stop();
+                    await fetchBarcodeProduct(code);
+                    break;
                   }
                 }
               },
@@ -119,7 +159,15 @@ class _ScannerScreenState extends State<ScannerScreen> {
             )
           else
             const Expanded(
-              child: Center(child: Text("Scan a QR code to fetch product")),
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text(
+                    "Scan a QR code or Barcode to fetch product",
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
             ),
         ],
       ),

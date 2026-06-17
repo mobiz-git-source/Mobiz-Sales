@@ -47,24 +47,19 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
     String productUrl = '${RestDatasource().Product_URL}/uploads/customer/$img';
     String baseUrl = '${RestDatasource().BASE_URL}/uploads/customer/$img';
 
-    // Try loading the image from the product URL first
     try {
       final response = await http.head(Uri.parse(productUrl));
       if (response.statusCode == 200) {
         return productUrl;
       }
-    } catch (e) {
-      // Log error if needed
-    }
+    } catch (e) {}
 
-    // If the product URL fails, try loading from the base URL
     try {
       final response = await http.head(Uri.parse(baseUrl));
       if (response.statusCode == 200) {
         return baseUrl;
       }
-    } catch (e) {
-    }
+    } catch (e) {}
     throw Exception('Image not found');
   }
 
@@ -117,7 +112,6 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
   int? id;
   String? _selectedRoute;
   String? _selectCuCode;
-  // String? _selectedProvince;
   int? _selectedProvinceid;
   int? _selectedrouteid;
 
@@ -126,18 +120,12 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
   CustomerCodeModel cuCode = CustomerCodeModel();
 
   final List<String> paymentTerms = ['CASH', 'CREDIT', 'BILLTOBILL'];
-  // final List<String> routes = ['a'];
-  final List<Map<String, dynamic>> routes = [
-    {'id': 1, 'name': 'routes 1'},
-    {'id': 2, 'name': 'routes 2'},
-  ];
-  final List<Map<String, dynamic>> provinces = [
-    {'id': 1, 'name': 'Province 1'},
-    {'id': 3, 'name': 'Province 2'},
-  ];
-  final List<String> cuCodeData = [
-    'Province 1',
-  ];
+
+  // ✅ Removed hardcoded initial data
+  final List<Map<String, dynamic>> routes = [];
+  final List<Map<String, dynamic>> provinces = [];
+  final List<String> cuCodeData = [];
+
   @override
   void initState() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -158,8 +146,6 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
             params['paymentTerms'] == '' ? null : params['paymentTerms'];
         _selectedProvinceid =
             params['provinceId'] == 0 ? null : params['provinceId'];
-        print('object');
-        print(params['provinceId']);
         _selectedrouteid = params['routeId'];
         id = params['id'];
         if (params['credit_days'] != null && params['credit_days'] != '') {
@@ -171,7 +157,6 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
         _emailController.text = params['email'] ?? '';
         _isUpdate = true;
       }
-      print("Code${_customercode}");
     });
     namefocus = FocusNode();
     addressfocus = FocusNode();
@@ -190,18 +175,14 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
         .then((storeDetail) {
       if (storeDetail != null && storeDetail.comapny_id == 5) {
         setState(() {
-          showFields = true; // Show fields for company_id 5
+          showFields = true;
         });
       } else {
         setState(() {
-          showFields = false; // Hide fields otherwise
+          showFields = false;
         });
       }
-      print("SSSSS${storeDetail!.comapny_id}");
     });
-    // fetchStoreDetail();
-    // _getProvince();
-    // print(_selectPaymentTerms);
   }
 
   @override
@@ -231,32 +212,6 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
 
   @override
   Widget build(BuildContext context) {
-    // if (ModalRoute.of(context)!.settings.arguments != null) {
-    //   final Map<String, dynamic>? params =
-    //   ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
-    //   _nameController.text = params!['name'] ?? '';
-    //   _customercode = params['code'];
-    //   _addressController.text = params['address'] ?? '';
-    //   _contactNumberController.text = params['phone'] ?? '';
-    //   _whatsappNumberController.text = params['whatsappNumber'] ?? '';
-    //   _trnController.text = params['trn'] ?? '';
-    //   _location = params['location'] ?? 'Click the icon to fetch the data';
-    //   _selectPaymentTerms = params['paymentTerms'] ?? '';
-    //   _selectedProvinceid = params['provinceId'];
-    //   _selectedrouteid = params['routeId'];
-    //   id = params['id'];
-    //   if (params['credit_days'] != null && params['credit_days'] != '') {
-    //     _creditDays.text = params['credit_days'].toString();
-    //   }
-    //   if (params['credit_limit'] != null && params['credit_limit'] != '') {
-    //     _creditLimit.text = params['credit_limit'].toString();
-    //   }
-    //
-    //   _emailController.text = params['email'] ?? '';
-    //   // print(_trnController.text);
-    //   // print('dddddddddddddddddddddddddddddddddddddd');
-    //   _isUpdate = true;
-    // }
     return Scaffold(
         appBar: AppBar(
             title: const Text(
@@ -324,7 +279,7 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
                                               image: FileImage(_image!),
                                               fit: BoxFit.cover,
                                             )
-                                          : null, // Set image only when _image is available
+                                          : null,
                                     ),
                                     child: _image == null
                                         ? (img != null && img!.isNotEmpty)
@@ -417,60 +372,31 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
                                       _validateNotEmpty(value, 'Name'),
                                 ),
                                 CommonWidgets.verticalSpace(2),
-                                // _buildDropdownField(
-                                //   label: 'Code',
-                                //   items: cuCodeData,
-                                //   value: _selectCuCode,
-                                //   onChanged: (value) {
-                                //     setState(() {
-                                //       _selectCuCode = value;
-                                //     });
-                                //   },
-                                // ),
-                                TextFormField(
-                                  style: TextStyle(color: Colors.black),
-                                  enabled: false, // Disable user interaction
-                                  controller: TextEditingController(
-                                    text: _isUpdate
-                                        ? _customercode
-                                        : cuCodeData.isNotEmpty
-                                            ? cuCodeData
-                                                .map((data) => data.toString())
-                                                .join(
-                                                    ', ') // Join elements with a comma
-                                            : '',
-                                  ),
-                                  decoration: InputDecoration(
-                                    focusedBorder: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                          color: AppConfig.colorPrimary),
-                                    ),
-                                    disabledBorder: OutlineInputBorder(
-                                        borderSide:
-                                            BorderSide(color: Colors.grey)),
-                                    labelText: 'Code',
-                                    border: OutlineInputBorder(),
-                                    // Add style for text color
-                                    labelStyle: TextStyle(
-                                        color: Colors
-                                            .black), // Change label text color
-                                    hintStyle: TextStyle(color: Colors.black),
-                                  ),
-                                ),
-
                                 // TextFormField(
-                                //   controller: _codeController,
+                                //   style: const TextStyle(color: Colors.black),
+                                //   enabled: false,
+                                //   controller: TextEditingController(
+                                //     text: _isUpdate
+                                //         ? _customercode
+                                //         : cuCodeData.isNotEmpty
+                                //             ? cuCodeData.join(', ')
+                                //             : '',
+                                //   ),
                                 //   decoration: const InputDecoration(
                                 //     focusedBorder: OutlineInputBorder(
-                                //         borderSide: BorderSide(
-                                //             color: AppConfig.colorPrimary)),
+                                //       borderSide: BorderSide(
+                                //           color: AppConfig.colorPrimary),
+                                //     ),
+                                //     disabledBorder: OutlineInputBorder(
+                                //         borderSide:
+                                //             BorderSide(color: Colors.grey)),
                                 //     labelText: 'Code',
                                 //     border: OutlineInputBorder(),
+                                //     labelStyle: TextStyle(color: Colors.black),
+                                //     hintStyle: TextStyle(color: Colors.black),
                                 //   ),
-                                //   validator: (value) =>
-                                //       _validateNotEmpty(value, 'Code'),
                                 // ),
-                                CommonWidgets.verticalSpace(2),
+                                // CommonWidgets.verticalSpace(2),
                                 TextFormField(
                                   focusNode: addressfocus,
                                   onEditingComplete: () {
@@ -490,10 +416,9 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
                                 CommonWidgets.verticalSpace(2),
                                 if (showFields) ...[
                                   TextFormField(
-                                    // keyboardType: TextInputType.phone,
                                     focusNode: buildingfocus,
                                     onEditingComplete: () {
-                                      buildingfocus.requestFocus();
+                                      flatfocus.requestFocus();
                                     },
                                     controller: _buildingController,
                                     decoration: const InputDecoration(
@@ -503,15 +428,12 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
                                       labelText: 'Building',
                                       border: OutlineInputBorder(),
                                     ),
-                                    // validator: (value) => _validateNotEmpty(
-                                    //     value, 'Building'),
                                   ),
                                   CommonWidgets.verticalSpace(2),
                                   TextFormField(
-                                    // keyboardType: TextInputType.phone,
                                     focusNode: flatfocus,
                                     onEditingComplete: () {
-                                      flatfocus.requestFocus();
+                                      contactfocus.requestFocus();
                                     },
                                     controller: _flatNumberController,
                                     decoration: const InputDecoration(
@@ -521,12 +443,9 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
                                       labelText: 'Flat Number',
                                       border: OutlineInputBorder(),
                                     ),
-                                    // validator: (value) => _validateNotEmpty(
-                                    //     value, 'Flat Number'),
                                   ),
                                   CommonWidgets.verticalSpace(2),
                                 ],
-                                // CommonWidgets.verticalSpace(2),
                                 TextFormField(
                                   keyboardType: TextInputType.phone,
                                   focusNode: contactfocus,
@@ -579,31 +498,22 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
                                   validator: _validateEmail,
                                 ),
                                 CommonWidgets.verticalSpace(2),
-                                // decoration: const InputDecoration(
-                                //   focusedBorder: OutlineInputBorder(
-                                //       borderSide: BorderSide(
-                                //           color: AppConfig.colorPrimary)),
-                                //   labelText: 'Address',
-                                //   border: OutlineInputBorder(),
-                                // ),
                                 TextField(
                                   controller: _locationController,
-                                  readOnly:
-                                      true, // Make the text field read-only
+                                  readOnly: true,
                                   decoration: InputDecoration(
-                                    border: OutlineInputBorder(
+                                    border: const OutlineInputBorder(
                                         borderSide: BorderSide(
                                             color: AppConfig.colorPrimary)),
-                                    focusedBorder: OutlineInputBorder(
+                                    focusedBorder: const OutlineInputBorder(
                                         borderSide: BorderSide(
                                             color: AppConfig.colorPrimary)),
                                     hintText: _location,
                                     suffixIcon: IconButton(
-                                      icon: Icon(Icons.my_location),
+                                      icon: const Icon(Icons.my_location),
                                       onPressed: _getLocation,
                                     ),
                                   ),
-                                  // onTap: _openMapScreen,
                                 ),
                                 CommonWidgets.verticalSpace(2),
                                 TextFormField(
@@ -674,12 +584,12 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
                                   selectedValue: _selectedrouteid != null
                                       ? routes.firstWhere(
                                         (element) => element['id'] == _selectedrouteid,
-                                    orElse: () => {} // Return null if no match is found
+                                    orElse: () => {}
                                   )
                                       : null,
                                   onChanged: (selectedroute) {
                                     setState(() {
-                                      _selectedrouteid = selectedroute?['id']; // Safely handle null values
+                                      _selectedrouteid = selectedroute?['id'];
                                     });
                                   },
                                   hint: 'Select Routes',
@@ -692,7 +602,7 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
                                   selectedValue: _selectedProvinceid != null
                                       ? provinces.firstWhere(
                                         (element) => element['id'] == _selectedProvinceid,
-                                    orElse: () => {}, // Return null if no match is found
+                                    orElse: () => {},
                                   )
                                       : null,
                                   onChanged: (selectedProvince) {
@@ -703,24 +613,6 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
                                   hint: 'Select Province',
                                   label: 'Province',
                                 ),
-
-                                // CustomDropdown(
-                                //   items: provinces,
-                                //   selectedValue: _selectedProvinceid != null
-                                //       ? provinces.firstWhere(
-                                //         (element) => element['id'] == _selectedProvinceid,
-                                //     orElse: () => {'id': null, 'name': 'Unknown'}, // Return a default map
-                                //   )
-                                //       : {'id': null, 'name': 'Select a province'}, // Default value when null
-                                //   onChanged: (selectedProvince) {
-                                //     setState(() {
-                                //       _selectedProvinceid = selectedProvince!['id'];
-                                //     });
-                                //     // print(_selectedProvinceid);
-                                //   },
-                                //   hint: 'Select Province',
-                                //   label: 'Province',
-                                // ),
                                 const SizedBox(height: 16),
                                 SizedBox(
                                   width: SizeConfig.blockSizeHorizontal * 35,
@@ -733,18 +625,27 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
                                         ),
                                       ),
                                       backgroundColor: WidgetStatePropertyAll(
-                                        _isLoading ? Colors.grey : AppConfig.colorPrimary, // Disable button color
+                                        _isLoading ? Colors.grey : AppConfig.colorPrimary,
                                       ),
                                     ),
-                                    onPressed: _isLoading ? null : _submitForm, // Disable button when loading
-                                    child: Text(
-                                      _isUpdate ? 'UPDATE' : 'CREATE',
-                                      style: TextStyle(
-                                        fontSize: AppConfig.textCaption3Size,
-                                        color: AppConfig.backgroundColor,
-                                        fontWeight: AppConfig.headLineWeight,
-                                      ),
-                                    ),
+                                    onPressed: _isLoading ? null : _submitForm,
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            height: 20,
+                                            width: 20,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : Text(
+                                            _isUpdate ? 'UPDATE' : 'CREATE',
+                                            style: TextStyle(
+                                              fontSize: AppConfig.textCaption3Size,
+                                              color: AppConfig.backgroundColor,
+                                              fontWeight: AppConfig.headLineWeight,
+                                            ),
+                                          ),
                                   ),
                                 ),
                               ],
@@ -759,6 +660,7 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
   }
 
   void _submitForm() {
+    if (_isLoading) return;
     if (_formKey.currentState!.validate()) {
       _postRecord();
     }
@@ -778,7 +680,6 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
         return 'Please enter a valid email';
       }
     }
-    // If value is null or empty, no error message is returned
     return null;
   }
 
@@ -800,7 +701,6 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
         return 'Please enter a valid $fieldName';
       }
     }
-    // If value is null or empty, no error message is returned
     return null;
   }
 
@@ -837,8 +737,6 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print("data:::${data['company_id']}");
-        print(showFields);
         if (data['company_id'] == 5) {
           setState(() {
             showFields = true;
@@ -850,7 +748,6 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
         }
         return StoreDetail.fromJson(data);
       } else {
-        // Handle error
         print('Failed to fetch data: ${response.statusCode}');
         return null;
       }
@@ -862,30 +759,38 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
 
   Future<void> _getRoutes() async {
     RestDatasource api = RestDatasource();
-    dynamic resJson = await api.getDetails(
-        '/api/get_route?store_id=${AppState().storeId}&user_id=${AppState().userId}', AppState().token);
+    String endpoint = '/api/get_route?store_id=${AppState().storeId}&user_id=${AppState().userId}';
+    print("🔹 Fetching Routes API: ${RestDatasource().BASE_URL}$endpoint");
+
+    dynamic resJson = await api.getDetails(endpoint, AppState().token);
+    print("🔹 Routes Response: $resJson");
+
     route = RouteDataModel.fromJson(resJson);
+    routes.clear();
     if (route.data != null) {
-      print(resJson);
-      routes.clear();
       for (var i in route.data!) {
         routes.add({'id': i.id, 'name': i.name});
       }
     }
+    if (mounted) setState(() {});
   }
 
   Future<void> _getProvince() async {
     RestDatasource api = RestDatasource();
-    dynamic resJson =
-        await api.getDetails('/api/get_province/', AppState().token);
+    String endpoint = '/api/get_province/${AppState().storeId}/';
+    print("🔹 Fetching Province API: ${RestDatasource().BASE_URL}$endpoint");
+
+    dynamic resJson = await api.getDetails(endpoint, AppState().token);
+    print("🔹 Province Response: $resJson");
 
     province = ProvinceDataModel.fromJson(resJson);
+    provinces.clear();
     if (province.data != null) {
-      provinces.clear();
       for (var i in province.data!) {
         provinces.add({'id': i.id, 'name': i.name});
       }
     }
+    if (mounted) setState(() {});
   }
 
   Future<void> _getCodeData() async {
@@ -896,100 +801,104 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
     cuCode = CustomerCodeModel.fromJson(resJson);
     if (cuCode.result!.data != null) {
       cuCodeData.clear();
-      // for (var i in cuCode.result.data) {
       cuCodeData.add(cuCode.result!.data!);
-      // }
     }
-    // print(cuCodeData);
-    // print('///////////////////////////////////////');
-    setState(() {
-      _initDone = true;
-    });
+    if (mounted) {
+      setState(() {
+        _initDone = true;
+      });
+    }
   }
 
-  Future _postRecord() async {
-    if (_isLoading) return; // Prevent multiple submissions
+  void _clearForm() {
+    _formKey.currentState?.reset();
+
+    _nameController.clear();
+    _addressController.clear();
+    _contactNumberController.clear();
+    _whatsappNumberController.clear();
+    _emailController.clear();
+    _buildingController.clear();
+    _flatNumberController.clear();
+    _locationController.clear();
+    _trnController.clear();
+    _creditDays.clear();
+    _creditLimit.clear();
+
+    _selectPaymentTerms = null;
+    _selectedProvinceid = null;
+    _selectedrouteid = null;
+    _image = null;
+  }
+
+  Future<void> _postRecord() async {
+    if (_isLoading) return;
 
     setState(() {
-      _isLoading = true; // Disable the button
+      _isLoading = true;
     });
 
-    int? pId;
-    int? rId;
-    for (var data in province.data!) {
-      if (data.name == _selectedProvinceid) {
-        pId = data.id;
-        break;
-      }
-    }
-    for (var data in route.data!) {
-      if (data.code == _selectedrouteid) {
-        rId = data.id;
-        break;
-      }
-    }
-
-    RestDatasource api = RestDatasource();
-    String codeToPost = _customercode ?? (cuCodeData.isNotEmpty ? cuCodeData.join(', ') : '');
-    Map<String, dynamic> bodyJson = {
-      'id': id,
-      'name': _nameController.text,
-      'code': codeToPost,
-      'address': _addressController.text,
-      'contact_number': _contactNumberController.text,
-      'whatsapp_number': _whatsappNumberController.text,
-      'email': _emailController.text,
-      'Building': _buildingController.text,
-      'Flat_no': _flatNumberController.text,
-      'location': _locationController.text.isNotEmpty ? _locationController.text : _location,
-      'trn': _trnController.text,
-      'payment_terms': _selectPaymentTerms,
-      'route_id': _selectedrouteid,
-      'provience_id': _selectedProvinceid,
-      'store_id': AppState().storeId,
-      if (_creditLimit.text.isNotEmpty) 'credi_limit': _creditLimit.text,
-      if (_creditDays.text.isNotEmpty) 'credi_days': _creditDays.text,
-    };
-
-    print('Body data: $bodyJson');
-    print('Image: $_image');
-
     try {
-      dynamic resJson = await api.customerRegister(
+      RestDatasource api = RestDatasource();
+
+      String codeToPost =
+          _customercode ?? (cuCodeData.isNotEmpty ? cuCodeData.join(', ') : '');
+
+      Map<String, dynamic> bodyJson = {
+        'id': id,
+        'name': _nameController.text,
+        'code': codeToPost,
+        'address': _addressController.text,
+        'contact_number': _contactNumberController.text,
+        'whatsapp_number': _whatsappNumberController.text,
+        'email': _emailController.text,
+        'Building': _buildingController.text,
+        'Flat_no': _flatNumberController.text,
+        'location': _locationController.text.isNotEmpty
+            ? _locationController.text
+            : _location,
+        'trn': _trnController.text,
+        'payment_terms': _selectPaymentTerms,
+        'route_id': _selectedrouteid,
+        'provience_id': _selectedProvinceid,
+        'store_id': AppState().storeId,
+        if (_creditLimit.text.isNotEmpty) 'credi_limit': _creditLimit.text,
+        if (_creditDays.text.isNotEmpty) 'credi_days': _creditDays.text,
+      };
+
+      await api.customerRegister(
         AppState().token,
         bodyJson,
         _image,
         context,
         _isUpdate,
       );
-      print('Image: $_image');
-      print("Body${bodyJson}");
-      print('Response: $resJson');
 
-      if (mounted) {
-        CommonWidgets.showDialogueBox(
-          context: context,
-          title: "Success",
-          msg: "Data Inserted Successfully",
-        ).then(
-              (value) => Navigator.pushReplacementNamed(context, HomeScreen.routeName),
-        );
-      }
+      if (!mounted) return;
+
+      await CommonWidgets.showDialogueBox(
+        context: context,
+        title: "Success",
+        msg: _isUpdate
+            ? "Data Updated Successfully"
+            : "Data Inserted Successfully",
+      );
+
+      _clearForm(); // 🧹 clear everything before navigating
+
+      Navigator.pushReplacementNamed(context, HomeScreen.routeName);
     } catch (e) {
-      print("Error: $e");
-      if (mounted) {
-        CommonWidgets.showDialogueBox(
-          context: context,
-          title: "Error",
-          msg: "Something went wrong. Please try again.",
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false; // Re-enable the button
-        });
-      }
+      if (!mounted) return;
+
+      await CommonWidgets.showDialogueBox(
+        context: context,
+        title: "Error",
+        msg: "Something went wrong. Please try again.",
+      );
+
+      setState(() {
+        _isLoading = false; // 🔓 re-enable only on failure
+      });
     }
   }
 
@@ -1026,7 +935,6 @@ class _CustomDropdownState extends State<CustomDropdown> {
   @override
   void didUpdateWidget(covariant CustomDropdown oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Update selectedItem when selectedValue changes in the parent widget
     if (widget.selectedValue != selectedItem) {
       setState(() {
         selectedItem = widget.selectedValue;
@@ -1038,7 +946,7 @@ class _CustomDropdownState extends State<CustomDropdown> {
   Widget build(BuildContext context) {
     return DropdownButtonFormField<Map<String, dynamic>>(
       hint: Text(widget.hint),
-      value: widget.items.contains(selectedItem) ? selectedItem : null, // Ensure selectedItem matches an item or is null
+      value: widget.items.contains(selectedItem) ? selectedItem : null,
       onChanged: (Map<String, dynamic>? newValue) {
         setState(() {
           selectedItem = newValue;
@@ -1056,11 +964,10 @@ class _CustomDropdownState extends State<CustomDropdown> {
         focusedBorder: OutlineInputBorder(
           borderSide: BorderSide(color: Theme.of(context).primaryColor),
         ),
-        border: OutlineInputBorder(),
+        border: const OutlineInputBorder(),
       ),
       validator: (value) =>
       value == null ? 'Please select ${widget.label}' : null,
     );
-
   }
 }

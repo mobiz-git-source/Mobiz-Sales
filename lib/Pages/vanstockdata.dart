@@ -769,7 +769,7 @@ class _VanStockScreenState extends State<VanStockScreen>
           throw Exception('Failed to load logo image');
         }
         String logoUrl =
-            'http://68.183.92.8:3697/uploads/store/${storeDetail.logos}';
+            'http://erpadmin.mobiz.ae/uploads/store/${storeDetail.logos}';
         if (logoUrl.isNotEmpty) {
           final response = await http.get(Uri.parse(logoUrl));
           if (response.statusCode == 200) {
@@ -1112,15 +1112,15 @@ class ApiResponse {
 }
 
 class Product {
-  int id;
-  String code;
-  String name;
-  String proImage;
-  double taxPercentage;
-  double price;
-  int storeId;
-  int status;
-  List<Unit> units;
+  final int id;
+  final String code;
+  final String name;
+  final String proImage;
+  final double taxPercentage;
+  final double price;
+  final int storeId;
+  final int status;
+  final List<Unit> units;
 
   Product({
     required this.id,
@@ -1136,18 +1136,20 @@ class Product {
 
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
-      id: json['id'],
-      code: json['code'],
-      name: json['name'],
-      proImage: json['pro_image'],
-      taxPercentage: json['tax_percentage'].toDouble(),
-      price: json['price'].toDouble(),
-      storeId: json['store_id'],
-      status: json['status'],
-      units: List<Unit>.from(json['units'].map((x) => Unit.fromJson(x))),
+      id: json['id'] ?? 0,
+      code: json['code'] ?? '', // ✅ NULL SAFE
+      name: json['name'] ?? '',
+      proImage: json['pro_image'] ?? '',
+      taxPercentage: (json['tax_percentage'] as num?)?.toDouble() ?? 0.0,
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      storeId: json['store_id'] ?? 0,
+      status: json['status'] ?? 0,
+      units: (json['units'] as List?)
+          ?.map((x) => Unit.fromJson(x))
+          .toList() ??
+          [],
     );
   }
-
   Product copyWith({List<Unit>? units}) {
     return Product(
       id: this.id,
@@ -1162,6 +1164,7 @@ class Product {
     );
   }
 }
+
 
 class Unit {
   int unit;

@@ -950,7 +950,9 @@ class VanOffloadDetail {
     unit = json['unit'];
     quantity = (json['quantity'] as num?)?.toDouble();
     approvedQuantity = json['approved_quantity'];
-    convertQty = json['convert_qty'];
+    convertQty = json['convert_qty'] == null
+        ? null
+        : int.tryParse(json['convert_qty'].toString());
     vanId = json['van_id'];
     userId = json['user_id'];
     storeId = json['store_id'];

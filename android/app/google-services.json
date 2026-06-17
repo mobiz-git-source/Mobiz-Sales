@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "662520788670",
+    "project_id": "mobiz-sales-b54ca",
+    "storage_bucket": "mobiz-sales-b54ca.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:662520788670:android:968ca037f5ddbe336b50ef",
+        "android_client_info": {
+          "package_name": "com.mobiz.sales"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCdNIIk0gxNgYTbDUWGHKNa4T1nA9vhrXM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

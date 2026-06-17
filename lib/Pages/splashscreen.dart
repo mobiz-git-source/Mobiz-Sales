@@ -56,7 +56,7 @@ class _SplashScreenState extends State<SplashScreen> {
     appState.discountState = json['discount'];
     appState.validate_qtySO = json['validate_qty_in_so'];
     appState.validate_qtySales = json['validate_qty_in_sales'];
-    appState.rolId = json['rol_id'];
+    appState.rolId = json['app_rol_id'];
     appState.email = json['email'];
     appState.osType = json['os_type'];
     appState.imageUrl = json['image_url'];

@@ -173,8 +173,8 @@ class Detail {
   int? id;
   int? goodsOutId;
   int? itemId;
-  String? productType;
-  String? unit;
+  dynamic productType;
+  dynamic unit;
   num? convertQty;
   num? quantity;
   num? rate;
@@ -292,8 +292,8 @@ class Detail {
     id = json['id'];
     goodsOutId = json['goods_out_id'];
     itemId = json['item_id'];
-    productType = json['product_type'] ?? '';
-    unit = json['unit'] ?? '';
+    productType = json['product_type']?.toString() ?? '';
+    unit = json['unit']?.toString()??'';
     convertQty = json['convert_qty'] ?? 0;
     quantity = json['quantity'] ?? 0;
     rate = json['rate'] ?? 0;

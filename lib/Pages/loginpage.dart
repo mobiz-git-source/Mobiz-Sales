@@ -1,5 +1,9 @@
 import 'dart:convert';
+import 'dart:developer';
+import 'dart:io';
 
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:mobizapp/Pages/store/StorePage.dart';
 import 'package:mobizapp/confg/appconfig.dart';
@@ -209,24 +213,63 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Future<String> getDeviceId() async {
+    DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+
+    if (Platform.isAndroid) {
+      var androidInfo = await deviceInfo.androidInfo;
+      return androidInfo.id; // Unique device ID
+    } else {
+      var iosInfo = await deviceInfo.iosInfo;
+      return iosInfo.identifierForVendor ?? "";
+    }
+  }
+
+  void printFullText(String text) {
+    final pattern = RegExp('.{1,800}');
+    pattern.allMatches(text).forEach((match) => print(match.group(0)));
+  }
+
   Future<void> _login() async {
     AppState appState = AppState();
     RestDatasource api = RestDatasource();
-    Map<String, String> bodyJson = {
-      "email": _username.text,
-      "password": _password.text,
-    };
+
     try {
+      // Get FCM token
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      print("FCM TOKEN LOGIN: $fcmToken");
+
+      // Get Device ID
+      final deviceId = await getDeviceId();
+      print("DEVICE ID LOGIN: $deviceId");
+
+      Map<String, String> bodyJson = {
+        "email": _username.text,
+        "password": _password.text,
+        "fcm_token": fcmToken ?? "",
+        "device_id": deviceId,
+      };
+
+      print("Request bodyJson: $bodyJson");
+
       dynamic resJson = await api.sendData(
         '/api/login',
         null,
         jsonEncode(bodyJson),
       );
 
+      printFullText(jsonEncode(resJson));
+
+      if (resJson == null || resJson.isEmpty) {
+        if (mounted) {
+          CommonWidgets.showDialogueBox(
+              context: context, title: "Error", msg: "Server connection failed.");
+        }
+        return;
+      }
+
       LoginModel loginResp = LoginModel.fromJson(resJson);
       if (loginResp.status == "success") {
-        // print('loginResp.settings!.vatState');
-        print("PRTTT${loginResp.settings!.printer}");
         if (loginResp.user != null && loginResp.authorisation != null && loginResp.settings != null) {
           appState.token = loginResp.authorisation!.token;
           appState.storeId = loginResp.user!.storeId;
@@ -234,59 +277,49 @@ class _LoginScreenState extends State<LoginScreen> {
           appState.name = loginResp.user!.name;
           appState.userId = loginResp.user!.id;
           appState.email = loginResp.user!.email;
-          appState.vatState =
-          loginResp.settings != null ? loginResp.settings!.vatState : '';
-          appState.discountState =
-          loginResp.settings != null ? loginResp.settings!.discountState : '';
-          appState.validate_qtySO =
-          loginResp.settings != null ? loginResp.settings!.soValQtyState : '';
-          appState.validate_qtySales =
-          loginResp.settings != null ? loginResp.settings!.qtySalesvalidate : '';
-          appState.attendanceState = loginResp.settings != null ? loginResp.settings!.attendanceState : '';
-          appState.printer = loginResp.settings != null ? loginResp.settings!.printer : '';
+          appState.vatState = loginResp.settings?.vatState ?? '';
+          appState.discountState = loginResp.settings?.discountState ?? '';
+          appState.validate_qtySO = loginResp.settings?.soValQtyState ?? '';
+          appState.validate_qtySales = loginResp.settings?.qtySalesvalidate ?? '';
+          appState.attendanceState = loginResp.settings?.attendanceState ?? '';
+          appState.printer = loginResp.settings?.printer ?? '';
           appState.loginState = 'LOGGED_IN';
+
           bool appStateRetrieved = await sharedPref.containsKey('app_state');
           if (appStateRetrieved == true) {
             sharedPref.removeAll();
           }
-          print('letsgop');
+          
           sharedPref.save("app_state", appState);
-          if (loginResp.user!.rolId == 2 || loginResp.user!.rolId == 5) {
-            if (mounted) {
+          
+          if (mounted) {
+            if (loginResp.user!.rolId == 2 || loginResp.user!.rolId == 5) {
               Navigator.of(context).pushReplacementNamed(HomeScreen.routeName);
-            }
-          } else if (loginResp.user!.rolId == 4) {
-            if (mounted) {
-              Navigator.of(context)
-                  .pushReplacementNamed(HomepageDriver.routeName);
-            }
-          } else if (loginResp.user!.rolId == 3) {
-            if (mounted) {
+            } else if (loginResp.user!.rolId == 4) {
+              Navigator.of(context).pushReplacementNamed(HomepageDriver.routeName);
+            } else if (loginResp.user!.rolId == 3) {
               Navigator.of(context).pushReplacementNamed(TransferOptionsPage.routeName);
-            }
-          } else if (loginResp.user!.rolId == 7) {
-            if (mounted) {
+            } else if (loginResp.user!.rolId == 7) {
               Navigator.of(context).pushReplacementNamed(DashboardScreen.routeName);
             }
           }
         } else {
           if (mounted) {
             CommonWidgets.showDialogueBox(
-                context: context, title: "Error", msg: "Something went wrong");
+                context: context, title: "Error", msg: "Invalid server response data.");
           }
         }
       } else {
-        // Handle unsuccessful login
         if (mounted) {
           CommonWidgets.showDialogueBox(
               context: context, title: "Error", msg: "Invalid Email/Password");
         }
       }
     } catch (e) {
-      // Handle exceptions
+      print("LOGIN EXCEPTION: $e");
       if (mounted) {
         CommonWidgets.showDialogueBox(
-            context: context, title: "Error", msg: "Invalid Email/Password");
+            context: context, title: "Error", msg: "An error occurred: $e");
       }
     }
   }

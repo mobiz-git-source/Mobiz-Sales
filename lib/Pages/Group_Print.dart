@@ -227,7 +227,7 @@ class _GroupPrintState extends State<GroupPrint> {
       }
 
       String logoUrl =
-          'http://68.183.92.8:3697/uploads/store/${invoice.sales!.store!.logo}';
+          'https://erpadmin.mobiz.ae/uploads/store/${invoice.sales!.store!.logo}';
       if (logoUrl.isNotEmpty) {
         final response = await http.get(Uri.parse(logoUrl));
         if (response.statusCode == 200) {

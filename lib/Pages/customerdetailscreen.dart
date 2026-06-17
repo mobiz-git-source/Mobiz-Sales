@@ -7,6 +7,7 @@ import 'package:mobizapp/Models/appstate.dart';
 import 'package:mobizapp/Pages/CustomeSOA.dart';
 import 'package:mobizapp/Pages/CustomerStock.dart';
 import 'package:mobizapp/Pages/CustomerVisit.dart';
+import 'package:mobizapp/Pages/Quotation/QuotatioCustomerScreen.dart';
 import 'package:mobizapp/Pages/customerorderdetail.dart';
 import 'package:mobizapp/Pages/customerregistration.dart';
 import 'package:mobizapp/Pages/paymentcollection.dart';
@@ -36,19 +37,59 @@ class CustomerDetailsScreen extends StatefulWidget {
 class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
   @override
   Timer? _timer;
+  bool _isFirstLoad = true;
+  bool _isArgsLoaded = false;
+
 
   void initState() {
     // TODO: implement initState
     super.initState();
-    fetchData();
+    // fetchData();
     _fetchData();
     fetchCustomerIcons();
-    _timer = Timer.periodic(Duration(seconds: 1), (Timer t) => fetchData());
+    // _timer = Timer.periodic(Duration(seconds: 10), (Timer t) => fetchData());
   }
 
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (!_isArgsLoaded) {
+      final args =
+      ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
+      if (args != null) {
+        name = args['name'];
+        address = args['address'];
+        phone = args['phone'];
+        location = args['location'];
+        whatsappNumber = args['whatsappNumber'];
+        customerType = args['customerType'];
+        creditDays = args['days'];
+        creditBalance = args['balance'];
+        totalOutstanding = args['total'];
+        trn = args['trn'];
+        img = args['cust_image'];
+        paymentTerms = args['paymentTerms'];
+        provinceId = args['provinceId'];
+        routeId = args['routeId'];
+        creditLimit = args['creditLimit'];
+        email = args['mail'];
+        id = args['id']; // ✅ NOW AVAILABLE
+        code = args['code'];
+        pricegroupId = args['price_group_id'];
+
+        fetchData();          // ✅ SAFE
+        fetchCustomerIcons(); // optional
+        _fetchData();
+        _isArgsLoaded = true;
+      }
+    }
   }
 
   bool _showButton = false;
@@ -150,36 +191,46 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
         return Icons.local_mall;
       case 'water_drop':
         return Icons.water_drop;
+        case 'quora':
+        return Icons.quora;
       default:
         return Icons.help;
     }
   }
 
+  String get formattedOutstanding {
+    if (_data == null || _data!.isEmpty || _data == '[]') {
+      return '--';
+    }
+
+    final value = double.tryParse(_data!);
+    if (value == null) {
+      return _data!;
+    }
+
+    return value.toStringAsFixed(3);
+  }
+
+  String get creditBalanceText {
+    if (_data == null || _data!.isEmpty || creditLimit == null) {
+      return '--';
+    }
+
+    final outstanding = double.tryParse(_data!);
+    if (outstanding == null) {
+      return '--';
+    }
+
+    final balance = outstanding - creditLimit!;
+    return balance.toStringAsFixed(2);
+  }
+
+
+
   @override
   Widget build(BuildContext context) {
-    if (ModalRoute.of(context)!.settings.arguments != null) {
-      final Map<String, dynamic>? params =
-          ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
-      name = params!['name'];
-      address = params['address'];
-      phone = params!['phone'];
-      location = params['location'];
-      whatsappNumber = params['whatsappNumber'];
-      customerType = params!['customerType'];
-      creditDays = params['days'];
-      creditBalance = params['balance'];
-      totalOutstanding = params['total'];
-      trn = params['trn'];
-      img = params['cust_image'];
-      paymentTerms = params['paymentTerms'];
-      provinceId = params['provinceId'];
-      routeId = params['routeId'];
-      creditLimit = params!['creditLimit'];
-      email = params!['mail'];
-      id = params['id'];
-      code = params['code'];
-      pricegroupId = params['price_group_id'];
-    }
+
+
     // print("uggug$img");
 
     return Scaffold(
@@ -321,24 +372,26 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                   ),
                   CommonWidgets.horizontalSpace(2),
                   Text(
-                    'Credit Balance: ${int.tryParse(_data) != null ? (int.tryParse(_data)! - creditLimit!).toString() : ''}',
+                    'Credit Balance: $creditBalanceText',
                     style: TextStyle(
                       fontWeight: AppConfig.headLineWeight,
                       color: Colors.black.withOpacity(0.7),
                     ),
                   ),
+
                 ],
               ),
               CommonWidgets.verticalSpace(2),
               Row(
                 children: [
                   Text(
-                    'Total Outstanding: ${_data == '[]' ? '' : (double.tryParse(_data) != null ? double.parse(_data).toStringAsFixed(3) : _data)}',
+                    'Total Outstanding: $formattedOutstanding',
                     style: TextStyle(
                       fontWeight: AppConfig.headLineWeight,
                       color: Colors.black.withOpacity(0.7),
                     ),
                   ),
+
                   CommonWidgets.horizontalSpace(2),
                   Text(
                     totalOutstanding ?? '',
@@ -774,6 +827,15 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                     'paymentTerms': paymentTerms
                   });
               break;
+            case 'QuotatioCustomerScreen':
+              Navigator.pushNamed(context, QuotatioCustomerScreen.routeName,
+                  arguments: {
+                    'customerId': id,
+                    'name': name,
+                    'code': code,
+                    'paymentTerms': paymentTerms
+                  });
+              break;
             case 'CustomerWater':
               Navigator.of(context)
                   .pushNamed(CustomerWater.routeName, arguments: {
@@ -862,7 +924,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
       var response = await http.get(Uri.parse(
           '${RestDatasource().BASE_URL}/api/get_sales_pending_outstanding?customer_id=$id&store_id=${AppState().storeId}'));
       if (response.statusCode == 200) {
-        // print(response.request);
+        print(response.request);
         Map<String, dynamic> jsonResponse = jsonDecode(response.body);
         setState(() {
           _data = jsonResponse['data'].toString();

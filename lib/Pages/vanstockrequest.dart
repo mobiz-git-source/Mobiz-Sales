@@ -26,13 +26,11 @@ class VanStockRequestsScreen extends StatefulWidget {
 class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
   bool _initDone = false;
   bool _nodata = false;
-  // RequestModel request = RequestModel();
   List <VanRequest> request= [];
   List<Map<String, dynamic>> stocks = [];
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
   Timer? _searchDebounce;
-  bool _search = false;
   bool _isButtonDisabled = false;
   bool _isLoading = false;
   int _page = 1;
@@ -135,10 +133,7 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
           ),
           style: const TextStyle(color: Colors.white),
           onChanged: (value) {
-            // Cancel previous debounce timer
             _searchDebounce?.cancel();
-
-            // Start new debounce timer
             _searchDebounce = Timer(const Duration(milliseconds: 500), () {
               _onSearchChanged();
             });
@@ -166,11 +161,9 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
             onPressed: () {
               setState(() {
                 if (_isSearching) {
-                  // Clear search
                   _searchController.clear();
                   _onSearchChanged();
                 } else {
-                  // Start searching
                   _isSearching = true;
                 }
               });
@@ -183,8 +176,8 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
         child: Column(
           children: [
             if (_isSearching && request.isEmpty && _searchController.text.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
+              const Padding(
+                padding: EdgeInsets.all(16.0),
                 child: Text('No results found'),
               ),
 
@@ -297,8 +290,7 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
                             ),
                           ),
                         ),
-                        // CommonWidgets.horizontalSpace(12),
-                        Spacer(),
+                        const Spacer(),
                         Text(
                           (data.status == 0)
                               ? 'Cancelled'
@@ -393,31 +385,6 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
                               ],
                             ),
                           ),
-                        // Text(
-                        //   'RB0002',
-                        //   style: TextStyle(
-                        //       fontSize: AppConfig.textCaption3Size,
-                        //       fontWeight: AppConfig.headLineWeight),
-                        // ),
-                        // Row(
-                        //   children: [
-                        //     Text(
-                        //       'KELLOGGS KORN FLAKE',
-                        //       style: TextStyle(
-                        //           fontSize: AppConfig.textCaption3Size,
-                        //           fontWeight: AppConfig.headLineWeight),
-                        //     ),
-                        //     const Spacer(),
-                        //     Text(
-                        //       'BOX QTY : 10',
-                        //       style: TextStyle(
-                        //           fontSize: AppConfig.textCaption3Size,
-                        //           fontWeight: AppConfig.headLineWeight),
-                        //     ),
-                        //   ],
-                        // ),
-                        // const Divider(),
-                        // CommonWidgets.verticalSpace(2),
                         Center(
                           child: SizedBox(
                             width: SizeConfig.blockSizeHorizontal * 25,
@@ -441,13 +408,22 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
                                   : () {
                                 _conformrequest(data.id!);
                               },
-                              child: Text(
-                                'Confirm',
-                                style: TextStyle(
-                                    fontSize: AppConfig.textCaption3Size,
-                                    color: AppConfig.backgroundColor,
-                                    fontWeight: AppConfig.headLineWeight),
-                              ),
+                              child: _isButtonDisabled
+                                  ? const SizedBox(
+                                      height: 15,
+                                      width: 15,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Text(
+                                      'Confirm',
+                                      style: TextStyle(
+                                          fontSize: AppConfig.textCaption3Size,
+                                          color: AppConfig.backgroundColor,
+                                          fontWeight: AppConfig.headLineWeight),
+                                    ),
                             ),
                           ),
                         ),
@@ -571,70 +547,52 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
   }
 
   Future<void> _conformrequest(int id) async {
+    if (_isButtonDisabled) return;
+
     setState(() {
-      _isButtonDisabled = true; // Disable button
+      _isButtonDisabled = true;
     });
 
     RestDatasource api = RestDatasource();
-
-    dynamic bodyJson = {
-      "id": id,
-    };
+    dynamic bodyJson = {"id": id};
 
     try {
       dynamic resJson = await api.sendData(
           '/api/vanrequest.confirm', AppState().token, jsonEncode(bodyJson));
 
-      // Check if the response indicates success
       if (resJson['success'] == true) {
-        print("Request confirmed successfully for ID: $id");
-
-        // Navigate to the home screen
-        Navigator.pushReplacementNamed(context, HomeScreen.routeName);
+        if (mounted) {
+          await CommonWidgets.showDialogueBox(
+              context: context,
+              title: "Success",
+              msg: "Request Confirmed Successfully");
+          
+          setState(() {
+            request.clear();
+            _page = 1;
+            _initDone = false;
+            _hasMore = true;
+          });
+          _getRequests();
+        }
       } else {
-        print("Request failed: ${resJson['messages']}");
+        if (mounted) {
+          CommonWidgets.showDialogueBox(
+              context: context,
+              title: "Alert",
+              msg: resJson['messages']?.toString() ?? "Failed to confirm request");
+        }
       }
     } catch (e) {
       print("Error while processing request: $e");
     } finally {
-      setState(() {
-        _isButtonDisabled = false; // Re-enable button
-      });
+      if (mounted) {
+        setState(() {
+          _isButtonDisabled = false;
+        });
+      }
     }
   }
-
-
-// Future<void> _conformrequest(int id) async {
-  //   setState(() {
-  //     _isButtonDisabled = true; // Disable button
-  //   });
-  //
-  //   RestDatasource api = RestDatasource();
-  //
-  //   dynamic bodyJson = {
-  //     "id": id,
-  //   };
-  //   try {
-  //     dynamic resJson = await api.sendData(
-  //         '/api/vanrequest.confirm', AppState().token, jsonEncode(bodyJson));
-  //   } catch (e) {
-  //     if (mounted) {
-  //       print("sdsd: ${id}");
-  //       CommonWidgets.showDialogueBox(
-  //           context: context,
-  //           title: "Alert",
-  //           msg: "Requset Added Successfully");
-  //       setState(() {
-  //         _initDone = false;
-  //       });
-  //       _getRequests();
-  //     }
-  //   }finally {
-  //     setState(() {
-  //       _isButtonDisabled = false;
-  //     });
-  //   }
-  // }
 }
 
 class VanRequestModel {
@@ -911,4 +869,3 @@ class PageLink {
     );
   }
 }
-
