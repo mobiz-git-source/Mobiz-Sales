@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:image/image.dart' as img;
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mobizapp/Models/appstate.dart';
@@ -11,9 +10,8 @@ import 'package:number_to_words/number_to_words.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../Models/Group_Model.dart';
 import '../Models/Group_Model.dart' as Invoice;
-// import '../Models/invoicedata.dart' as Invoice;
-// import '../confg/appconfig.dart';
-import 'package:http/http.dart'as http;
+import 'package:http/http.dart' as http;
+import 'package:mobizapp/Utilities/rest_ds.dart';
 
 class GroupPrint extends StatefulWidget {
   static const routeName = "/GroupPrint";
@@ -53,10 +51,14 @@ class _GroupPrintState extends State<GroupPrint> {
 
   Future<void> _connect() async {
     if (_selectedDevice != null) {
-      await printer.connect(_selectedDevice!);
-      setState(() {
-        _connected = true;
-      });
+      try {
+        await printer.connect(_selectedDevice!);
+        setState(() {
+          _connected = true;
+        });
+      } catch (e) {
+        print("Error connecting to printer: $e");
+      }
     }
   }
 
@@ -71,32 +73,13 @@ class _GroupPrintState extends State<GroupPrint> {
   }
 
   Future<SaleReturnCollection> fetchData() async {
-    print(saleId);
-    print(returnId);
-    print(payId);
-    print("${AppState().storeId}");
-
-    final String url = 'http://68.183.92.8:3699/api/sale_return_collection_print?sales=${saleId}&return=${returnId}&collection=${payId}&store_id=${AppState().storeId}';
-    print(url);
+    final String url =
+        '${RestDatasource().BASE_URL}/api/sale_return_collection_print?sales=${saleId}&return=${returnId}&collection=${payId}&store_id=${AppState().storeId}';
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
-      print("Sale: $saleId");
-      print("Return: $returnId");
-      print("PAY: $payId");
+      print(response.request);
       var jsonData = json.decode(response.body);
-      SaleReturnCollection saleReturnData = SaleReturnCollection.fromJson(jsonData);
-
-      if (response.body.isEmpty) {
-        throw Exception('Empty response body');
-      }
-
-      Map<String, dynamic> data = jsonDecode(response.body) as Map<String, dynamic>;
-
-      if (data == null) {
-        throw Exception('Data is null');
-      }
-
-      return SaleReturnCollection.fromJson(data);
+      return SaleReturnCollection.fromJson(jsonData);
     } else {
       throw Exception('Failed to load data');
     }
@@ -106,16 +89,21 @@ class _GroupPrintState extends State<GroupPrint> {
   void initState() {
     super.initState();
     _initPrinter();
-    futureData = fetchData(); // Initialize futureData here
+    futureData = fetchData();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (ModalRoute.of(context)!.settings.arguments != null) {
         final Map<String, dynamic>? params =
-        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
+            ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
         pricegroupId = params!['price_group_id'];
         saleId = params['saleId'];
         returnId = params['returnId'] ?? 0;
         payId = params['payId'];
-        futureData = fetchData();
+        setState(() {
+          futureData = fetchData();
+        });
+        print("sales:$saleId");
+        print("sales:$returnId");
+        print("sales:$payId");
       }
     });
   }
@@ -124,28 +112,24 @@ class _GroupPrintState extends State<GroupPrint> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Sale Return Collection Print', style: TextStyle(color: Colors.white)),
+        title: const Text('Sale Return Collection Print',
+            style: TextStyle(color: Colors.white)),
         backgroundColor: AppConfig.colorPrimary,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: FutureBuilder<SaleReturnCollection>(
         future: futureData,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            print(snapshot.error);
             return Center(child: Text('Error: ${snapshot.error}'));
           } else if (snapshot.hasData) {
             final saleReturnData = snapshot.data!;
             return Center(
               child: InkWell(
                 onTap: () {
-                  if (saleReturnData != null) {
-                    _print(saleReturnData, true);
-                  } else {
-                    print("Sale return data is null");
-                  }
+                  _print(saleReturnData, true);
                 },
                 child: Icon(
                   Icons.print,
@@ -155,20 +139,38 @@ class _GroupPrintState extends State<GroupPrint> {
               ),
             );
           }
-          return Center(child: Text('No data available'));
+          return const Center(child: Text('No data available'));
         },
       ),
     );
   }
+
   void _print(Invoice.SaleReturnCollection invoice, bool isPrint) async {
+    if (!_connected) {
+      await _connect();
+    }
+
     if (_connected) {
-      // Company Information
-      String companyName = invoice.sales!.store!.name ?? 'N/A';
-      String companyAddress = invoice.sales!.store!.address ?? 'N/A';
-      String companyMail = invoice.sales!.store!.email??'N/A';
-      String companyTRN = "TRN: ${invoice.sales!.store!.trn ?? 'N/A'}";
+      var store = invoice.store ??
+          invoice.sales?.store ??
+          invoice.returnData?.store;
+      
+      var customer = invoice.sales?.customer ??
+          invoice.returnData?.customer ??
+          (invoice.collection?.customer != null &&
+                  invoice.collection!.customer!.isNotEmpty
+              ? invoice.collection!.customer!.first
+              : null);
+
+      if (store == null) return;
+
+      String companyName = store.name ?? 'N/A';
+      String companyAddress = store.address ?? 'N/A';
+      String companyMail = store.email ?? 'N/A';
+      String companyTRN = "TRN: ${store.trn ?? 'N/A'}";
       String billtype = "Tax Invoice";
-      String customerName = "${invoice.sales!.customer!.name}";
+
+      String customerName = customer?.name ?? 'N/A';
       List<String> nameWords = customerName.split(' ');
       String firstLine = customerName;
       String secondLine = "";
@@ -176,407 +178,273 @@ class _GroupPrintState extends State<GroupPrint> {
         firstLine = nameWords.sublist(0, 7).join(' ');
         secondLine = nameWords.sublist(7).join(' ');
       }
-      String customerEmail = invoice.sales!.customer!.email ?? 'N/A';
-      String customerContact =
-          invoice.sales!.customer!.contactNumber ?? 'N/A';
-      String customerTRN = invoice.sales!.customer!.trn ?? '';
-      String invoiceNumber = invoice.returnData?.invoiceNo ?? 'N/A';
-      String invoiceDate = invoice.returnData?.inDate != null
-          ? DateFormat('dd MMMM yyyy').format(DateTime.parse(invoice.returnData!.inDate!))
+      String customerContact = customer?.contactNumber ?? 'N/A';
+      String customerTRN = customer?.trn ?? '';
+      String billType = invoice.sales?.cashCard ?? 'N/A';
+      String invoiceNumber =
+          invoice.sales?.invoiceNo ?? invoice.returnData?.invoiceNo ?? 'N/A';
+      String? rawDate = invoice.sales?.inDate ?? invoice.returnData?.inDate;
+      String invoiceDate = rawDate != null && rawDate.isNotEmpty
+          ? DateFormat('dd MMMM yyyy').format(DateTime.parse(rawDate))
           : 'N/A';
 
-      // String dueDate = DateFormat('dd MMMM yyyy')
-      //     .format(DateTime.parse(invoice.returnData!.inDate!));
-      String ReturnTotal = invoice.returnData?.total?.toStringAsFixed(2) ?? '0.00';
-      String SalesTotal = invoice.sales?.total?.toStringAsFixed(2) ?? '0.00';
-      String tax = invoice.returnData?.totalTax?.toStringAsFixed(2) ?? '0.00';
-      String vat = invoice.returnData?.totalTax?.toStringAsFixed(2) ?? '0.00';
-      String ReturngrandTotal = invoice.returnData?.grandTotal?.toStringAsFixed(2) ?? '0.00';
-      String SalesgrandTotal = invoice.sales?.grandTotal?.toStringAsFixed(2) ?? '0.00';
-
-      String Discount;
-      if (invoice.returnData != null && invoice.returnData!.discount != null &&
-          double.tryParse(invoice.returnData!.discount!.toString()) != null &&
-          double.parse(invoice.returnData!.discount!.toString()) > 0) {
-        Discount = "Discount: ${double.parse(invoice.returnData!.discount!.toString()).toStringAsFixed(2)}";
-      } else {
-        Discount = '';
-      }
-
-      String ReturnamountInWords = "Amount in Words: AED ${NumberToWord().convert('en-in', invoice.returnData?.grandTotal?.toInt() ?? 0).toUpperCase()} ONLY";
-      String SalesamountInWords = "Amount in Words: AED ${NumberToWord().convert('en-in', invoice.sales?.grandTotal?.toInt() ?? 0).toUpperCase()} ONLY";
-
-      String van = invoice.sales?.van?.name ?? 'N/A';
-      String Returnsalesman = invoice.returnData?.user?.name ?? 'N/A';
-      String Salessalesman = invoice.sales?.user?.name ?? 'N/A';
-
-
-
       void printAlignedText(String leftText, String rightText) {
-        const int maxLineLength =
-        68; // Adjust the maximum line length as per your printer's character limit
+        const int maxLineLength = 68;
         int leftTextLength = leftText.length;
         int rightTextLength = rightText.length;
-
-        // Calculate padding to ensure rightText is right-aligned
         int spaceLength = maxLineLength - (leftTextLength + rightTextLength);
+        if (spaceLength < 0) spaceLength = 1;
         String spaces = ' ' * spaceLength;
-
-        printer.printCustom(
-            '$leftText$spaces$rightText', 1, 0); // Print with left-aligned text
+        printer.printCustom('$leftText$spaces$rightText', 1, 0);
       }
 
-      String logoUrl =
-          'https://erpadmin.mobiz.ae/uploads/store/${invoice.sales!.store!.logo}';
-      if (logoUrl.isNotEmpty) {
-        final response = await http.get(Uri.parse(logoUrl));
-        if (response.statusCode == 200) {
-          Uint8List imageBytes = response.bodyBytes;
+      if (store.logo != null && store.logo!.isNotEmpty) {
+        try {
+          String logoUrl =
+              'https://erpadmin.mobiz.ae/uploads/store/${store.logo}';
+          final response = await http.get(Uri.parse(logoUrl));
+          if (response.statusCode == 200) {
+            Uint8List imageBytes = response.bodyBytes;
 
-          // Decode image and convert to monochrome bitmap if needed
-          img.Image originalImage = img.decodeImage(imageBytes)!;
-          img.Image monoLogo = img.grayscale(originalImage);
+            // Decode image
+            img.Image? originalImage = img.decodeImage(imageBytes);
+            if (originalImage != null) {
+              // Resize image to fit thermal printer width (typically 384 or 576 pixels)
+              // 200-250px is a safe width for logos on most thermal printers.
+              img.Image resizedImage = img.copyResize(originalImage, width: 250);
+              
+              // Convert to grayscale
+              img.Image monoLogo = img.grayscale(resizedImage);
 
-          // Encode the image to the required format (e.g., PNG)
-          Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
+              // Encode the image to PNG
+              Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
 
-          // Print the logo image
-          printer.printImageBytes(logoBytes);
-        } else {
-          print('Failed to load image: ${response.statusCode}');
-        }
-      }
-      // Print company details
-      printer.printNewLine();
-      printer.printCustom(companyName, 3, 1); // Centered
-      printer.printCustom(companyAddress, 1, 1); // Centered
-      printer.printCustom(companyMail, 1, 1);
-      printer.printCustom(companyTRN, 1, 1); // Centered
-      printer.printCustom(billtype, 1, 1); // Centered
-      printer.printNewLine();
-
-      printer.printCustom("-" * 72, 1, 1); // Centered
-      printAlignedText("Invoice No: ${invoiceNumber}","Date: ${invoiceDate}");
-      // printer.printCustom("Invoice No: ${invoiceNumber} | Date: ${invoiceDate}", 1, 1);
-      printer.printNewLine();
-      // Print customer details
-      printAlignedText("Customer: $firstLine","");
-
-      if (secondLine.isNotEmpty) {
-        printAlignedText("         $secondLine", ""); // Aligns the second line under the first line
-      }
-      // printAlignedText("$cusAddress", " ");
-      // printAlignedText("Email: $customerEmail", "");
-      printAlignedText("Contact No: $customerContact", "");
-      printAlignedText("TRN: $customerTRN", " ");
-      printer.printNewLine();
-      printAlignedText("Sales", " ");
-      printer.printCustom("-" * 70, 1, 1); // Centered
-
-      // Define column widths for table
-      const int columnWidth1 = 5; // S.No
-      const int columnWidth2 = 22; // Product Description
-      const int columnWidth3 = 5; // Unit
-      const int columnWidth4 = 4; // Qty
-      const int columnWidth5 = 7; // Type
-      const int columnWidth6 = 8; // Rate
-      const int columnWidth7 = 8; // Total
-      // const int columnWidth8 = 4; // Tax
-      const int columnWidth9 = 6; // Amount
-
-      // Print table headers
-      String headers = "${'S.No'.padRight(columnWidth1)}"
-          " ${'Product'.padRight(columnWidth2)}"
-          " ${'Unit'.padRight(columnWidth3)}"
-          "${'Qty'.padRight(columnWidth4)}"
-          "${'Type'.padRight(columnWidth5)}"
-          "${'Rate'.padRight(columnWidth6)}"
-          "${'Amount'.padRight(columnWidth7)}"
-      // "${'Vat'.padRight(columnWidth8)}"
-          " ${'Total'.padLeft(columnWidth9)}";
-      printer.printCustom(headers, 1, 0); // Left aligned
-
-      // Function to split text into lines of a given width
-      List<String> splitText(String text, int width) {
-        List<String> lines = [];
-        while (text.length > width) {
-          lines.add(text.substring(0, width));
-          text = text.substring(width);
-        }
-        lines.add(text); // Add remaining part
-        return lines;
-      }
-
-      // Print all product details
-      for (int i = 0; i < invoice.sales!.detail!.length; i++) {
-        String productDescription = invoice.sales!.detail![i].name ?? 'N/A';
-        String productUnit = invoice.sales!.detail![i].unit ?? 'N/A';
-        String productQty = invoice.sales!.detail![i].quantity?.toString() ?? '0';
-        String productType= invoice.sales!.detail![i].productType?.toString()??'0';
-        String productRate = invoice.sales!.detail![i].mrp?.toStringAsFixed(2) ?? '0.00';
-        String productTotal = invoice.sales!.detail![i].taxable?.toStringAsFixed(2) ?? '0.00';
-        // String productTax = tax.toString();
-        String productAmount =invoice.sales!.detail![i].amount?.toStringAsFixed(2)??'0.00';
-        // (invoice.data!.detail![i].mrp! * invoice.data!.detail![i].quantity!)
-        //     .toStringAsFixed(2);
-
-        // Split the product description if it exceeds the column width
-        List<String> descriptionLines =
-        splitText(productDescription, columnWidth2);
-
-        for (int j = 0; j < descriptionLines.length; j++) {
-          String line;
-          if (j == 0) {
-            // For the first line, include all columns
-            line = "${(i + 1).toString().padRight(columnWidth1)}"
-                "${descriptionLines[j].padRight(columnWidth2)}"
-                "  ${productUnit.padRight(columnWidth3)}"
-                "${productQty.padRight(columnWidth4)}"
-                "${productType.padRight(columnWidth5)}"
-                "${productRate.padRight(columnWidth6)}"
-                "${productTotal.padRight(columnWidth7)}"
-            // "${productTax.padRight(columnWidth8)}"
-                "${productAmount.padLeft(columnWidth9)}";
-          } else {
-            // For subsequent lines, only include the description, leaving other columns blank
-            line = "${''.padRight(columnWidth1)}"
-                "${descriptionLines[j].padRight(columnWidth2)}"
-                "${''.padRight(columnWidth3)}"
-                "${''.padRight(columnWidth4)}"
-                "${''.padRight(columnWidth5)}"
-                "${''.padRight(columnWidth6)}"
-                "${''.padRight(columnWidth7)}";
-            // "${''.padRight(columnWidth8)}";
-            "${''.padRight(columnWidth9)}";
-          }
-          printer.printCustom(line, 1, 0); // Left aligned
-        }
-      }
-      printer.printCustom("-" * 70, 1, 1); // Centered
-
-      // Print totals
-      // if (Discount.isNotEmpty) {
-      //   print(Discount);
-      //   printAlignedText("Van: $van", "$Discount");
-      // } else {
-      //   printAlignedText("Van: $van", ""); // Skip printing Total
-      // }
-      printAlignedText("Salesman: $Salessalesman", "Total: $SalesTotal");
-      printer.printCustom("Vat: $vat", 1, 2);
-      printer.printCustom("Grand Total: $SalesgrandTotal", 1, 2); // Right aligned
-      printer.printNewLine();
-      printer.printCustom(SalesamountInWords, 1, 0);
-      printer.printNewLine();
-      printer.printNewLine();
-
-      printAlignedText("Return", " ");
-      printer.printCustom("-" * 70, 1, 1); // Centered
-
-      // Define column widths for table
-      const int columnWidthh1 = 5; // S.No
-      const int columnWidthh2 = 22; // Product Description
-      const int columnWidthh3 = 5; // Unit
-      const int columnWidthh4 = 4; // Qty
-      const int columnWidthh5 = 7; // Type
-      const int columnWidthh6 = 8; // Rate
-      const int columnWidthh7 = 8; // Total
-      // const int columnWidthh8 = 4; // Tax
-      const int columnWidthh9 = 6; // Amount
-
-      // Print table headers
-      String headersh = "${'S.No'.padRight(columnWidthh1)}"
-          " ${'Product'.padRight(columnWidthh2)}"
-          " ${'Unit'.padRight(columnWidthh3)}"
-          "${'Qty'.padRight(columnWidthh4)}"
-          "${'Type'.padRight(columnWidthh5)}"
-          "${'Rate'.padRight(columnWidthh6)}"
-          "${'Amount'.padRight(columnWidthh7)}"
-      // "${'Vat'.padRight(columnWidth8)}"
-          " ${'Total'.padLeft(columnWidth9)}";
-      printer.printCustom(headersh, 1, 0); // Left aligned
-
-      // Function to split text into lines of a given width
-      List<String> splitTexth(String text, int width) {
-        List<String> lines = [];
-        while (text.length > width) {
-          lines.add(text.substring(0, width));
-          text = text.substring(width);
-        }
-        lines.add(text); // Add remaining part
-        return lines;
-      }
-
-      // Print all product details
-      for (int i = 0; i < (invoice.returnData?.detail?.length ?? 0); i++) {
-          String productDescription = invoice.returnData!.detail![i].name ?? 'N/A';
-          String productUnit = invoice.returnData!.detail![i].unit ?? 'N/A';
-          String productQty = invoice.returnData!.detail![i].quantity?.toString() ?? '0';
-          String productType= invoice.returnData!.detail![i].productType?.toString()??'0';
-          String productRate = invoice.returnData!.detail![i].mrp?.toStringAsFixed(2) ?? '0.00';
-          String productTotal = invoice.returnData!.detail![i].taxable?.toStringAsFixed(2) ?? '0.00';
-          String productTax = tax.toString();
-          String productAmount =invoice.returnData!.detail![i].amount?.toStringAsFixed(2)??'0.00';
-          // (invoice.data!.detail![i].mrp! * invoice.data!.detail![i].quantity!)
-          //     .toStringAsFixed(2);
-
-          // Split the product description if it exceeds the column width
-          List<String> descriptionLines =
-          splitTexth(productDescription, columnWidth2);
-
-          for (int j = 0; j < descriptionLines.length; j++) {
-            String line;
-            if (j == 0) {
-              // For the first line, include all columns
-              line = "${(i + 1).toString().padRight(columnWidth1)}"
-                  "${descriptionLines[j].padRight(columnWidth2)}"
-                  "  ${productUnit.padRight(columnWidth3)}"
-                  "${productQty.padRight(columnWidth4)}"
-                  "${productType.padRight(columnWidth5)}"
-                  "${productRate.padRight(columnWidth6)}"
-                  "${productTotal.padRight(columnWidth7)}"
-              // "${productTax.padRight(columnWidth8)}"
-                  "${productAmount.padLeft(columnWidth9)}";
-            } else {
-              // For subsequent lines, only include the description, leaving other columns blank
-              line = "${''.padRight(columnWidth1)}"
-                  "${descriptionLines[j].padRight(columnWidth2)}"
-                  "${''.padRight(columnWidth3)}"
-                  "${''.padRight(columnWidth4)}"
-                  "${''.padRight(columnWidth5)}"
-                  "${''.padRight(columnWidth6)}"
-                  "${''.padRight(columnWidth7)}";
-              // "${''.padRight(columnWidth8)}";
-              "${''.padRight(columnWidth9)}";
+              // Print the logo image
+              await printer.printImageBytes(logoBytes);
+              // Small delay to allow printer to process image data
+              await Future.delayed(const Duration(milliseconds: 500));
             }
-            printer.printCustom(line, 1, 0); // Left aligned
+          } else {
+            print('Failed to load image: ${response.statusCode}');
+          }
+        } catch (e) {
+          print('Error printing logo: $e');
+        }
+      }
+
+      printer.printNewLine();
+      printer.printCustom(companyName, 3, 1);
+      printer.printCustom(companyAddress, 1, 1);
+      printer.printCustom(companyMail, 1, 1);
+      printer.printCustom(companyTRN, 1, 1);
+      printer.printCustom(billtype, 1, 1);
+      printer.printNewLine();
+
+      printer.printCustom("-" * 72, 1, 1);
+      printAlignedText("Invoice No: $invoiceNumber", "Date: $invoiceDate");
+      printer.printNewLine();
+
+      printAlignedText("Customer: $firstLine", "");
+      if (secondLine.isNotEmpty) {
+        printAlignedText("         $secondLine", "");
+      }
+      printAlignedText("Contact No: $customerContact", "");
+      printAlignedText("${store.vatLabel ?? 'VAT'}: $customerTRN", " ");
+      printAlignedText("Bill Type: $billType"," ");
+      printer.printNewLine();
+
+      // Sales Section
+      if (invoice.sales != null && invoice.sales!.detail.isNotEmpty) {
+        String salesTotal =
+            invoice.sales!.total.toStringAsFixed(AppState().noOfDecimals ?? 2);
+        String salesVat = invoice.sales!.totalTax
+            .toStringAsFixed(AppState().noOfDecimals ?? 2);
+        String salesGrandTotal = invoice.sales!.grandTotal
+            .toStringAsFixed(AppState().noOfDecimals ?? 2);
+        String salesAmountInWords =
+            "Amount in Words: ${AppState().code} ${NumberToWord().convert('en-in', invoice.sales!.grandTotal.toInt()).toUpperCase()} ONLY";
+        String salesman = invoice.sales!.user?.name ?? 'N/A';
+
+        printAlignedText("Sales", " ");
+        printer.printCustom("-" * 70, 1, 1);
+
+        const int col1 = 5,
+            col2 = 22,
+            col3 = 5,
+            col4 = 4,
+            col5 = 7,
+            col6 = 8,
+            col7 = 8,
+            col9 = 6;
+        String headers =
+            "${'S.No'.padRight(col1)} ${'Product'.padRight(col2)} ${'Unit'.padRight(col3)}${'Qty'.padRight(col4)}${'Type'.padRight(col5)}${'Rate'.padRight(col6)}${'Amount'.padRight(col7)} ${'Total'.padLeft(col9)}";
+        printer.printCustom(headers, 1, 0);
+
+        for (int i = 0; i < invoice.sales!.detail.length; i++) {
+          var d = invoice.sales!.detail[i];
+          List<String> descLines = splitText(d.name, col2);
+          for (int j = 0; j < descLines.length; j++) {
+            String line = j == 0
+                ? "${(i + 1).toString().padRight(col1)}${descLines[j].padRight(col2)}  ${d.unit.padRight(col3)}${d.quantity.toString().padRight(col4)}${d.productType.padRight(col5)}${d.mrp.toStringAsFixed(AppState().noOfDecimals ?? 2).padRight(col6)}${d.taxable.toStringAsFixed(AppState().noOfDecimals ?? 2).padRight(col7)}${d.amount.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(col9)}"
+                : "${''.padRight(col1)}${descLines[j].padRight(col2)}${''.padRight(col3)}${''.padRight(col4)}${''.padRight(col5)}${''.padRight(col6)}${''.padRight(col7)}${''.padRight(col9)}";
+            printer.printCustom(line, 1, 0);
           }
         }
-        printer.printCustom("-" * 70, 1, 1); // Centered
-
-      // Print totals
-      if (Discount.isNotEmpty) {
-        print(Discount);
-        printAlignedText("Van: $van", "$Discount");
-      } else {
-        printAlignedText("Van: $van", ""); // Skip printing Total
+        printer.printCustom("-" * 70, 1, 1);
+        printAlignedText("Salesman: $salesman", "Total: $salesTotal");
+        printer.printCustom("Vat: $salesVat", 1, 2);
+        printer.printCustom("Grand Total: $salesGrandTotal", 1, 2);
+        printer.printNewLine();
+        printer.printCustom(salesAmountInWords, 1, 0);
+        printer.printNewLine();
+        printer.printNewLine();
       }
-      printAlignedText("Salesman: $Returnsalesman", "Total: $ReturnTotal");
-      printer.printCustom("Vat: $tax", 1, 2);
-      printer.printCustom("Grand Total: $ReturngrandTotal", 1, 2); // Right aligned
-      printer.printNewLine();
-      printer.printCustom(ReturnamountInWords, 1, 0);
 
-      printer.printNewLine();
-      printer.printNewLine();
-      printAlignedText("Collection", " ");
-      printer.printCustom("-" * 72, 1, 1); // Centered
+      // Return Section
+      if (invoice.returnData != null && invoice.returnData!.detail.isNotEmpty) {
+        String returnTotal = invoice.returnData!.total
+            .toStringAsFixed(AppState().noOfDecimals ?? 2);
+        String returnVat = invoice.returnData!.totalTax
+            .toStringAsFixed(AppState().noOfDecimals ?? 2);
+        String returnGrandTotal = invoice.returnData!.grandTotal
+            .toStringAsFixed(AppState().noOfDecimals ?? 2);
+        String returnAmountInWords =
+            "Amount in Words: ${AppState().code} ${NumberToWord().convert('en-in', invoice.returnData!.grandTotal.toInt()).toUpperCase()} ONLY";
+        String salesman = invoice.returnData!.user?.name ?? 'N/A';
+        String van = invoice.returnData!.van?.name ?? invoice.sales?.van?.name ?? 'N/A';
 
-      // Print Sales Details
-      // printer.printLeftRight(
-      //     'Reference:', '${data.sales![0].voucherNo ?? 'N/A'}', 1);
-      // printer.printLeftRight('Date:', '${data.sales![0].inDate}', 1);
-      // printer.printLeftRight('Due Date:', '${data.sales![0].inDate}', 1);
-      // printer.printNewLine();
+        String discountStr = '';
+        if (invoice.returnData!.discount > 0) {
+          discountStr =
+              "Discount: ${invoice.returnData!.discount.toStringAsFixed(AppState().noOfDecimals ?? 2)}";
+        }
 
-      // Collection Information
-      if (invoice.collection != null) {
-        // Only print the totalAmount if it is not null
+        printAlignedText("Return", " ");
+        printer.printCustom("-" * 70, 1, 1);
+
+        const int col1 = 5,
+            col2 = 22,
+            col3 = 5,
+            col4 = 4,
+            col5 = 7,
+            col6 = 8,
+            col7 = 8,
+            col9 = 6;
+        String headers =
+            "${'S.No'.padRight(col1)} ${'Product'.padRight(col2)} ${'Unit'.padRight(col3)}${'Qty'.padRight(col4)}${'Type'.padRight(col5)}${'Rate'.padRight(col6)}${'Amount'.padRight(col7)} ${'Total'.padLeft(col9)}";
+        printer.printCustom(headers, 1, 0);
+
+        for (int i = 0; i < invoice.returnData!.detail.length; i++) {
+          var d = invoice.returnData!.detail[i];
+          List<String> descLines = splitText(d.name, col2);
+          for (int j = 0; j < descLines.length; j++) {
+            String line = j == 0
+                ? "${(i + 1).toString().padRight(col1)}${descLines[j].padRight(col2)}  ${d.unit.padRight(col3)}${d.quantity.toString().padRight(col4)}${d.productType.padRight(col5)}${d.mrp.toStringAsFixed(AppState().noOfDecimals ?? 2).padRight(col6)}${d.taxable.toStringAsFixed(AppState().noOfDecimals ?? 2).padRight(col7)}${d.amount.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(col9)}"
+                : "${''.padRight(col1)}${descLines[j].padRight(col2)}${''.padRight(col3)}${''.padRight(col4)}${''.padRight(col5)}${''.padRight(col6)}${''.padRight(col7)}${''.padRight(col9)}";
+            printer.printCustom(line, 1, 0);
+          }
+        }
+        printer.printCustom("-" * 70, 1, 1);
+        if (discountStr.isNotEmpty) {
+          printAlignedText("Van: $van", discountStr);
+        } else {
+          printAlignedText("Van: $van", "");
+        }
+        printAlignedText("Salesman: $salesman", "Total: $returnTotal");
+        printer.printCustom("Vat: $returnVat", 1, 2);
+        printer.printCustom("Grand Total: $returnGrandTotal", 1, 2);
+        printer.printNewLine();
+        printer.printCustom(returnAmountInWords, 1, 0);
+        printer.printNewLine();
+        printer.printNewLine();
+      }
+
+      // Collection Section
+      if (invoice.collection != null &&
+          ((invoice.collection!.sales != null &&
+                  invoice.collection!.sales!.isNotEmpty) ||
+              (double.tryParse(invoice.collection!.totalAmount ?? '0') ?? 0) !=
+                  0)) {
+        printAlignedText("Collection", " ");
+        printer.printCustom("-" * 72, 1, 1);
+
         if (invoice.collection!.totalAmount != null) {
           printAlignedText('Amount: ${invoice.collection!.totalAmount}', ' ');
-        } else {
-          printAlignedText('Amount: Not available', ' ');
         }
-
         if (invoice.collection!.collectionType == 'Cheque') {
           printAlignedText('Collection Type: Cheque', ' ');
           printAlignedText('Bank Name: ${invoice.collection!.bank}', ' ');
           printAlignedText('Cheque No: ${invoice.collection!.chequeNo}', ' ');
-          printAlignedText('Cheque Date: ${invoice.collection!.chequeDate}', ' ');
+          printAlignedText(
+              'Cheque Date: ${invoice.collection!.chequeDate}', ' ');
         } else if (invoice.collection!.collectionType == 'Cash') {
-          printAlignedText('Collection Type: Cash', ' '); // Optional
+          printAlignedText('Collection Type: Cash', ' ');
         }
-      } else {
-        // Handle the case where collection is null
-        printAlignedText('No collection data available', ' ');
-      }
 
-      // printer.printLeftRight('Collection Type:', '${data.collectionType}', 1);
-      // printer.printLeftRight('Bank Name:', '${data.bank}', 1);
-      // printer.printLeftRight('Cheque No:', '${data.chequeNo}', 1);
-      // printer.printLeftRight('Cheque Date:', '${data.chequeDate}', 1);
-      // printer.printLeftRight('Amount:', '${data.totalAmount}', 1);
-      printer.printNewLine();
-      printer.printCustom("-" * 72, 1, 1);
-      const int columnWidthc0 = 4;
-      const int columnWidthc1 = 14; // S.No
-      const int columnWidthc2 = 20; // Product Description
-      const int columnWidthc3 = 14; // Unit
-      const int columnWidthc4 = 5;
-      String line;
-      String headersc = "${''.padRight(columnWidthc0)}"
-          "${'SI.NO'.padRight(columnWidthc1)}"
-          " ${'Reference NO'.padRight(columnWidthc2)}"
-          " ${'Type'.padRight(columnWidthc3)}"
-          "${'Amount'.padRight(columnWidthc4)}";
-      printer.printCustom(headersc, 1, 0);
-      printer.printCustom("-" * 72, 1, 1);
-      // Sales List Header
-      // printer.printCustom('SI NO   Reference No   Type   Amount', 1, 0);
-      // printer.printCustom('---------------------------', 1, 0);
+        if (invoice.collection!.sales != null &&
+            invoice.collection!.sales!.isNotEmpty) {
+          printer.printNewLine();
+          printer.printCustom("-" * 72, 1, 1);
+          const int colc0 = 4, colc1 = 14, colc2 = 20, colc3 = 14, colc4 = 5;
+          String headersc =
+              "${''.padRight(colc0)}${'SI.NO'.padRight(colc1)} ${'Reference NO'.padRight(colc2)} ${'Type'.padRight(colc3)}${'Amount'.padRight(colc4)}";
+          printer.printCustom(headersc, 1, 0);
+          printer.printCustom("-" * 72, 1, 1);
 
-      // Iterate and print each sales item
-
-      String formatInvoiceType(String? invoiceType) {
-        if (invoiceType == null)
-          return 'N/A'; // Return N/A if invoiceType is null
-
-        // Capitalize the first letter and check for specific cases
-        switch (invoiceType.toLowerCase()) {
-          case 'salesreturn':
-            return 'Sales Return';
-          case 'payment_voucher':
-            return 'Payment';
-          default:
-            return invoiceType[0].toUpperCase() +
-                invoiceType.substring(1).toLowerCase();
+          for (var i = 0; i < invoice.collection!.sales!.length; i++) {
+            var sale = invoice.collection!.sales![i];
+            String line =
+                "${('').padRight(colc0)}${(i + 1).toString().padRight(colc1)} ${sale.invoiceNo?.padRight(colc2) ?? 'N/A'.padRight(colc2)}${formatInvoiceType(sale.invoiceType).padRight(colc3)}${sale.amount?.padRight(colc4) ?? 'N/A'.padRight(colc4)}";
+            printer.printCustom(line, 1, 0);
+          }
+          printer.printNewLine();
+          printer.printCustom("-" * 72, 1, 1);
         }
-      }
 
-      if (invoice.collection?.sales != null && invoice.collection!.sales!.isNotEmpty) {
-        for (var i = 0; i < invoice.collection!.sales!.length; i++) {
-          var sale = invoice.collection!.sales![i];
-          line = "${('').padRight(columnWidthc0)}"
-              "${(i + 1).toString().padRight(columnWidthc1)}"
-              " ${sale.invoiceNo?.padRight(columnWidthc2) ?? 'N/A'.padRight(columnWidthc2)}"
-              "${formatInvoiceType(sale.invoiceType)?.padRight(columnWidthc3) ?? 'N/A'.padRight(columnWidthc3)}"
-              "${sale.amount?.padRight(columnWidthc4) ?? 'N/A'.padRight(columnWidthc4)}";
-          printer.printCustom(line, 1, 0);
+        if (invoice.collection!.roundOff != null &&
+            (double.tryParse(invoice.collection!.roundOff!) ?? 0) != 0) {
+          printAlignedText('',
+              'Round Off: ${double.parse(invoice.collection!.roundOff!).toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         }
-      } else {
-        printAlignedText('No sales data available', ' ');
+        printAlignedText('', 'Total: ${invoice.collection!.totalAmount}');
+        if (invoice.collection!.van != null &&
+            invoice.collection!.van!.isNotEmpty) {
+          printAlignedText("Van: ${invoice.collection!.van![0].name}", "");
+        }
+        if (invoice.collection!.user != null &&
+            invoice.collection!.user!.isNotEmpty) {
+          printAlignedText("Salesman: ${invoice.collection!.user![0].name}", "");
+        }
+        printer.printNewLine();
       }
 
-      printer.printNewLine();
-      printer.printCustom("-" * 72, 1, 1);
-      if (invoice.collection!.roundOff != null && double.parse(invoice.collection!.roundOff!) != 0) {
-        printAlignedText('',
-            'Round Off: ${double.parse(invoice.collection!.roundOff!).toStringAsFixed(2)}');
-      }
-      printAlignedText('', 'Total: ${invoice.collection!.totalAmount}');
-      printAlignedText("Van: ${invoice.collection!.van![0].name}", "");
-      printAlignedText("Salesman: ${invoice.collection!.user![0].name}", "");
-      printer.printNewLine();
-
-      // Cut the paper
       printer.paperCut();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Printer not connected')),
-      );
+          const SnackBar(content: Text('Printer not connected')));
     }
-    if (!_connected) {
-      await _connect();
+  }
+
+  List<String> splitText(String text, int width) {
+    List<String> lines = [];
+    while (text.length > width) {
+      lines.add(text.substring(0, width));
+      text = text.substring(width);
+    }
+    lines.add(text);
+    return lines;
+  }
+
+  String formatInvoiceType(String? invoiceType) {
+    if (invoiceType == null) return 'N/A';
+    switch (invoiceType.toLowerCase()) {
+      case 'salesreturn':
+        return 'Sales Return';
+      case 'payment_voucher':
+        return 'Payment';
+      default:
+        return invoiceType[0].toUpperCase() +
+            invoiceType.substring(1).toLowerCase();
     }
   }
 }
-

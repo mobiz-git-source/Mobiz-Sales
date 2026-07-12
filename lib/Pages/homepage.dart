@@ -788,7 +788,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                               fontSize:
                                                   AppConfig.textCaption3Size),
                                         ),
-                                        Text(expenses.toStringAsFixed(2),
+                                        Text(expenses.toStringAsFixed(AppState().noOfDecimals ?? 2),
                                             style: TextStyle(
                                                 color: Colors.white,
                                                 fontWeight: FontWeight.w700,
@@ -884,7 +884,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                               fontSize:
                                                   AppConfig.textCaption3Size),
                                         ),
-                                        Text(cashInHand.toStringAsFixed(2),
+                                        Text(cashInHand.toStringAsFixed(AppState().noOfDecimals ?? 2),
                                             style: TextStyle(
                                                 color: Colors.white,
                                                 fontWeight: FontWeight.w700,
@@ -1056,7 +1056,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                     ),
                                                     Text(
                                                       totalSale
-                                                          .toStringAsFixed(2),
+                                                          .toStringAsFixed(AppState().noOfDecimals ?? 2),
                                                       style: TextStyle(
                                                           color: Colors.white),
                                                     )

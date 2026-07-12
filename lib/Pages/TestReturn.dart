@@ -687,7 +687,7 @@ class _HomereturnScreenState extends State<HomereturnScreen> {
     // Draw invoice details at the bottom right.
     // ${num.parse(invoice.data!.roundOff.toString()) != 0 ? 'Discount: ${invoice.data!.discount}' : '\t'}
     String bottomInvoiceDetails = '''
-  ${invoice.data!.discount != null && invoice.data!.discount! > 0 ? 'Discount: ${invoice.data!.discount!.toStringAsFixed(2)}' : '\t'}
+  ${invoice.data!.discount != null && invoice.data!.discount! > 0 ? 'Discount: ${invoice.data!.discount!.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : '\t'}
 
   Total: ${invoice.data!.total}
   Tax: ${invoice.data!.totalTax}
@@ -781,16 +781,16 @@ Salesman: ${invoice.data!.user![0].name}
           .format(DateTime.parse(invoice.data!.inDate!));
       String dueDate = DateFormat('dd MMMM yyyy')
           .format(DateTime.parse(invoice.data!.inDate!));
-      String Total = invoice.data!.total?.toStringAsFixed(2) ?? '0.00';
-      String tax = invoice.data!.totalTax?.toStringAsFixed(2) ?? '0.00';
+      String Total = invoice.data!.total?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
+      String tax = invoice.data!.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
       String grandTotal =
-          invoice.data!.grandTotal?.toStringAsFixed(2) ?? '0.00';
+          invoice.data!.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
       String Discount;
       if (invoice.data!.discount != null &&
           double.tryParse(invoice.data!.discount!.toString()) != null &&
           double.parse(invoice.data!.discount!.toString()) > 0) {
         Discount =
-            "Discount: ${double.parse(invoice.data!.discount!.toString()).toStringAsFixed(2)}";
+            "Discount: ${double.parse(invoice.data!.discount!.toString()).toStringAsFixed(AppState().noOfDecimals ?? 2)}";
       } else {
         Discount = '';
       }
@@ -904,14 +904,14 @@ Salesman: ${invoice.data!.user![0].name}
         String productType =
             invoice.data!.detail![i].productType?.toString() ?? '0';
         String productRate =
-            invoice.data!.detail![i].mrp?.toStringAsFixed(2) ?? '0.00';
+            invoice.data!.detail![i].mrp?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
         String productTotal =
-            invoice.data!.detail![i].taxable?.toStringAsFixed(2) ?? '0.00';
+            invoice.data!.detail![i].taxable?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
         // String productTax = tax.toString();
         String productAmount =
-            invoice.data!.detail![i].amount?.toStringAsFixed(2) ?? '0.00';
+            invoice.data!.detail![i].amount?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
         // (invoice.data!.detail![i].mrp! * invoice.data!.detail![i].quantity!)
-        //     .toStringAsFixed(2);
+        //     .toStringAsFixed(AppState().noOfDecimals ?? 2);
 
         // Split the product description if it exceeds the column width
         List<String> descriptionLines =

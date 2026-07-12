@@ -186,7 +186,25 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     }
   }
 
+  Future<String> _getOutstanding(int? customerId) async {
+    if (customerId == null) return '0.00';
+    try {
+      final response = await http.get(Uri.parse(
+          '${RestDatasource().BASE_URL}/api/get_sales_pending_outstanding?store_id=${AppState().storeId}&customer_id=$customerId'));
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['success'] == true) {
+          return responseData['data'].toString();
+        }
+      }
+    } catch (e) {
+      print('Error fetching outstanding: $e');
+    }
+    return '0.00';
+  }
+
   Future<void> generatePdf(ReportData data) async {
+    String outstanding = await _getOutstanding(data.customerId);
     final response = await http.get(Uri.parse(
         '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
     if (response.statusCode == 200) {
@@ -316,11 +334,14 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
             pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
               pw.Text((data.roundoff != null &&
                       double.parse(data.roundoff!) != 0)
-                  ? 'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(2)}'
+                  ? 'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(AppState().noOfDecimals ?? 2)}'
                   : ''),
             ]),
             pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
               pw.Text('Total: ${data.totalAmount ?? 'N/A'}'),
+            ]),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
+              pw.Text('Total Outstanding: $outstanding'),
             ]),
             pw.SizedBox(height: 20),
             pw.Text('Van: ${data.van![0].name ?? 'N/A'}'),
@@ -340,6 +361,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   }
 
   Future<void> generateWifiPdf(ReportData data) async {
+    String outstanding = await _getOutstanding(data.customerId);
     final response = await http.get(Uri.parse(
         '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
     if (response.statusCode == 200) {
@@ -472,11 +494,14 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
             pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
               pw.Text((data.roundoff != null &&
                   double.parse(data.roundoff!) != 0)
-                  ? 'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(2)}'
+                  ? 'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(AppState().noOfDecimals ?? 2)}'
                   : ''),
             ]),
             pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
               pw.Text('Total: ${data.totalAmount ?? 'N/A'}'),
+            ]),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
+              pw.Text('Total Outstanding: $outstanding'),
             ]),
             pw.SizedBox(height: 20),
             pw.Text('Van: ${data.van![0].name ?? 'N/A'}'),
@@ -882,6 +907,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
       //     print('Failed to load image: ${response.statusCode}');
       //   }
       // }
+      String outstanding = await _getOutstanding(data.customerId);
       final response = await http.get(Uri.parse(
           '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
       if (response.statusCode == 200) {
@@ -1029,9 +1055,10 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         printer.printCustom("-" * 72, 1, 1);
         if (data.roundoff != null && double.parse(data.roundoff!) != 0) {
           printAlignedText('',
-              'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(2)}');
+              'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         }
         printAlignedText('', 'Total: ${data.totalAmount}');
+        printAlignedText('', 'Total Outstanding: $outstanding');
         printAlignedText("Van: ${data.van![0].name}", "");
         printAlignedText("Salesman: ${data.user![0].name}", "");
         // printer.printLeftRight('Van:', '${data.vanId}', 1);

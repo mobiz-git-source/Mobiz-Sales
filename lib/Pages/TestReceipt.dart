@@ -205,7 +205,7 @@
 //             pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
 //               pw.Text((data.roundoff != null &&
 //                   double.parse(data.roundoff!) != 0)
-//                   ? 'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(2)}'
+//                   ? 'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(AppState().noOfDecimals ?? 2)}'
 //                   : ''),
 //             ]),
 //             pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
@@ -676,7 +676,7 @@
 //         printer.printCustom("-" * 72, 1, 1);
 //         if (data.roundoff != null && double.parse(data.roundoff!) != 0) {
 //           printAlignedText('',
-//               'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(2)}');
+//               'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(AppState().noOfDecimals ?? 2)}');
 //         }
 //         printAlignedText('', 'Total: ${data.totalAmount}');
 //         printAlignedText("Van: ${data.van![0].name}", "");

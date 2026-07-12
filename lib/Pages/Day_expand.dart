@@ -1247,11 +1247,11 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                   '${entry.key + 1}',
                   formatCustomerName(customerNames),
                   sale.invoiceNo ?? '',
-                  sale.grandTotal?.toStringAsFixed(2) ?? '0.00',
+                  sale.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00',
                 ];
               }).toList();
 
-              salesRows.add(['', '', 'Total:', totalSales.toStringAsFixed(2)]);
+              salesRows.add(['', '', 'Total:', totalSales.toStringAsFixed(AppState().noOfDecimals ?? 2)]);
 
               pageContent.add(buildCompactTable(
                 headers: ['SI NO', 'SHOP NAME', 'INVOICE NO', 'Amount'],
@@ -1314,13 +1314,13 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                   '${entry.key + 1}',
                   formatCustomerName(customerNames),
                   ret.invoiceNo ?? '',
-                  ret.grandTotal?.toStringAsFixed(2) ?? '0.00',
+                  ret.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00',
                 ];
               }).toList();
 
               // Add total row
               returnRows
-                  .add(['', '', 'Total:', totalReturns.toStringAsFixed(2)]);
+                  .add(['', '', 'Total:', totalReturns.toStringAsFixed(AppState().noOfDecimals ?? 2)]);
 
               pageContent.add(buildCompactTable(
                 headers: ['SI NO', 'SHOP NAME', 'Reference', 'Amount'],
@@ -1427,7 +1427,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
 
               // Add total row
               collectionRows
-                  .add(['', '', 'Total:', totalCollections.toStringAsFixed(2)]);
+                  .add(['', '', 'Total:', totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2)]);
 
               pageContent.add(buildCompactTable(
                 headers: ['SI NO', 'SHOP NAME', 'TYPE', 'Amount', 'Reference'],
@@ -1469,7 +1469,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
               }).toList();
 
               // Add total row
-              expenseRows.add(['', 'Total:', totalExpenses.toStringAsFixed(2)]);
+              expenseRows.add(['', 'Total:', totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2)]);
 
               pageContent.add(buildCompactTable(
                 headers: ['SI NO', 'Description', 'Amount'],
@@ -1514,7 +1514,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                   ),
                   pw.SizedBox(height: 2),
                   pw.Text(
-                    'Net Cash Balance: ${(totalCollections - totalExpenses).toStringAsFixed(2)}',
+                    'Net Cash Balance: ${(totalCollections - totalExpenses).toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                     style: pw.TextStyle(fontSize: 12),
                   ),
                   pw.SizedBox(height: 2),
@@ -1618,7 +1618,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
       printer.printCustom('Petty Cash:${report.data!.pettyCash}', 1, 0);
       printer.printCustom('Invoice No: ${report.data!.invoiceNo}', 1, 0);
       printer.printCustom(
-          'Sales: ${report.data!.noOfSales} | ${report.data!.amountOfSales.toStringAsFixed(2)}',
+          'Sales: ${report.data!.noOfSales} | ${report.data!.amountOfSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
           1,
           0);
       printer.printCustom(
@@ -1691,7 +1691,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
               "${(report.sales!.indexOf(sale) + 1).toString().padRight(columnWidth1)}"
               "${customerNameLines[0].padRight(columnWidth2)}"
               "${sale.invoiceNo!.padRight(columnWidth3)}"
-              "${sale.grandTotal!.toStringAsFixed(2).padLeft(columnWidth4)}";
+              "${sale.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(columnWidth4)}";
 
           printer.printCustom(firstLine, 1, 0);
 
@@ -1703,7 +1703,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
           }
         }
         printer.printNewLine();
-        printAlignedText('', 'Total Sales: ${totalSales.toStringAsFixed(2)}');
+        printAlignedText('', 'Total Sales: ${totalSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         printer.printNewLine();
       }
 
@@ -1743,7 +1743,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
               "${(report.salesReturn!.indexOf(salesReturn) + 1).toString().padRight(columnWidth1)}"
               "${customerNameLines[0].padRight(columnWidth2)}"
               "${(salesReturn.invoiceNo ?? 'No Type').padRight(columnWidth3)}"
-              "${salesReturn.grandTotal!.toStringAsFixed(2).padLeft(columnWidth4)}";
+              "${salesReturn.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(columnWidth4)}";
 
           printer.printCustom(firstLine, 1, 0);
           for (int i = 1; i < customerNameLines.length; i++) {
@@ -1754,7 +1754,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
         }
         printer.printNewLine();
         printAlignedText(
-            '', 'Total Sales Return: ${totalSalesreturn.toStringAsFixed(2)}');
+            '', 'Total Sales Return: ${totalSalesreturn.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         // printer.printCustom('Total Collections: $totalCollections', 1, 0);
         printer.printNewLine();
         // printer.printCustom('Return', 1, 0);
@@ -1813,7 +1813,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
               "${(report.collection!.indexOf(collection) + 1).toString().padRight(columnWidth1)}"
               "${customerNameLines[0].padRight(columnWidth2)}"
               "${(collection.collectionType ?? 'No Type').padRight(columnWidth3)}"
-              "${(double.tryParse(collection.totalAmount ?? '0')?.toStringAsFixed(2) ?? '0.00').padLeft(columnWidth4)}";
+              "${(double.tryParse(collection.totalAmount ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00').padLeft(columnWidth4)}";
 
           printer.printCustom(firstLine, 1, 0);
           for (int i = 1; i < customerNameLines.length; i++) {
@@ -1824,7 +1824,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
         }
         printer.printNewLine();
         printAlignedText(
-            '', 'Total Collections: ${totalCollections.toStringAsFixed(2)}');
+            '', 'Total Collections: ${totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         // printer.printCustom('Total Collections: $totalCollections', 1, 0);
         printer.printNewLine();
       }
@@ -1864,7 +1864,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
               "${(report.expense!.indexOf(expense) + 1).toString().padRight(columnWidth1)}"
               "${customerNameLines[0].padRight(columnWidth2)}"
               "${(expense.invoiceNo ?? 'No Type').padRight(columnWidth3)}"
-              "${(double.tryParse(expense.amount ?? '0')?.toStringAsFixed(2) ?? '0.00').padLeft(columnWidth4)}";
+              "${(double.tryParse(expense.amount ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00').padLeft(columnWidth4)}";
 
           printer.printCustom(firstLine, 1, 0);
           for (int i = 1; i < customerNameLines.length; i++) {
@@ -1882,7 +1882,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
         }
         printer.printNewLine();
         printAlignedText(
-            '', 'Total Expenses: ${totalExpenses.toStringAsFixed(2)}');
+            '', 'Total Expenses: ${totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         printer.printNewLine();
       }
       printer.printCustom('Expense ${report.data!.expense}', 1, 0);
@@ -1944,12 +1944,12 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
           final collections = dayCloseResponse.collection ?? [];
           final expenses = dayCloseResponse.expense ?? [];
           double totalSale = sales.fold(0.0, (sum, returns) {
-            return sum + (double.tryParse(returns.grandTotal!.toStringAsFixed(2)) ?? 0.0);
+            return sum + (double.tryParse(returns.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)) ?? 0.0);
           });
 
           double totalSum = salesReturns.fold(0.0, (sum, returns) {
             return sum +
-                (double.tryParse(returns.grandTotal!.toStringAsFixed(2)) ??
+                (double.tryParse(returns.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)) ??
                     0.0);
           });
 
@@ -1959,12 +1959,12 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
           });
 
           String totalCollectionsFormatted =
-              totalCollections.toStringAsFixed(2);
+              totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2);
           double totalExpenses = expenses.fold(0.0, (sum, returns) {
             return sum + (double.tryParse(returns.amount.toString()) ?? 0.0);
           });
 
-          String totalExpenseFormated = totalExpenses.toStringAsFixed(2);
+          String totalExpenseFormated = totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2);
 
           final vanName = (dayCloseResponse.data!.van != null &&
                   dayCloseResponse.data!.van.isNotEmpty)
@@ -2045,7 +2045,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                             children: [
                               TextSpan(
                                 text:
-                                    '${dayCloseResponse.data!.noOfSales} | ${dayCloseResponse.data!.amountOfSales.toStringAsFixed(2)}',
+                                    '${dayCloseResponse.data!.noOfSales} | ${dayCloseResponse.data!.amountOfSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                                 style: TextStyle(color: Colors.grey),
                               ),
                             ],
@@ -2218,7 +2218,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                                         Expanded(
                                           flex: 3, // More space for Amount
                                           child: Text(
-                                            '${sale.grandTotal?.toStringAsFixed(2)}', // Amount
+                                            '${sale.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2)}', // Amount
                                             textAlign: TextAlign
                                                 .right, // Align amount to the right
                                           ),
@@ -2234,7 +2234,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                                   mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
                                     Text(
-                                      'Total: ${totalSale.toStringAsFixed(2)}',
+                                      'Total: ${totalSale.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                                       style: TextStyle(
                                           fontWeight: FontWeight.w700,
                                           fontSize: 13),
@@ -2356,7 +2356,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                                           Expanded(
                                             flex: 3, // More space for Amount
                                             child: Text(
-                                                '${returns.grandTotal!.toStringAsFixed(2)}',
+                                                '${returns.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                                                 textAlign:
                                                     TextAlign.right), // Amount
                                           ),
@@ -2372,7 +2372,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                                     mainAxisAlignment: MainAxisAlignment.end,
                                     children: [
                                       Text(
-                                        'Total: ${totalSum.toStringAsFixed(2)}',
+                                        'Total: ${totalSum.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                                         style: TextStyle(
                                             fontWeight: FontWeight.w700,
                                             fontSize: 13),
@@ -2629,7 +2629,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                                             (double.tryParse(
                                                 e.totalAmount ?? '0') ??
                                                 0.0),
-                                      ).toStringAsFixed(2)}', // Optional: Format as currency or 2 decimal places
+                                      ).toStringAsFixed(AppState().noOfDecimals ?? 2)}', // Optional: Format as currency or 2 decimal places
                                       style: TextStyle(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 13,

@@ -524,7 +524,7 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
                     //   )
 
                     ? Text(
-                        'Total: ${data.total?.toStringAsFixed(2)}',
+                        'Total: ${data.total?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                         style: TextStyle(
                           fontSize: AppConfig.textCaption3Size,
                         ),
@@ -537,14 +537,14 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
                       ),
                 data.discount_type == '0'
                     ? Text(
-                        'Discount : ${data.discount?.toStringAsFixed(2)}',
+                        'Discount : ${data.discount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                         style: TextStyle(
                           fontSize: AppConfig.textCaption3Size,
                         ),
                       )
                     : data.discount_type == '1'
                         ? Text(
-                            'Discount(%): ${data.discount?.toStringAsFixed(2)}',
+                            'Discount(%): ${data.discount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                             style: TextStyle(
                               fontSize: AppConfig.textCaption3Size,
                             ),
@@ -553,7 +553,7 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
                 Row(
                   children: [
                     Text(
-                      'Round off:${double.parse(data.roundOff ?? '').toStringAsFixed(2)}',
+                      'Round off:${double.parse(data.roundOff ?? '').toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                       style: TextStyle(
                         fontSize: AppConfig.textCaption3Size,
                       ),
@@ -593,13 +593,14 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
                   ],
                 ),
                 Text(
-                  'Total Vat: ${(data.totalTax?.toStringAsFixed(2)) ?? ''}',
+                  'Total Vat: ${(data.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2)) ?? ''}',
                   style: TextStyle(
                     fontSize: AppConfig.textCaption3Size,
                   ),
                 ),
+                // Text("Code: ${AppState().code}"),
                 Text(
-                  'Grand Total: ${data.grandTotal?.toStringAsFixed(2)}',
+                  'Grand Total: ${data.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                   style: TextStyle(
                     fontSize: AppConfig.textCaption3Size,
                   ),
@@ -664,7 +665,7 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
                                 ),
                                 const Text(' | '),
                                 Text(
-                                  'Amount: ${data.detail![i].taxable?.toStringAsFixed(2)}',
+                                  'Amount: ${data.detail![i].taxable?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                                   style: TextStyle(
                                     fontSize: AppConfig.textCaption3Size,
                                   ),
@@ -710,28 +711,30 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
       String customerEmail = invoice.data!.customer![0].email ?? 'N/A';
       String customerContact =
           invoice.data!.customer![0].contactNumber ?? 'N/A';
-      String customerTRN = invoice.data!.customer![0].trn ?? '';
+      String customerTRN =
+              invoice.data?.customer?.firstOrNull?.trn ??
+              '';
       String invoiceNumber = invoice.data!.invoiceNo ?? 'N/A';
       String invoiceDate = DateFormat('dd MMMM yyyy')
           .format(DateTime.parse(invoice.data!.inDate!));
       String dueDate = DateFormat('dd MMMM yyyy')
           .format(DateTime.parse(invoice.data!.inDate!));
-      String Total = invoice.data!.total?.toStringAsFixed(2) ?? '0.00';
-      String tax = invoice.data!.totalTax?.toStringAsFixed(2) ?? '0.00';
+      String Total = invoice.data!.total?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
+      String tax = invoice.data!.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
       String grandTotal =
-          invoice.data!.grandTotal?.toStringAsFixed(2) ?? '0.00';
+          invoice.data!.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
       final remarks = invoice.data?.remarks;
       String Discount;
       if (invoice.data!.discount != null &&
           double.tryParse(invoice.data!.discount!.toString()) != null &&
           double.parse(invoice.data!.discount!.toString()) > 0) {
         Discount =
-            "Discount: ${double.parse(invoice.data!.discount!.toString()).toStringAsFixed(2)}";
+            "Discount: ${double.parse(invoice.data!.discount!.toString()).toStringAsFixed(AppState().noOfDecimals ?? 2)}";
       } else {
         Discount = '';
       }
       String amountInWords =
-          "Amount in Words: AED ${NumberToWord().convert('en-in', invoice.data!.grandTotal?.toInt() ?? 0).toUpperCase()} ONLY";
+          "Amount in Words: ${AppState().code} ${NumberToWord().convert('en-in', invoice.data!.grandTotal?.toInt() ?? 0).toUpperCase()} ONLY";
       String van = invoice.data!.van![0].name ?? 'N/A';
       String salesman = invoice.data!.user![0].name ?? 'N/A';
 
@@ -792,7 +795,8 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
       printAlignedText("$cusAddress", " ");
       // printAlignedText("Email: $customerEmail", "");
       printAlignedText("Contact No: $customerContact", "");
-      printAlignedText("TRN: $customerTRN", " ");
+      printAlignedText("${invoice.data?.store?.firstOrNull?.vat_label}: $customerTRN", " ");
+      printAlignedText("Bill Type: ${invoice.data!.cashCard}", " ");
       printer.printNewLine();
 
       // Print horizontal line
@@ -841,14 +845,14 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
         String productType =
             invoice.data!.detail![i].productType?.toString() ?? '0';
         String productRate =
-            invoice.data!.detail![i].mrp?.toStringAsFixed(2) ?? '0.00';
+            invoice.data!.detail![i].mrp?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
         String productTotal =
-            invoice.data!.detail![i].taxable?.toStringAsFixed(2) ?? '0.00';
-        String productTax = invoice.data!.detail![i].taxAmt?.toStringAsFixed(2) ?? '0.00';
+            invoice.data!.detail![i].taxable?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
+        String productTax = invoice.data!.detail![i].taxAmt?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
         String productAmount =
-            invoice.data!.detail![i].amount?.toStringAsFixed(2) ?? '0.00';
+            invoice.data!.detail![i].amount?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
         // (invoice.data!.detail![i].mrp! * invoice.data!.detail![i].quantity!)
-        //     .toStringAsFixed(2);
+        //     .toStringAsFixed(AppState().noOfDecimals ?? 2);
 
         // Split the product description if it exceeds the column width
         List<String> descriptionLines =
@@ -886,14 +890,14 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
       double total = (invoice.data!.total ?? 0).toDouble();
       double discount = (invoice.data!.discount ?? 0).toDouble();
       double subTotal = total - discount;
-      printAlignedText("","Total: ${total.toStringAsFixed(2)}");
+      printAlignedText("","Total: ${total.toStringAsFixed(AppState().noOfDecimals ?? 2)}");
       if (Discount.isNotEmpty) {
         print(Discount);
         printAlignedText("Van: $van", "$Discount");
       } else {
         printAlignedText("Van: $van", ""); // Skip printing Total
       }
-      printAlignedText("Salesman: $salesman", "Sub Total: ${subTotal.toStringAsFixed(2)}");
+      printAlignedText("Salesman: $salesman", "Sub Total: ${subTotal.toStringAsFixed(AppState().noOfDecimals ?? 2)}");
       printAlignedText("","Vat 5%: $tax");
       printAlignedText("","Grand Total: $grandTotal"); // Right aligned
       printer.printNewLine();
@@ -976,6 +980,10 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
 
     final PdfFont font = PdfStandardFont(PdfFontFamily.helvetica, 15);
     final Size textSize = font.measureString(text);
+    String customerTRN =
+        // invoice.data?.store?.firstOrNull?.vat_label ??
+            invoice.data?.customer?.firstOrNull?.trn ??
+            '';
     final double xPosition = (pageWidth - textSize.width) / 2;
     final double yPosition =
         165;
@@ -1000,7 +1008,8 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
   Customer: ${invoice.data!.customer![0].code} | ${invoice.data!.customer![0].name}
   Email: ${invoice.data!.customer![0].email}
   Contact No:  ${invoice.data!.customer![0].contactNumber}
-  TRN:  ${invoice.data!.customer![0].trn ?? ''}
+  ${invoice.data?.store?.firstOrNull?.vat_label}:  $customerTRN
+  Bill Type: ${invoice.data!.cashCard}
   ''';
 
     String invoiceDetails = '''
@@ -1072,13 +1081,13 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
           ? 'Normal'
           : 'Normal';
       row.cells[5].value =
-          '${invoice.data!.detail![k].mrp?.toStringAsFixed(2)}';
+          '${invoice.data!.detail![k].mrp?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
       row.cells[6].value =
-          '${invoice.data!.detail![k].taxable?.toStringAsFixed(2)}';
+          '${invoice.data!.detail![k].taxable?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
       row.cells[7].value =
-          '${invoice.data!.detail![k].taxAmt?.toStringAsFixed(2)}';
+          '${invoice.data!.detail![k].taxAmt?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
       row.cells[8].value =
-          '${invoice.data!.detail![k].amount?.toStringAsFixed(2)}';
+          '${invoice.data!.detail![k].amount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
     }
 
     // Define no border style
@@ -1137,13 +1146,13 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
 
     // Draw invoice details at the bottom right.
 
-    // ${num.parse(invoice.data!.roundOff.toString()) != 0 ? 'Discount: ${invoice.data!.discount?.toStringAsFixed(2)}' : '\t'}
+    // ${num.parse(invoice.data!.roundOff.toString()) != 0 ? 'Discount: ${invoice.data!.discount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : '\t'}
 
     String bottomInvoiceDetails = '''
-    ${invoice.data!.discount != null && invoice.data!.discount! > 0 ? 'Discount: ${invoice.data!.discount!.toStringAsFixed(2)}' : '\t'}
+    ${invoice.data!.discount != null && invoice.data!.discount! > 0 ? 'Discount: ${invoice.data!.discount!.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : '\t'}
   Sub Total: ${invoice.data!.total ?? ''}
-  Vat: ${invoice.data!.totalTax?.toStringAsFixed(2)}
-  ${'${invoice.data!.roundOff}' != 0 ? 'Round off:${double.parse(invoice.data!.roundOff ?? '').toStringAsFixed(2)}\nGrand Total: ${invoice.data!.grandTotal?.toStringAsFixed(2)}' : 'Grand Total: ${invoice.data!.grandTotal}'}
+  Vat: ${invoice.data!.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2)}
+  ${'${invoice.data!.roundOff}' != 0 ? 'Round off:${double.parse(invoice.data!.roundOff ?? '').toStringAsFixed(AppState().noOfDecimals ?? 2)}\nGrand Total: ${invoice.data!.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : 'Grand Total: ${invoice.data!.grandTotal}'}
 
 
   ''';
@@ -1268,7 +1277,7 @@ Salesman: ${invoice.data!.user![0].name}
 
 // Prepare the text data
     String textData =
-        'Amount in Words: AED ${numberToWords(invoice.data!.grandTotal!.toInt()).toUpperCase()} ONLY';
+        'Amount in Words: ${AppState().code} ${numberToWords(invoice.data!.grandTotal!.toInt()).toUpperCase()} ONLY';
     String? infoot = invoice.data!.store![0].invoice_footer;
 
 // Measure the height of both text strings
@@ -1355,7 +1364,7 @@ Salesman: ${invoice.data!.user![0].name}
   Customer: ${invoice.data!.customer![0].code} | ${invoice.data!.customer![0].name}
   Email: ${invoice.data!.customer![0].email}
   Contact No:  ${invoice.data!.customer![0].contactNumber}
-  TRN:  ${invoice.data!.customer![0].trn ?? ''}
+  VAT Label:  ${invoice.data!.customer![0].trn ?? ''}
   ''';
 
     String invoiceDetails = '''
@@ -1438,13 +1447,13 @@ Salesman: ${invoice.data!.user![0].name}
       row.cells[1].value = '${invoice.data!.detail![k].name}';
       row.cells[2].value = '${invoice.data!.detail![k].unit}';
       row.cells[3].value = '${invoice.data!.detail![k].quantity}';
-      row.cells[4].value = '${invoice.data!.detail![k].mrp?.toStringAsFixed(2)}';
-      row.cells[5].value = '${(invoice.data!.detail![k].mrp! * 1.05).toStringAsFixed(2)}';
-      row.cells[6].value = '${invoice.data!.detail![k].taxable?.toStringAsFixed(2)}';
-      row.cells[7].value = '${invoice.data!.detail![k].taxable?.toStringAsFixed(2)}';
+      row.cells[4].value = '${invoice.data!.detail![k].mrp?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
+      row.cells[5].value = '${(invoice.data!.detail![k].mrp! * 1.05).toStringAsFixed(AppState().noOfDecimals ?? 2)}';
+      row.cells[6].value = '${invoice.data!.detail![k].taxable?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
+      row.cells[7].value = '${invoice.data!.detail![k].taxable?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
       row.cells[8].value = '5%';
-      row.cells[9].value = '${invoice.data!.detail![k].taxAmt?.toStringAsFixed(2)}';
-      row.cells[10].value = '${invoice.data!.detail![k].amount?.toStringAsFixed(2)}';
+      row.cells[9].value = '${invoice.data!.detail![k].taxAmt?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
+      row.cells[10].value = '${invoice.data!.detail![k].amount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
 
       final PdfStringFormat centerFormat = PdfStringFormat(
         alignment: PdfTextAlignment.center,
@@ -1491,11 +1500,11 @@ Salesman: ${invoice.data!.user![0].name}
     double subTotal = total - discount;
 
     String bottomInvoiceDetails = '''
-Total: ${total.toStringAsFixed(2)}    
-${(invoice.data!.discount ?? 0) > 0 ? 'Discount: ${(invoice.data!.discount ?? 0).toStringAsFixed(2)}' : '\t'}
-Sub Total: ${subTotal.toStringAsFixed(2)}
-Vat: ${invoice.data!.totalTax?.toStringAsFixed(2)}
-${'${invoice.data!.roundOff}' != '0' ? 'Round off: ${double.parse(invoice.data!.roundOff ?? '0').toStringAsFixed(2)}\nGrand Total: ${invoice.data!.grandTotal?.toStringAsFixed(2)}' : 'Grand Total: ${invoice.data!.grandTotal}'}
+Total: ${total.toStringAsFixed(AppState().noOfDecimals ?? 2)}    
+${(invoice.data!.discount ?? 0) > 0 ? 'Discount: ${(invoice.data!.discount ?? 0).toStringAsFixed(AppState().noOfDecimals ?? 2)}' : '\t'}
+Sub Total: ${subTotal.toStringAsFixed(AppState().noOfDecimals ?? 2)}
+Vat: ${invoice.data!.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2)}
+${'${invoice.data!.roundOff}' != '0' ? 'Round off: ${double.parse(invoice.data!.roundOff ?? '0').toStringAsFixed(AppState().noOfDecimals ?? 2)}\nGrand Total: ${invoice.data!.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : 'Grand Total: ${invoice.data!.grandTotal}'}
 ''';
 
 
@@ -1610,12 +1619,10 @@ Salesman: ${invoice.data!.user![0].name}
       return words.trim();
     }
 
-    // Define the font
     final PdfStandardFont sfont = PdfStandardFont(PdfFontFamily.helvetica, 12);
 
 // Prepare the text data
-    String textData =
-        'Amount in Words: AED ${numberToWords(invoice.data!.grandTotal!.toInt()).toUpperCase()} ONLY';
+    String textData = 'Amount in Words: ${AppState().code} ${numberToWords(invoice.data!.grandTotal!.toInt()).toUpperCase()} ONLY';
     String? infoot = invoice.data!.store![0].invoice_footer;
 
 // Measure the height of both text strings

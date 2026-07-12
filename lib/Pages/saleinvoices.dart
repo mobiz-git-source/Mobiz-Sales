@@ -280,7 +280,7 @@
 //                     //   )
 //
 //                     ? Text(
-//                         'Total: ${data.total?.toStringAsFixed(2)}',
+//                         'Total: ${data.total?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
 //                         style: TextStyle(
 //                           fontSize: AppConfig.textCaption3Size,
 //                         ),
@@ -293,14 +293,14 @@
 //                       ),
 //                 data.discount_type == '0'
 //                     ? Text(
-//                         'Discount : ${data.discount?.toStringAsFixed(2)}',
+//                         'Discount : ${data.discount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
 //                         style: TextStyle(
 //                           fontSize: AppConfig.textCaption3Size,
 //                         ),
 //                       )
 //                     : data.discount_type == '1'
 //                         ? Text(
-//                             'Discount(%): ${data.discount?.toStringAsFixed(2)}',
+//                             'Discount(%): ${data.discount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
 //                             style: TextStyle(
 //                               fontSize: AppConfig.textCaption3Size,
 //                             ),
@@ -309,7 +309,7 @@
 //                 Row(
 //                   children: [
 //                     Text(
-//                       'Round off:${double.parse(data.roundOff ?? '').toStringAsFixed(2)}',
+//                       'Round off:${double.parse(data.roundOff ?? '').toStringAsFixed(AppState().noOfDecimals ?? 2)}',
 //                       style: TextStyle(
 //                         fontSize: AppConfig.textCaption3Size,
 //                       ),
@@ -335,13 +335,13 @@
 //                   ],
 //                 ),
 //                 Text(
-//                   'Total Vat: ${(data.totalTax?.toStringAsFixed(2)) ?? ''}',
+//                   'Total Vat: ${(data.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2)) ?? ''}',
 //                   style: TextStyle(
 //                     fontSize: AppConfig.textCaption3Size,
 //                   ),
 //                 ),
 //                 Text(
-//                   'Grand Total: ${data.grandTotal?.toStringAsFixed(2)}',
+//                   'Grand Total: ${data.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
 //                   style: TextStyle(
 //                     fontSize: AppConfig.textCaption3Size,
 //                   ),
@@ -406,7 +406,7 @@
 //                                 ),
 //                                 const Text(' | '),
 //                                 Text(
-//                                   'Amount: ${data.detail![i].taxable?.toStringAsFixed(2)}',
+//                                   'Amount: ${data.detail![i].taxable?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
 //                                   style: TextStyle(
 //                                     fontSize: AppConfig.textCaption3Size,
 //                                   ),
@@ -476,17 +476,17 @@
 //           .format(DateTime.parse(invoice.data!.inDate!));
 //       String dueDate = DateFormat('dd MMMM yyyy')
 //           .format(DateTime.parse(invoice.data!.inDate!));
-//       String Total = invoice.data!.total?.toStringAsFixed(2)??'0.00';
-//       String tax = invoice.data!.totalTax?.toStringAsFixed(2) ?? '0.00';
+//       String Total = invoice.data!.total?.toStringAsFixed(AppState().noOfDecimals ?? 2)??'0.00';
+//       String tax = invoice.data!.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
 //       String grandTotal =
-//           invoice.data!.grandTotal?.toStringAsFixed(2) ?? '0.00';
+//           invoice.data!.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
 //       final remarks = invoice.data?.remarks;
 //       String Discount;
 //       if (invoice.data!.discount != null &&
 //           double.tryParse(invoice.data!.discount!.toString()) != null &&
 //           double.parse(invoice.data!.discount!.toString()) > 0) {
 //
-//         Discount = "Discount: ${double.parse(invoice.data!.discount!.toString()).toStringAsFixed(2)}";
+//         Discount = "Discount: ${double.parse(invoice.data!.discount!.toString()).toStringAsFixed(AppState().noOfDecimals ?? 2)}";
 //       } else {
 //         Discount = '';
 //       }
@@ -598,12 +598,12 @@
 //         String productUnit = invoice.data!.detail![i].unit ?? 'N/A';
 //         String productQty = invoice.data!.detail![i].quantity?.toString() ?? '0';
 //         String productType= invoice.data!.detail![i].productType?.toString()??'0';
-//         String productRate = invoice.data!.detail![i].mrp?.toStringAsFixed(2) ?? '0.00';
-//         String productTotal = invoice.data!.detail![i].taxable?.toStringAsFixed(2) ?? '0.00';
+//         String productRate = invoice.data!.detail![i].mrp?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
+//         String productTotal = invoice.data!.detail![i].taxable?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
 //         // String productTax = tax.toString();
-//         String productAmount =invoice.data!.detail![i].amount?.toStringAsFixed(2)??'0.00';
+//         String productAmount =invoice.data!.detail![i].amount?.toStringAsFixed(AppState().noOfDecimals ?? 2)??'0.00';
 //             // (invoice.data!.detail![i].mrp! * invoice.data!.detail![i].quantity!)
-//             //     .toStringAsFixed(2);
+//             //     .toStringAsFixed(AppState().noOfDecimals ?? 2);
 //
 //         // Split the product description if it exceeds the column width
 //         List<String> descriptionLines =
@@ -866,13 +866,13 @@
 //           invoice.data!.detail![k].productType!.toLowerCase() == "Change")
 //           ? 'Normal' : 'Normal';
 //       row.cells[5].value =
-//       '${invoice.data!.detail![k].mrp?.toStringAsFixed(2)}';
+//       '${invoice.data!.detail![k].mrp?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
 //       row.cells[6].value =
-//       '${invoice.data!.detail![k].taxable?.toStringAsFixed(2)}';
+//       '${invoice.data!.detail![k].taxable?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
 //       row.cells[7].value =
-//           '${invoice.data!.detail![k].taxAmt?.toStringAsFixed(2)}';
+//           '${invoice.data!.detail![k].taxAmt?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
 //       row.cells[8].value =
-//           '${invoice.data!.detail![k].amount?.toStringAsFixed(2)}';
+//           '${invoice.data!.detail![k].amount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
 //     }
 //
 //     // Define no border style
@@ -931,13 +931,13 @@
 //
 //     // Draw invoice details at the bottom right.
 //
-//     // ${num.parse(invoice.data!.roundOff.toString()) != 0 ? 'Discount: ${invoice.data!.discount?.toStringAsFixed(2)}' : '\t'}
+//     // ${num.parse(invoice.data!.roundOff.toString()) != 0 ? 'Discount: ${invoice.data!.discount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : '\t'}
 //
 //     String bottomInvoiceDetails = '''
-//     ${invoice.data!.discount != null && invoice.data!.discount! > 0 ? 'Discount: ${invoice.data!.discount!.toStringAsFixed(2)}' : '\t'}
+//     ${invoice.data!.discount != null && invoice.data!.discount! > 0 ? 'Discount: ${invoice.data!.discount!.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : '\t'}
 //   Total: ${invoice.data!.total ?? ''}
-//   Vat: ${invoice.data!.totalTax?.toStringAsFixed(2)}
-//   ${'${invoice.data!.roundOff}' != 0 ? 'Round off:${double.parse(invoice.data!.roundOff ?? '').toStringAsFixed(2)}\nGrand Total: ${invoice.data!.grandTotal?.toStringAsFixed(2)}' : 'Grand Total: ${invoice.data!.grandTotal}'}
+//   Vat: ${invoice.data!.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2)}
+//   ${'${invoice.data!.roundOff}' != 0 ? 'Round off:${double.parse(invoice.data!.roundOff ?? '').toStringAsFixed(AppState().noOfDecimals ?? 2)}\nGrand Total: ${invoice.data!.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : 'Grand Total: ${invoice.data!.grandTotal}'}
 //
 //
 //   ''';

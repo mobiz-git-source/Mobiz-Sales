@@ -525,7 +525,7 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
     double total = calculateTotalRate();
     double tax = _ifVat == 1 ? calculateTax() : 0;
     var roundedGrandTotal =
-        grandTotalMap['rounded']?.toStringAsFixed(2) ?? '0.00';
+        grandTotalMap['rounded']?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
 
     double roundOffValue = grandTotalMap['roundOffValue'];
 
@@ -575,7 +575,7 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
           'mrp': amounts.entries
                   .map((entry) {
                     double value = double.tryParse(entry.value) ?? 0.0;
-                    return double.parse(value.toStringAsFixed(2));
+                    return double.parse(value.toStringAsFixed(AppState().noOfDecimals ?? 2));
                   })
                   .toList()
                   .isEmpty
@@ -583,7 +583,7 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
               : amounts.entries.map((entry) {
                   double value = double.tryParse(entry.value) ?? 0.0;
                   print("sdsds$value");
-                  return double.parse(value.toStringAsFixed(2));
+                  return double.parse(value.toStringAsFixed(AppState().noOfDecimals ?? 2));
                 }).toList(),
           // 'mrp': amounts.entries.map((entry) {
           //   return double.tryParse(entry.value) ?? 0.0;
@@ -1309,7 +1309,7 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
                                           )),
                                       Text(' | '),
                                       Text(
-                                        'Amt: ${ttlamount.toStringAsFixed(3)}',
+                                        'Amt: ${ttlamount.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                                         style: TextStyle(color: Colors.grey),
                                       )
                                     ],
@@ -1566,8 +1566,8 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
                                 ],
                               )
                             : SizedBox.shrink(),
-                        Text('Total: ${total.toStringAsFixed(3)}'),
-                        Text('Tax: ${tax.toStringAsFixed(2)}'),
+                        Text('Total: ${total.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
+                        Text('Tax: ${tax.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
@@ -1608,7 +1608,7 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
                                           Radius.circular(5))),
                                   child: Center(
                                     child: Text(''
-                                        '${roundoff == '' ? roundOffValue.toStringAsFixed(2) : roundoff}'),
+                                        '${roundoff == '' ? roundOffValue.toStringAsFixed(AppState().noOfDecimals ?? 2) : roundoff}'),
                                   )),
                             ),
                           ],

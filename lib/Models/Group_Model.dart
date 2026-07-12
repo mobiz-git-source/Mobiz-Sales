@@ -1,38 +1,60 @@
 import 'TestMos.dart';
 
+double _toDouble(dynamic value) {
+  if (value == null) return 0.0;
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? 0.0;
+  return 0.0;
+}
+
+int _toInt(dynamic value) {
+  if (value == null) return 0;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
+}
+
+int? _toIntNullable(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
+num? _toNumNullable(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value;
+  if (value is String) return num.tryParse(value);
+  return null;
+}
+
+String? _toStringNullable(dynamic value) {
+  if (value == null) return null;
+  return value.toString();
+}
+
 class SaleReturnCollection {
   final SaleReturn? returnData;
-  final Sale? sales;  // Make sales nullable
-  final Collection? collection; // Make collection nullable
+  final Sale? sales;
+  final Collection? collection;
+  final Store? store;
 
   SaleReturnCollection({
     this.returnData,
-    this.sales, // Nullable property
-    this.collection, // Nullable property
+    this.sales,
+    this.collection,
+    this.store,
   });
 
   factory SaleReturnCollection.fromJson(Map<String, dynamic> json) {
-    // Check if 'sales' is present before parsing it
-    Sale? parsedSales;
-    if (json['sales'] != null) {
-      parsedSales = Sale.fromJson(json['sales']);
-    }
-
-    // Check if 'collection' is present before parsing it
-    Collection? parsedCollection;
-    if (json['collection'] != null) {
-      parsedCollection = Collection.fromJson(json['collection']);
-    }
-
     return SaleReturnCollection(
       returnData: json['return'] != null ? SaleReturn.fromJson(json['return']) : null,
-      sales: parsedSales, // Only assign if parsedSales is not null
-      collection: parsedCollection, // Only assign if parsedCollection is not null
+      sales: json['sales'] != null ? Sale.fromJson(json['sales']) : null,
+      collection: json['collection'] != null ? Collection.fromJson(json['collection']) : null,
+      store: json['store'] != null ? Store.fromJson(json['store']) : null,
     );
   }
 }
-
-
 
 class SaleReturn {
   final int id;
@@ -46,8 +68,8 @@ class SaleReturn {
   final double discount;
   final double totalTax;
   final List<Detail> detail;
-  final Customer? customer; // Nullable to handle null response
-  final Store? store;       // Nullable to handle null response
+  final Customer? customer;
+  final Store? store;
   final Van? van;
   final User? user;
 
@@ -63,44 +85,42 @@ class SaleReturn {
     required this.discount,
     required this.totalTax,
     required this.detail,
-    this.customer, // Nullable field
-    this.store,    // Nullable field
+    this.customer,
+    this.store,
     this.van,
     this.user,
   });
 
   factory SaleReturn.fromJson(Map<String, dynamic> json) {
-    // Safely handle the 'detail' field
     var detailList = (json['detail'] as List?)?.map((item) => Detail.fromJson(item)).toList() ?? [];
 
     return SaleReturn(
-      id: json['id'] ?? 0,
-      customerId: json['customer_id'] ?? 0,
-      billMode: json['bill_mode'] ?? '',
-      inDate: json['in_date'] ?? '',
-      inTime: json['in_time'] ?? '',
-      invoiceNo: json['invoice_no'] ?? '',
-      total: (json['total'] ?? 0.0).toDouble(),
-      grandTotal: (json['grand_total'] ?? 0.0).toDouble(),
-      discount: (json['discount'] ?? 0.0).toDouble(),
-      totalTax: (json['total_tax'] ?? 0.0).toDouble(),
+      id: _toInt(json['id']),
+      customerId: _toInt(json['customer_id']),
+      billMode: json['bill_mode']?.toString() ?? '',
+      inDate: json['in_date']?.toString() ?? '',
+      inTime: json['in_time']?.toString() ?? '',
+      invoiceNo: json['invoice_no']?.toString() ?? '',
+      total: _toDouble(json['total']),
+      grandTotal: _toDouble(json['grand_total']),
+      discount: _toDouble(json['discount']),
+      totalTax: _toDouble(json['total_tax']),
       detail: detailList,
-      customer: json['customer'] != null && json['customer'].isNotEmpty
+      customer: json['customer'] != null && (json['customer'] as List).isNotEmpty
           ? Customer.fromJson(json['customer'][0])
           : null,
-      store: json['store'] != null && json['store'].isNotEmpty
+      store: json['store'] != null && (json['store'] as List).isNotEmpty
           ? Store.fromJson(json['store'][0])
           : null,
-      van: json['van'] != null && json['van'].isNotEmpty
+      van: json['van'] != null && (json['van'] as List).isNotEmpty
           ? Van.fromJson(json['van'][0])
           : null,
-      user: json['user'] != null && json['user'].isNotEmpty
+      user: json['user'] != null && (json['user'] as List).isNotEmpty
           ? User.fromJson(json['user'][0])
           : null,
     );
   }
 }
-
 
 class Detail {
   final int id;
@@ -109,9 +129,9 @@ class Detail {
   final String productType;
   final String unit;
   final double quantity;
-  final double taxable; // Added field
+  final double taxable;
   final double taxAmt;
-  final double mrp; // Added field
+  final double mrp;
   final double amount;
   final String name;
   final String proImage;
@@ -123,9 +143,9 @@ class Detail {
     required this.productType,
     required this.unit,
     required this.quantity,
-    required this.taxable, // Added field
+    required this.taxable,
     required this.taxAmt,
-    required this.mrp, // Added field
+    required this.mrp,
     required this.amount,
     required this.name,
     required this.proImage,
@@ -133,22 +153,21 @@ class Detail {
 
   factory Detail.fromJson(Map<String, dynamic> json) {
     return Detail(
-      id: json['id'],
-      goodsOutId: json['goods_out_id'],
-      itemId: json['item_id'],
-      productType: json['product_type'],
-      unit: json['unit'],
-      quantity: json['quantity'].toDouble(),
-      taxable: json['taxable'].toDouble(), // Map taxable
-      taxAmt: json['tax_amt'].toDouble(),
-      mrp: json['mrp'].toDouble(), // Map mrp
-      amount: json['amount'].toDouble(),
-      name: json['name'],
-      proImage: json['pro_image'],
+      id: _toInt(json['id']),
+      goodsOutId: _toInt(json['goods_out_id']),
+      itemId: _toInt(json['item_id']),
+      productType: json['product_type']?.toString() ?? '',
+      unit: json['unit']?.toString() ?? '',
+      quantity: _toDouble(json['quantity']),
+      taxable: _toDouble(json['taxable']),
+      taxAmt: _toDouble(json['tax_amt']),
+      mrp: _toDouble(json['mrp']),
+      amount: _toDouble(json['amount']),
+      name: json['name']?.toString() ?? '',
+      proImage: json['pro_image']?.toString() ?? '',
     );
   }
 }
-
 
 class Customer {
   int? id;
@@ -172,73 +191,74 @@ class Customer {
   String? deletedAt;
   String? erpCustomerCode;
 
-  Customer(
-      {this.id,
-      this.name,
-      this.code,
-      this.address,
-      this.contactNumber,
-      this.whatsappNumber,
-      this.email,
-      this.trn,
-      this.custImage,
-      this.paymentTerms,
-      this.creditLimit,
-      this.creditDays,
-      this.routeId,
-      this.provinceId,
-      this.storeId,
-      this.status,
-      this.createdAt,
-      this.updatedAt,
-      this.deletedAt,
-      this.erpCustomerCode});
+  Customer({
+    this.id,
+    this.name,
+    this.code,
+    this.address,
+    this.contactNumber,
+    this.whatsappNumber,
+    this.email,
+    this.trn,
+    this.custImage,
+    this.paymentTerms,
+    this.creditLimit,
+    this.creditDays,
+    this.routeId,
+    this.provinceId,
+    this.storeId,
+    this.status,
+    this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
+    this.erpCustomerCode,
+  });
 
   Customer.fromJson(Map<String, dynamic> json) {
-    id = json['id'];
-    name = json['name'];
-    code = json['code'];
-    address = json['address'];
-    contactNumber = json['contact_number'];
-    whatsappNumber = json['whatsapp_number'];
-    email = json['email'];
-    trn = json['trn'];
-    custImage = json['cust_image'];
-    paymentTerms = json['payment_terms'];
-    creditLimit = json['credit_limit'];
-    creditDays = json['credit_days'];
-    routeId = json['route_id'];
-    provinceId = json['province_id'];
-    storeId = json['store_id'];
-    status = json['status'];
-    createdAt = json['created_at'];
-    updatedAt = json['updated_at'];
-    deletedAt = json['deleted_at'];
-    erpCustomerCode = json['erp_customer_code'];
+    id = _toIntNullable(json['id']);
+    name = _toStringNullable(json['name']);
+    code = _toStringNullable(json['code']);
+    address = _toStringNullable(json['address']);
+    contactNumber = _toStringNullable(json['contact_number']);
+    whatsappNumber = _toStringNullable(json['whatsapp_number']);
+    email = _toStringNullable(json['email']);
+    trn = _toStringNullable(json['trn']);
+    custImage = _toStringNullable(json['cust_image']);
+    paymentTerms = _toStringNullable(json['payment_terms']);
+    creditLimit = _toIntNullable(json['credit_limit']);
+    creditDays = _toIntNullable(json['credit_days']);
+    routeId = _toIntNullable(json['route_id']);
+    provinceId = _toIntNullable(json['province_id']);
+    storeId = _toIntNullable(json['store_id']);
+    status = _toIntNullable(json['status']);
+    createdAt = _toStringNullable(json['created_at']);
+    updatedAt = _toStringNullable(json['updated_at']);
+    deletedAt = _toStringNullable(json['deleted_at']);
+    erpCustomerCode = _toStringNullable(json['erp_customer_code']);
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = new Map<String, dynamic>();
-    data['id'] = this.id;
-    data['name'] = this.name;
-    data['code'] = this.code;
-    data['address'] = this.address;
-    data['contact_number'] = this.contactNumber;
-    data['whatsapp_number'] = this.whatsappNumber;
-    data['email'] = this.email;
-    data['trn'] = this.trn;
-    data['cust_image'] = this.custImage;
-    data['payment_terms'] = this.paymentTerms;
-    data['credit_limit'] = this.creditLimit;
-    data['credit_days'] = this.creditDays;
-    data['route_id'] = this.routeId;
-    data['province_id'] = this.provinceId;
-    data['store_id'] = this.storeId;
-    data['status'] = this.status;
-    data['created_at'] = this.createdAt;
-    data['updated_at'] = this.updatedAt;
-    data['deleted_at'] = this.deletedAt;
-    data['erp_customer_code'] = this.erpCustomerCode;
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['id'] = id;
+    data['name'] = name;
+    data['code'] = code;
+    data['address'] = address;
+    data['contact_number'] = contactNumber;
+    data['whatsapp_number'] = whatsappNumber;
+    data['email'] = email;
+    data['trn'] = trn;
+    data['cust_image'] = custImage;
+    data['payment_terms'] = paymentTerms;
+    data['credit_limit'] = creditLimit;
+    data['credit_days'] = creditDays;
+    data['route_id'] = routeId;
+    data['province_id'] = provinceId;
+    data['store_id'] = storeId;
+    data['status'] = status;
+    data['created_at'] = createdAt;
+    data['updated_at'] = updatedAt;
+    data['deleted_at'] = deletedAt;
+    data['erp_customer_code'] = erpCustomerCode;
     return data;
   }
 }
@@ -264,90 +284,95 @@ class Store {
   String? currency;
   num? vatPercentage;
   String? trn;
+  String? vatLabel;
   int? status;
   String? createdAt;
   String? updatedAt;
   String? deletedAt;
 
-  Store(
-      {this.id,
-      this.code,
-      this.name,
-      this.comapnyId,
-      this.logo,
-      this.address,
-      this.emirate,
-      this.country,
-      this.contactNumber,
-      this.whatsappNumber,
-      this.email,
-      this.username,
-      this.password,
-      this.noOfUsers,
-      this.suscriptionEndDate,
-      this.bufferDays,
-      this.description,
-      this.currency,
-      this.vatPercentage,
-      this.trn,
-      this.status,
-      this.createdAt,
-      this.updatedAt,
-      this.deletedAt});
+  Store({
+    this.id,
+    this.code,
+    this.name,
+    this.comapnyId,
+    this.logo,
+    this.address,
+    this.emirate,
+    this.country,
+    this.contactNumber,
+    this.whatsappNumber,
+    this.email,
+    this.username,
+    this.password,
+    this.noOfUsers,
+    this.suscriptionEndDate,
+    this.bufferDays,
+    this.description,
+    this.currency,
+    this.vatPercentage,
+    this.trn,
+    this.vatLabel,
+    this.status,
+    this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
+  });
 
   Store.fromJson(Map<String, dynamic> json) {
-    id = json['id'];
-    code = json['code'];
-    name = json['name'];
-    comapnyId = json['comapny_id'];
-    logo = json['logo'];
-    address = json['address'];
-    emirate = json['emirate'];
-    country = json['country'];
-    contactNumber = json['contact_number'];
-    whatsappNumber = json['whatsapp_number'];
-    email = json['email'];
-    username = json['username'];
-    password = json['password'];
-    noOfUsers = json['no_of_users'];
-    suscriptionEndDate = json['suscription_end_date'];
+    id = _toIntNullable(json['id']);
+    code = _toStringNullable(json['code']);
+    name = _toStringNullable(json['name']);
+    comapnyId = _toIntNullable(json['comapny_id']);
+    logo = _toStringNullable(json['logo']);
+    address = _toStringNullable(json['address']);
+    emirate = _toStringNullable(json['emirate']);
+    country = _toStringNullable(json['country']);
+    contactNumber = _toStringNullable(json['contact_number']);
+    whatsappNumber = _toStringNullable(json['whatsapp_number']);
+    email = _toStringNullable(json['email']);
+    username = _toStringNullable(json['username']);
+    password = _toStringNullable(json['password']);
+    noOfUsers = _toIntNullable(json['no_of_users']);
+    suscriptionEndDate = _toStringNullable(json['suscription_end_date']);
     bufferDays = json['buffer_days'];
-    description = json['description'];
-    currency = json['currency'];
-    vatPercentage = json['vat_percentage'];
-    trn = json['trn'];
-    status = json['status'];
-    createdAt = json['created_at'];
-    updatedAt = json['updated_at'];
-    deletedAt = json['deleted_at'];
+    description = _toStringNullable(json['description']);
+    currency = _toStringNullable(json['currency']);
+    vatPercentage = _toNumNullable(json['vat_percentage']);
+    trn = _toStringNullable(json['trn']);
+    vatLabel = _toStringNullable(json['vat_label']);
+    status = _toIntNullable(json['status']);
+    createdAt = _toStringNullable(json['created_at']);
+    updatedAt = _toStringNullable(json['updated_at']);
+    deletedAt = _toStringNullable(json['deleted_at']);
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = new Map<String, dynamic>();
-    data['id'] = this.id;
-    data['code'] = this.code;
-    data['name'] = this.name;
-    data['comapny_id'] = this.comapnyId;
-    data['logo'] = this.logo;
-    data['address'] = this.address;
-    data['emirate'] = this.emirate;
-    data['country'] = this.country;
-    data['contact_number'] = this.contactNumber;
-    data['whatsapp_number'] = this.whatsappNumber;
-    data['email'] = this.email;
-    data['username'] = this.username;
-    data['password'] = this.password;
-    data['no_of_users'] = this.noOfUsers;
-    data['suscription_end_date'] = this.suscriptionEndDate;
-    data['buffer_days'] = this.bufferDays;
-    data['description'] = this.description;
-    data['currency'] = this.currency;
-    data['vat_percentage'] = this.vatPercentage;
-    data['trn'] = this.trn;
-    data['status'] = this.status;
-    data['created_at'] = this.createdAt;
-    data['updated_at'] = this.updatedAt;
-    data['deleted_at'] = this.deletedAt;
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['id'] = id;
+    data['code'] = code;
+    data['name'] = name;
+    data['comapny_id'] = comapnyId;
+    data['logo'] = logo;
+    data['address'] = address;
+    data['emirate'] = emirate;
+    data['country'] = country;
+    data['contact_number'] = contactNumber;
+    data['whatsapp_number'] = whatsappNumber;
+    data['email'] = email;
+    data['username'] = username;
+    data['password'] = password;
+    data['no_of_users'] = noOfUsers;
+    data['suscription_end_date'] = suscriptionEndDate;
+    data['buffer_days'] = bufferDays;
+    data['description'] = description;
+    data['currency'] = currency;
+    data['vat_percentage'] = vatPercentage;
+    data['trn'] = trn;
+    data['vat_label'] = vatLabel;
+    data['status'] = status;
+    data['created_at'] = createdAt;
+    data['updated_at'] = updatedAt;
+    data['deleted_at'] = deletedAt;
     return data;
   }
 }
@@ -363,8 +388,8 @@ class Van {
 
   factory Van.fromJson(Map<String, dynamic> json) {
     return Van(
-      id: json['id'],
-      name: json['name'],
+      id: _toInt(json['id']),
+      name: json['name']?.toString() ?? '',
     );
   }
 }
@@ -382,9 +407,9 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'],
-      name: json['name'],
-      email: json['email'],
+      id: _toInt(json['id']),
+      name: json['name']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
     );
   }
 }
@@ -397,6 +422,7 @@ class Sale {
   final String inTime;
   final double totalTax;
   final String invoiceNo;
+  final String cashCard;
   final double total;
   final double grandTotal;
   final List<Detail> detail;
@@ -413,6 +439,7 @@ class Sale {
     required this.inTime,
     required this.totalTax,
     required this.invoiceNo,
+    required this.cashCard,
     required this.total,
     required this.grandTotal,
     required this.detail,
@@ -423,268 +450,257 @@ class Sale {
   });
 
   factory Sale.fromJson(Map<String, dynamic> json) {
-    var detailList =
-    (json['detail'] as List).map((item) => Detail.fromJson(item)).toList();
+    var detailList = (json['detail'] as List?)?.map((item) => Detail.fromJson(item)).toList() ?? [];
     return Sale(
-      id: json['id'],
-      customerId: json['customer_id'],
-      billMode: json['bill_mode'],
-      inDate: json['in_date'],
-      inTime: json['in_time'],
-      totalTax: json['total_tax'].toDouble(),
-      invoiceNo: json['invoice_no'],
-      total: json['total'].toDouble(),
-      grandTotal: json['grand_total'].toDouble(),
+      id: _toInt(json['id']),
+      customerId: _toInt(json['customer_id']),
+      billMode: json['bill_mode']?.toString() ?? '',
+      inDate: json['in_date']?.toString() ?? '',
+      inTime: json['in_time']?.toString() ?? '',
+      totalTax: _toDouble(json['total_tax']),
+      invoiceNo: json['invoice_no']?.toString() ?? '',
+      cashCard: json['cash_card']?.toString() ?? '',
+      total: _toDouble(json['total']),
+      grandTotal: _toDouble(json['grand_total']),
       detail: detailList,
-      store: json['store'] != null && json['store'].isNotEmpty
+      store: json['store'] != null && (json['store'] as List).isNotEmpty
           ? Store.fromJson(json['store'][0])
           : null,
-      customer: json['customer'] != null && json['customer'].isNotEmpty
+      customer: json['customer'] != null && (json['customer'] as List).isNotEmpty
           ? Customer.fromJson(json['customer'][0])
           : null,
-      van: json['van'] != null && json['van'].isNotEmpty
+      van: json['van'] != null && (json['van'] as List).isNotEmpty
           ? Van.fromJson(json['van'][0])
           : null,
-      user: json['user'] != null && json['user'].isNotEmpty
+      user: json['user'] != null && (json['user'] as List).isNotEmpty
           ? User.fromJson(json['user'][0])
           : null,
     );
   }
 }
 
-
 class Collection {
+  int? id;
+  int? customerId;
+  String? inDate;
+  String? inTime;
+  String? collectionType;
+  String? bank;
+  String? chequeDate;
+  String? chequeNo;
+  String? voucherNo;
+  String? totalAmount;
+  int? vanId;
+  int? userId;
+  int? storeId;
+  int? dayClose;
+  int? dayCloseId;
+  String? roundOff;
+  int? status;
+  String? createdAt;
+  String? updatedAt;
+  dynamic deletedAt;
+  List<Sales>? sales;
+  List<Customer>? customer;
+  List<Van>? van;
+  List<User>? user;
+
   Collection({
-    int? id,
-    int? customerId,
-    String? inDate,
-    String? inTime,
-    String? collectionType,
-    String? bank,
-    String? chequeDate,
-    String? chequeNo,
-    String? voucherNo,
-    String? totalAmount,
-    int? vanId,
-    int? userId,
-    int? storeId,
-    int? dayClose,
-    int? dayCloseId,
-    String? roundOff,
-    int? status,
-    String? createdAt,
-    String? updatedAt,
-    dynamic deletedAt,
-    List<Sales>? sales,
-    List<Customer>? customer,
-    List<Van>? van,
-    List<User>? user,}){
-    _id = id;
-    _customerId = customerId;
-    _inDate = inDate;
-    _inTime = inTime;
-    _collectionType = collectionType;
-    _bank = bank;
-    _chequeDate = chequeDate;
-    _chequeNo = chequeNo;
-    _voucherNo = voucherNo;
-    _totalAmount = totalAmount;
-    _vanId = vanId;
-    _userId = userId;
-    _storeId = storeId;
-    _dayClose = dayClose;
-    _dayCloseId = dayCloseId;
-    _roundOff = roundOff;
-    _status = status;
-    _createdAt = createdAt;
-    _updatedAt = updatedAt;
-    _deletedAt = deletedAt;
-    _sales = sales;
-    _customer = customer;
-    _van = van;
-    _user = user;
-  }
+    this.id,
+    this.customerId,
+    this.inDate,
+    this.inTime,
+    this.collectionType,
+    this.bank,
+    this.chequeDate,
+    this.chequeNo,
+    this.voucherNo,
+    this.totalAmount,
+    this.vanId,
+    this.userId,
+    this.storeId,
+    this.dayClose,
+    this.dayCloseId,
+    this.roundOff,
+    this.status,
+    this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
+    this.sales,
+    this.customer,
+    this.van,
+    this.user,
+  });
 
   Collection.fromJson(dynamic json) {
-    _id = json['id'];
-    _customerId = json['customer_id'];
-    _inDate = json['in_date'];
-    _inTime = json['in_time'];
-    _collectionType = json['collection_type'];
-    _bank = json['bank'];
-    _chequeDate = json['cheque_date'];
-    _chequeNo = json['cheque_no'];
-    _voucherNo = json['voucher_no'];
-    _totalAmount = json['total_amount'];
-    _vanId = json['van_id'];
-    _userId = json['user_id'];
-    _storeId = json['store_id'];
-    _dayClose = json['day_close'];
-    _dayCloseId = json['day_close_id'];
-    _roundOff = json['round_off'];
-    _status = json['status'];
-    _createdAt = json['created_at'];
-    _updatedAt = json['updated_at'];
-    _deletedAt = json['deleted_at'];
-    if (json['sales'] != null) {
-      _sales = [];
-      json['sales'].forEach((v) {
-        _sales?.add(Sales.fromJson(v));
-      });
+    id = _toIntNullable(json['id']);
+    customerId = _toIntNullable(json['customer_id']);
+    inDate = _toStringNullable(json['in_date']);
+    inTime = _toStringNullable(json['in_time']);
+    collectionType = _toStringNullable(json['collection_type']);
+    bank = _toStringNullable(json['bank']);
+    chequeDate = _toStringNullable(json['cheque_date']);
+    chequeNo = _toStringNullable(json['cheque_no']);
+    voucherNo = _toStringNullable(json['voucher_no']);
+    totalAmount = _toStringNullable(json['total_amount']);
+    vanId = _toIntNullable(json['van_id']);
+    userId = _toIntNullable(json['user_id']);
+    storeId = _toIntNullable(json['store_id']);
+    dayClose = _toIntNullable(json['day_close']);
+    dayCloseId = _toIntNullable(json['day_close_id']);
+    roundOff = _toStringNullable(json['round_off']);
+    status = _toIntNullable(json['status']);
+    createdAt = _toStringNullable(json['created_at']);
+    updatedAt = _toStringNullable(json['updated_at']);
+    deletedAt = json['deleted_at'];
+    if (json['sales'] != null && json['sales'] is List) {
+      sales = (json['sales'] as List).map((v) => Sales.fromJson(v)).toList();
     }
-    if (json['customer'] != null) {
-      _customer = [];
-      json['customer'].forEach((v) {
-        _customer?.add(Customer.fromJson(v));
-      });
+    if (json['customer'] != null && json['customer'] is List) {
+      customer = (json['customer'] as List).map((v) => Customer.fromJson(v)).toList();
     }
-    if (json['van'] != null) {
-      _van = [];
-      json['van'].forEach((v) {
-        _van?.add(Van.fromJson(v));
-      });
+    if (json['van'] != null && json['van'] is List) {
+      van = (json['van'] as List).map((v) => Van.fromJson(v)).toList();
     }
-    if (json['user'] != null) {
-      _user = [];
-      json['user'].forEach((v) {
-        _user?.add(User.fromJson(v));
-      });
+    if (json['user'] != null && json['user'] is List) {
+      user = (json['user'] as List).map((v) => User.fromJson(v)).toList();
     }
   }
-  int? _id;
-  int? _customerId;
-  String? _inDate;
-  String? _inTime;
-  String? _collectionType;
-  String? _bank;
-  String? _chequeDate;
-  String? _chequeNo;
-  String? _voucherNo;
-  String? _totalAmount;
-  int? _vanId;
-  int? _userId;
-  int? _storeId;
-  int? _dayClose;
-  int? _dayCloseId;
-  String? _roundOff;
-  int? _status;
-  String? _createdAt;
-  String? _updatedAt;
-  dynamic _deletedAt;
-  List<Sales>? _sales;
-  List<Customer>? _customer;
-  List<Van>? _van;
-  List<User>? _user;
-  Collection copyWith({  int? id,
-    int? customerId,
-    String? inDate,
-    String? inTime,
-    String? collectionType,
-    String? bank,
-    String? chequeDate,
-    String? chequeNo,
-    String? voucherNo,
-    String? totalAmount,
-    int? vanId,
-    int? userId,
-    int? storeId,
-    int? dayClose,
-    int? dayCloseId,
-    String? roundOff,
-    int? status,
-    String? createdAt,
-    String? updatedAt,
-    dynamic deletedAt,
-    List<Sales>? sales,
-    List<Customer>? customer,
-    List<Van>? van,
-    List<User>? user,
-  }) => Collection(  id: id ?? _id,
-    customerId: customerId ?? _customerId,
-    inDate: inDate ?? _inDate,
-    inTime: inTime ?? _inTime,
-    collectionType: collectionType ?? _collectionType,
-    bank: bank ?? _bank,
-    chequeDate: chequeDate ?? _chequeDate,
-    chequeNo: chequeNo ?? _chequeNo,
-    voucherNo: voucherNo ?? _voucherNo,
-    totalAmount: totalAmount ?? _totalAmount,
-    vanId: vanId ?? _vanId,
-    userId: userId ?? _userId,
-    storeId: storeId ?? _storeId,
-    dayClose: dayClose ?? _dayClose,
-    dayCloseId: dayCloseId ?? _dayCloseId,
-    roundOff: roundOff ?? _roundOff,
-    status: status ?? _status,
-    createdAt: createdAt ?? _createdAt,
-    updatedAt: updatedAt ?? _updatedAt,
-    deletedAt: deletedAt ?? _deletedAt,
-    sales: sales ?? _sales,
-    customer: customer ?? _customer,
-    van: van ?? _van,
-    user: user ?? _user,
-  );
-  int? get id => _id;
-  int? get customerId => _customerId;
-  String? get inDate => _inDate;
-  String? get inTime => _inTime;
-  String? get collectionType => _collectionType;
-  String? get bank => _bank;
-  String? get chequeDate => _chequeDate;
-  String? get chequeNo => _chequeNo;
-  String? get voucherNo => _voucherNo;
-  String? get totalAmount => _totalAmount;
-  int? get vanId => _vanId;
-  int? get userId => _userId;
-  int? get storeId => _storeId;
-  int? get dayClose => _dayClose;
-  int? get dayCloseId => _dayCloseId;
-  String? get roundOff => _roundOff;
-  int? get status => _status;
-  String? get createdAt => _createdAt;
-  String? get updatedAt => _updatedAt;
-  dynamic get deletedAt => _deletedAt;
-  List<Sales>? get sales => _sales;
-  List<Customer>? get customer => _customer;
-  List<Van>? get van => _van;
-  List<User>? get user => _user;
 
   Map<String, dynamic> toJson() {
-    final map = <String, dynamic>{};
-    map['id'] = _id;
-    map['customer_id'] = _customerId;
-    map['in_date'] = _inDate;
-    map['in_time'] = _inTime;
-    map['collection_type'] = _collectionType;
-    map['bank'] = _bank;
-    map['cheque_date'] = _chequeDate;
-    map['cheque_no'] = _chequeNo;
-    map['voucher_no'] = _voucherNo;
-    map['total_amount'] = _totalAmount;
-    map['van_id'] = _vanId;
-    map['user_id'] = _userId;
-    map['store_id'] = _storeId;
-    map['day_close'] = _dayClose;
-    map['day_close_id'] = _dayCloseId;
-    map['round_off'] = _roundOff;
-    map['status'] = _status;
-    map['created_at'] = _createdAt;
-    map['updated_at'] = _updatedAt;
-    map['deleted_at'] = _deletedAt;
-    if (_sales != null) {
-      map['sales'] = _sales?.map((v) => v?.toJson()).toList();
+    final Map<String, dynamic> map = <String, dynamic>{};
+    map['id'] = id;
+    map['customer_id'] = customerId;
+    map['in_date'] = inDate;
+    map['in_time'] = inTime;
+    map['collection_type'] = collectionType;
+    map['bank'] = bank;
+    map['cheque_date'] = chequeDate;
+    map['cheque_no'] = chequeNo;
+    map['voucher_no'] = voucherNo;
+    map['total_amount'] = totalAmount;
+    map['van_id'] = vanId;
+    map['user_id'] = userId;
+    map['store_id'] = storeId;
+    map['day_close'] = dayClose;
+    map['day_close_id'] = dayCloseId;
+    map['round_off'] = roundOff;
+    map['status'] = status;
+    map['created_at'] = createdAt;
+    map['updated_at'] = updatedAt;
+    map['deleted_at'] = deletedAt;
+    if (sales != null) {
+      map['sales'] = sales?.map((v) => v.toJson()).toList();
     }
-    if (_customer != null) {
-      map['customer'] = _customer?.map((v) => v.toJson()).toList();
+    if (customer != null) {
+      map['customer'] = customer?.map((v) => v.toJson()).toList();
     }
-    // if (_van != null) {
-    //   map['van'] = _van?.map((v) => v.toJson()).toList();
-    // }
-    // if (_user != null) {
-    //   map['user'] = _user?.map((v) => v.toJson()).toList();
-    // }
     return map;
   }
 }
 
+class Sales {
+  int? id;
+  int? masterId;
+  int? customerId;
+  int? goodsOutId;
+  int? invoiceOutstandingId;
+  String? amount;
+  String? inDate;
+  String? inTime;
+  String? collectionType;
+  String? bank;
+  String? chequeDate;
+  String? chequeNo;
+  String? voucherNo;
+  String? invoiceDate;
+  String? invoiceType;
+  String? invoiceNo;
+  // String? cashCard;
+  int? userId;
+  int? vanId;
+  int? storeId;
+  String? createdAt;
+  String? updatedAt;
+  dynamic deletedAt;
 
+  Sales({
+    this.id,
+    this.masterId,
+    this.customerId,
+    this.goodsOutId,
+    this.invoiceOutstandingId,
+    this.amount,
+    this.inDate,
+    this.inTime,
+    this.collectionType,
+    this.bank,
+    this.chequeDate,
+    this.chequeNo,
+    this.voucherNo,
+    this.invoiceDate,
+    this.invoiceType,
+    this.invoiceNo,
+    // this.cashCard,
+    this.userId,
+    this.vanId,
+    this.storeId,
+    String? createdAt,
+    String? updatedAt,
+    dynamic deletedAt,
+  });
+
+  Sales.fromJson(dynamic json) {
+    id = _toIntNullable(json['id']);
+    masterId = _toIntNullable(json['master_id']);
+    customerId = _toIntNullable(json['customer_id']);
+    goodsOutId = _toIntNullable(json['goods_out_id']);
+    invoiceOutstandingId = _toIntNullable(json['invoice_outstanding_id']);
+    amount = _toStringNullable(json['amount']);
+    inDate = _toStringNullable(json['in_date']);
+    inTime = _toStringNullable(json['in_time']);
+    collectionType = _toStringNullable(json['collection_type']);
+    bank = _toStringNullable(json['bank']);
+    chequeDate = _toStringNullable(json['cheque_date']);
+    chequeNo = _toStringNullable(json['cheque_no']);
+    voucherNo = _toStringNullable(json['voucher_no']);
+    invoiceDate = _toStringNullable(json['invoice_date']);
+    invoiceType = _toStringNullable(json['invoice_type']);
+    invoiceNo = _toStringNullable(json['invoice_no']);
+    // cashCard = _toStringNullable(json['cash_card']);
+    userId = _toIntNullable(json['user_id']);
+    vanId = _toIntNullable(json['van_id']);
+    storeId = _toIntNullable(json['store_id']);
+    createdAt = _toStringNullable(json['created_at']);
+    updatedAt = _toStringNullable(json['updated_at']);
+    deletedAt = json['deleted_at'];
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> map = <String, dynamic>{};
+    map['id'] = id;
+    map['master_id'] = masterId;
+    map['customer_id'] = customerId;
+    map['goods_out_id'] = goodsOutId;
+    map['invoice_outstanding_id'] = invoiceOutstandingId;
+    map['amount'] = amount;
+    map['in_date'] = inDate;
+    map['in_time'] = inTime;
+    map['collection_type'] = collectionType;
+    map['bank'] = bank;
+    map['cheque_date'] = chequeDate;
+    map['cheque_no'] = chequeNo;
+    map['voucher_no'] = voucherNo;
+    map['invoice_date'] = invoiceDate;
+    map['invoice_type'] = invoiceType;
+    map['invoice_no'] = invoiceNo;
+    // map['cash_card'] = cashCard;
+    map['user_id'] = userId;
+    map['van_id'] = vanId;
+    map['store_id'] = storeId;
+    map['created_at'] = createdAt;
+    map['updated_at'] = updatedAt;
+    map['deleted_at'] = deletedAt;
+    return map;
+  }
+}

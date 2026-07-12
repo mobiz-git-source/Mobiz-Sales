@@ -142,7 +142,7 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
           : (amt * taxPercentage) / 100;
       tax = Tax;
     }
-    return double.parse(tax.toStringAsFixed(2));
+    return double.parse(tax.toStringAsFixed(AppState().noOfDecimals ?? 2));
   }
 
 
@@ -295,9 +295,9 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
     Map<String, dynamic> grandTotalMap = CalculatedValue();
 
     double tax = _ifVat == 1 ? calculateTax() : 0;
-    String taxpost = tax.toStringAsFixed(2);
-    double roundedGrandTotal = double.parse(double.parse(grandTotalMap['rounded'].toString()).toStringAsFixed(2));
-    double roundOffValue = double.parse(double.parse(grandTotalMap['roundOffValue'].toString()).toStringAsFixed(2));
+    String taxpost = tax.toStringAsFixed(AppState().noOfDecimals ?? 2);
+    double roundedGrandTotal = double.parse(double.parse(grandTotalMap['rounded'].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2));
+    double roundOffValue = double.parse(double.parse(grandTotalMap['roundOffValue'].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2));
     double total;
     if (ModalRoute.of(context)!.settings.arguments != null) {
       final Map<String, dynamic>? params =
@@ -323,7 +323,7 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
         }).toList();
         List<double> amounts = savedProducts.map<double>((product) {
           return double.parse(
-              double.parse(product['amount'].toString()).toStringAsFixed(2));
+              double.parse(product['amount'].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2));
         }).toList();
         List<double> quantity = savedProducts.map<double>((product) {
           return double.parse(product['quantity'].toString());
@@ -794,7 +794,7 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                       Text(' | '),
                                       Text('Rate: ${product['amount']}'),
                                       Text(' | '),
-                                      Text('Amt: ${total.toStringAsFixed(2)}')
+                                      Text('Amt: ${total.toStringAsFixed(AppState().noOfDecimals ?? 2)}')
                                     ],
                                   )
                                 ],
@@ -1008,8 +1008,8 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                 ],
                               )
                             : SizedBox.shrink(),
-                        Text('Total: ${totalAmount.toStringAsFixed(2)}'),
-                        Text('Tax: ${tax.toStringAsFixed(2)}'),
+                        Text('Total: ${totalAmount.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
+                        Text('Tax: ${tax.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
@@ -1050,13 +1050,13 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                           Radius.circular(5))),
                                   child: Center(
                                     child: Text(''
-                                        '${roundoff == '' ? roundOffValue.toStringAsFixed(2) : roundoff}'),
+                                        '${roundoff == '' ? roundOffValue.toStringAsFixed(AppState().noOfDecimals ?? 2) : roundoff}'),
                                   )),
                             ),
                           ],
                         ),
                         Text('Grand Total: '
-                            '${roundedGrandTotal.toStringAsFixed(2)}'
+                            '${roundedGrandTotal.toStringAsFixed(AppState().noOfDecimals ?? 2)}'
                             ''),
                       ],
                     ),

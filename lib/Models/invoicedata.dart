@@ -23,6 +23,7 @@ class Data {
   int? id;
   int? customerId;
   String? billMode;
+  String? cashCard;
   String? inDate;
   String? inTime;
   String? invoiceNo;
@@ -56,6 +57,7 @@ class Data {
       {this.id,
       this.customerId,
       this.billMode,
+      this.cashCard,
       this.inDate,
       this.inTime,
       this.invoiceNo,
@@ -89,6 +91,7 @@ class Data {
     id = json['id'];
     customerId = json['customer_id'];
     billMode = json['bill_mode'];
+    cashCard = json['cash_card'];
     inDate = json['in_date'];
     inTime = json['in_time'];
     invoiceNo = json['invoice_no'];
@@ -149,6 +152,7 @@ class Data {
     data['id'] = this.id;
     data['customer_id'] = this.customerId;
     data['bill_mode'] = this.billMode;
+    data['cash_card'] = this.cashCard;
     data['in_date'] = this.inDate;
     data['in_time'] = this.inTime;
     data['invoice_no'] = this.invoiceNo;
@@ -210,6 +214,7 @@ class Store {
   String? currency;
   num? vatPercentage;
   String? trn;
+  String? vat_label;
   String? invoice_footer;
   String? invoice_heading;
   String? invoice_company_name;
@@ -239,6 +244,7 @@ class Store {
       this.currency,
       this.vatPercentage,
       this.trn,
+      this.vat_label,
       this.invoice_footer,
       this.invoice_heading,
       this.invoice_company_name,
@@ -270,6 +276,7 @@ class Store {
         ? null
         : num.tryParse(json['vat_percentage'].toString());
     trn = json['trn'];
+    vat_label = json['vat_label'];
     invoice_footer = json['invoice_footer']??'';
     invoice_heading = json['invoice_heading']??'';
     invoice_company_name = json['invoice_company_name'];
@@ -301,6 +308,7 @@ class Store {
     data['currency'] = this.currency;
     data['vat_percentage'] = this.vatPercentage;
     data['trn'] = this.trn;
+    data['vat_label'] = this.vat_label;
     data['invoice_footer'] = this.invoice_footer;
     data['status'] = this.status;
     data['created_at'] = this.createdAt;

@@ -652,7 +652,7 @@ class _VanTransferState extends State<VanTransfer> {
                                                         'Rate: ${product['amount']}'),
                                                     Text(' | '),
                                                     Text(
-                                                        'Amt: ${total.toStringAsFixed(2)}')
+                                                        'Amt: ${total.toStringAsFixed(AppState().noOfDecimals ?? 2)}')
                                                   ],
                                                 )
                                               ],

@@ -117,10 +117,10 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> {
 
   String _formatAmount(dynamic amount) {
     if (amount == null) return '0.00';
-    if (amount is num) return amount.toStringAsFixed(2);
+    if (amount is num) return amount.toStringAsFixed(AppState().noOfDecimals ?? 2);
     if (amount is String) {
       try {
-        return double.parse(amount).toStringAsFixed(2);
+        return double.parse(amount).toStringAsFixed(AppState().noOfDecimals ?? 2);
       } catch (e) {
         return amount;
       }

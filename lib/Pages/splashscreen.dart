@@ -63,6 +63,9 @@ class _SplashScreenState extends State<SplashScreen> {
     appState.minorVersion = json['minor_version'];
     appState.username = json['username'];
     appState.attendanceState = json['attendance'];
+    appState.printer = json['printer'];
+    appState.noOfDecimals = json['no_of_decimals'];
+    appState.code = json['code'];
     appState.devices = json['devices'];
     appState.initialConsent = json['initial_consent'];
     appState.country = json['country'];

@@ -20,6 +20,8 @@ class AppState {
   int? storeId;
   int? routeId;
   int? rolId;
+  int? noOfDecimals;
+  String? code;
   String? appVersion;
   String? buildNumber;
   String? osType;
@@ -53,6 +55,8 @@ class AppState {
     printer= "";
     routeId;
     vanId;
+    noOfDecimals;
+    code = "";
     appVersion = "";
     buildNumber = "";
     osType = "";
@@ -88,6 +92,8 @@ class AppState {
     name = json['name'];
     rolId = json['app_rol_id'];
     email = json['email'];
+    noOfDecimals = json['no_of_decimals'];
+    code=json['code'];
     appVersion = json['app_version'];
     buildNumber = json['build_number'];
     userId = json['id'];
@@ -123,6 +129,8 @@ class AppState {
     data['attendance'] = attendanceState;
     data['printer'] = printer;
     data['route_id'] = routeId;
+    data['no_of_decimals'] = noOfDecimals;
+    data['code'] = code;
     data['app_version'] = appVersion;
     data['build_number'] = buildNumber;
     data['os_type'] = osType;

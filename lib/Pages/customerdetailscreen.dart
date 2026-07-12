@@ -208,7 +208,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
       return _data!;
     }
 
-    return value.toStringAsFixed(3);
+    return value.toStringAsFixed(AppState().noOfDecimals ?? 2);
   }
 
   String get creditBalanceText {
@@ -222,7 +222,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
     }
 
     final balance = outstanding - creditLimit!;
-    return balance.toStringAsFixed(2);
+    return balance.toStringAsFixed(AppState().noOfDecimals ?? 2);
   }
 
 

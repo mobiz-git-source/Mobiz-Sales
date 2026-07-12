@@ -308,7 +308,7 @@
 //                 //   )
 //
 //                     ? Text(
-//                   'Total: ${data.total?.toStringAsFixed(2)}',
+//                   'Total: ${data.total?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
 //                   style: TextStyle(
 //                     fontSize: AppConfig.textCaption3Size,
 //                   ),
@@ -321,14 +321,14 @@
 //                 ),
 //                 data.discount_type == '0'
 //                     ? Text(
-//                   'Discount : ${data.discount?.toStringAsFixed(2)}',
+//                   'Discount : ${data.discount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
 //                   style: TextStyle(
 //                     fontSize: AppConfig.textCaption3Size,
 //                   ),
 //                 )
 //                     : data.discount_type == '1'
 //                     ? Text(
-//                   'Discount(%): ${data.discount?.toStringAsFixed(2)}',
+//                   'Discount(%): ${data.discount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
 //                   style: TextStyle(
 //                     fontSize: AppConfig.textCaption3Size,
 //                   ),
@@ -337,7 +337,7 @@
 //                 Row(
 //                   children: [
 //                     Text(
-//                       'Round off:${double.parse(data.roundOff ?? '').toStringAsFixed(2)}',
+//                       'Round off:${double.parse(data.roundOff ?? '').toStringAsFixed(AppState().noOfDecimals ?? 2)}',
 //                       style: TextStyle(
 //                         fontSize: AppConfig.textCaption3Size,
 //                       ),
@@ -377,13 +377,13 @@
 //                   ],
 //                 ),
 //                 Text(
-//                   'Total Vat: ${(data.totalTax?.toStringAsFixed(2)) ?? ''}',
+//                   'Total Vat: ${(data.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2)) ?? ''}',
 //                   style: TextStyle(
 //                     fontSize: AppConfig.textCaption3Size,
 //                   ),
 //                 ),
 //                 Text(
-//                   'Grand Total: ${data.grandTotal?.toStringAsFixed(2)}',
+//                   'Grand Total: ${data.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
 //                   style: TextStyle(
 //                     fontSize: AppConfig.textCaption3Size,
 //                   ),
@@ -448,7 +448,7 @@
 //                                 ),
 //                                 const Text(' | '),
 //                                 Text(
-//                                   'Amount: ${data.detail![i].taxable?.toStringAsFixed(2)}',
+//                                   'Amount: ${data.detail![i].taxable?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
 //                                   style: TextStyle(
 //                                     fontSize: AppConfig.textCaption3Size,
 //                                   ),

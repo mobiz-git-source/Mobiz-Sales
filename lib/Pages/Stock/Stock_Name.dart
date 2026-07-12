@@ -657,7 +657,7 @@ class _Stock_NameState extends State<Stock_Name> {
                                         // Text('Rate: ${product['amount']}'),
                                         // Text(' | '),
                                         // Text(
-                                        //     'Amt: ${total.toStringAsFixed(2)}')
+                                        //     'Amt: ${total.toStringAsFixed(AppState().noOfDecimals ?? 2)}')
                                       ],
                                     )
                                   ],

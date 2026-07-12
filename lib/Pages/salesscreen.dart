@@ -350,7 +350,7 @@ class _SalesScreenState extends State<SalesScreen> {
           "discount": _discountData.text.isEmpty ? '0' : _discountData.text,
           "total": totalAmount,
           "round_off": roundOffValue,
-          "grand_total": roundedGrandTotal.toStringAsFixed(2),
+          "grand_total": roundedGrandTotal.toStringAsFixed(AppState().noOfDecimals ?? 2),
           'remarks': _remarksText
         };
         var body = json.encode(data);
@@ -365,7 +365,7 @@ class _SalesScreenState extends State<SalesScreen> {
         print("data$body dddd");
         if (response.statusCode == 200) {
           print(response.body);
-          print("roundedGrandTotal: ${roundedGrandTotal.toStringAsFixed(2)}");
+          print("roundedGrandTotal: ${roundedGrandTotal.toStringAsFixed(AppState().noOfDecimals ?? 2)}");
           var jsonResponse = jsonDecode(response.body);
           if (jsonResponse['success'] == true) {
             print('Post successful');
@@ -733,7 +733,7 @@ class _SalesScreenState extends State<SalesScreen> {
                                       Text(' | '),
                                       Text('Rate: ${product['amount']}'),
                                       Text(' | '),
-                                      Text('Amt: ${total.toStringAsFixed(2)}')
+                                      Text('Amt: ${total.toStringAsFixed(AppState().noOfDecimals ?? 2)}')
                                     ],
                                   )
                                 ],
@@ -947,8 +947,8 @@ class _SalesScreenState extends State<SalesScreen> {
                                 ],
                               )
                             : SizedBox.shrink(),
-                        Text('Total: ${totalAmount.toStringAsFixed(2)}'),
-                        Text('Tax: ${tax.toStringAsFixed(2)}'),
+                        Text('Total: ${totalAmount.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
+                        Text('Tax: ${tax.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
@@ -989,13 +989,13 @@ class _SalesScreenState extends State<SalesScreen> {
                                           Radius.circular(5))),
                                   child: Center(
                                     child: Text(''
-                                        '${roundoff == '' ? roundOffValue.toStringAsFixed(2) : roundoff}'),
+                                        '${roundoff == '' ? roundOffValue.toStringAsFixed(AppState().noOfDecimals ?? 2) : roundoff}'),
                                   )),
                             ),
                           ],
                         ),
                         Text('Grand Total: '
-                            '${roundedGrandTotal.toStringAsFixed(2)}'
+                            '${roundedGrandTotal.toStringAsFixed(AppState().noOfDecimals ?? 2)}'
                             ''),
                       ],
                     ),

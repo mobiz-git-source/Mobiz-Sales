@@ -192,7 +192,7 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
     double balance = paidAmount + allocatedAmount - roundOff;
 
     // Truncate the balance to two decimal places
-    balance = double.parse(balance.toStringAsFixed(2));
+    balance = double.parse(balance.toStringAsFixed(AppState().noOfDecimals ?? 2));
     print("BAL $balance");
     print("PAy $paidAmount");
     print("allocated $allocatedAmount");
@@ -302,7 +302,7 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
                       _inputBox(
                         status: false,
                         value:
-                        "${paydata == '[]' || paydata == null ? '' : (double.tryParse(paydata!)?.toStringAsFixed(3) ?? '')}"
+                        "${paydata == '[]' || paydata == null ? '' : (double.tryParse(paydata!)?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '')}"
                       ),
 
                       // ${_data == '[]' ? '' : _data}
@@ -362,7 +362,7 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
                       CommonWidgets.horizontalSpace(1),
                       _inputBox(
                           status: false,
-                          value: getAllocatedAmount().toStringAsFixed(2)),
+                          value: getAllocatedAmount().toStringAsFixed(AppState().noOfDecimals ?? 2)),
                       const Spacer(),
                       const Text(
                         'Balance Amount',
@@ -918,7 +918,7 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
                   double parsedValue = double.tryParse(value) ?? 0.0;
                   double parsedPaidAmt = double.tryParse(PaidAmt) ?? 0.0;
                   double currentBalance = parsedValue + parsedPaidAmt - getAllocatedAmount();
-                  enteredValues[index] = currentBalance.toStringAsFixed(2);
+                  enteredValues[index] = currentBalance.toStringAsFixed(AppState().noOfDecimals ?? 2);
                 }
               });
 
@@ -1002,7 +1002,7 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
     List<double> processedValues = enteredValues.map((value) {
       return value.isEmpty
           ? 0.0
-          : double.parse(double.parse(value).toStringAsFixed(2));
+          : double.parse(double.parse(value).toStringAsFixed(AppState().noOfDecimals ?? 2));
     }).toList();
 
     final body = {
@@ -1109,7 +1109,7 @@ print(AppState().storeId);
   //   List<double> processedValues = enteredValues.map((value) {
   //     return value.isEmpty
   //         ? 0.0
-  //         : double.parse(double.parse(value).toStringAsFixed(2));
+  //         : double.parse(double.parse(value).toStringAsFixed(AppState().noOfDecimals ?? 2));
   //   }).toList();
   //
   //   final body = {

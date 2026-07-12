@@ -66,7 +66,7 @@ class CustomerDues extends StatelessWidget {
           final userOverdue = snapshot.data!;
           return Center(
             child: Text(
-              "Total Overdue Amount: ₹${userOverdue.totalOverdueAmount.toStringAsFixed(2)}",
+              "Total Overdue Amount: ₹${userOverdue.totalOverdueAmount.toStringAsFixed(AppState().noOfDecimals ?? 2)}",
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           );

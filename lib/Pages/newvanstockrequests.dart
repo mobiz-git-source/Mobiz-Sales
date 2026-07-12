@@ -446,7 +446,7 @@ class _VanStocksState extends State<VanStocks> {
                                         // Text('Rate: ${product['amount']}'),
                                         // Text(' | '),
                                         // Text(
-                                        //     'Amt: ${total.toStringAsFixed(2)}')
+                                        //     'Amt: ${total.toStringAsFixed(AppState().noOfDecimals ?? 2)}')
                                       ],
                                     )
                                   ],

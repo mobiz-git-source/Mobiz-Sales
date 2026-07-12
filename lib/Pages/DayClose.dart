@@ -461,7 +461,7 @@ class _DaycloseState extends State<Dayclose> {
                                   children: [
                                     TextSpan(
                                         text:
-                                            '${data['no_of_sales']} | ${data['amount_of_sales'].toStringAsFixed(3)}',
+                                            '${data['no_of_sales']} | ${data['amount_of_sales'].toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                                         style: TextStyle(color: Colors.grey))
                                   ]),
                             ),
@@ -502,296 +502,318 @@ class _DaycloseState extends State<Dayclose> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Petty Cash'),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical!*1.2,
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Petty Cash
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Petty Cash'),
+                                      Container(
+                                        child: Center(child: Text("${data['petty_cash']}")),
+                                        width: SizeConfig.safeBlockHorizontal! * 17,
+                                        height: SizeConfig.safeBlockVertical! * 2.4,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade300,
+                                          borderRadius: BorderRadius.circular(3),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Divider(),
+
+                                  // Expense
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Expense'),
+                                      Container(
+                                        child: Center(child: Text("${data['expense']}")),
+                                        width: SizeConfig.safeBlockHorizontal! * 17,
+                                        height: SizeConfig.safeBlockVertical! * 2.4,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade300,
+                                          borderRadius: BorderRadius.circular(3),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Divider(),
+
+                                  // Cash Deposited
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Cash Deposited'),
+                                      GestureDetector(
+                                        onTap: isdayclose == false
+                                            ? null
+                                            : () {
+                                          _showDialog(CashDepositedcontrol,
+                                              'cashdeposit', 'Cash Deposited');
+                                        },
+                                        child: Container(
+                                          child: Center(
+                                              child: Text(isdayclose == false
+                                                  ? Dayclosedata == null
+                                                  ? ''
+                                                  : Dayclosedata!['cash_deposited']
+                                                  : cashdeposit)),
+                                          width: SizeConfig.safeBlockHorizontal! * 17,
+                                          height: SizeConfig.safeBlockVertical! * 2.4,
+                                          decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(3),
+                                              border: Border.all(color: Colors.grey)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Divider(),
+
+                                  // Cash Handed Over
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Cash Handed Over'),
+                                      GestureDetector(
+                                        onTap: isdayclose == false
+                                            ? null
+                                            : () {
+                                          _showDialog(CashHandedOvercontrol,
+                                              'cashHanded', 'Cash Handed Over');
+                                        },
+                                        child: Container(
+                                          child: Center(
+                                              child: Text(isdayclose == false
+                                                  ? Dayclosedata == null
+                                                  ? ''
+                                                  : Dayclosedata!['cash_hand_over']
+                                                  : cashHanded)),
+                                          width: SizeConfig.safeBlockHorizontal! * 17,
+                                          height: SizeConfig.safeBlockVertical! * 2.4,
+                                          decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(3),
+                                              border: Border.all(color: Colors.grey)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Divider(),
+
+                                  // No of Cheque Deposited (commented out, kept as-is)
+                                  // Row(
+                                  //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  //   children: [
+                                  //     Text('No of Cheque Deposited'),
+                                  //     GestureDetector(
+                                  //       onTap: isdayclose == false
+                                  //           ? null
+                                  //           : () {
+                                  //               print("Ncheqdepo$Ncheqdepo");
+                                  //               _showDialog(NoofChequeDepositedcontrol, 'Ncheqdepo');
+                                  //               print(Ncheqdepo);
+                                  //             },
+                                  //       child: Container(
+                                  //         child: Center(
+                                  //             child: Text(isdayclose == false
+                                  //                 ? Dayclosedata == null
+                                  //                     ? ''
+                                  //                     : "${Dayclosedata!['no_of_cheque_deposited']}"
+                                  //                 : Ncheqdepo)),
+                                  //         width: SizeConfig.safeBlockHorizontal! * 17,
+                                  //         height: SizeConfig.safeBlockVertical! * 2.4,
+                                  //         decoration: BoxDecoration(
+                                  //             borderRadius: BorderRadius.circular(3),
+                                  //             border: Border.all(color: Colors.grey)),
+                                  //       ),
+                                  //     ),
+                                  //   ],
+                                  // ),
+                                  // Divider(),
+
+                                  // Cheque Deposited Amount
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Cheque Deposited Amount'),
+                                      GestureDetector(
+                                        onTap: isdayclose == false
+                                            ? null
+                                            : () {
+                                          _showDialog(
+                                              ChequeDepositedAmountcontrol,
+                                              'cheqdepoamt',
+                                              'Cheque Deposited Amount');
+                                          print(double.tryParse(
+                                              Dayclosedata?['cheque_amount_in_hand']
+                                                  ?.toString() ??
+                                                  '0') ??
+                                              0.0);
+                                        },
+                                        child: Container(
+                                          child: Center(
+                                              child: Text(isdayclose == false
+                                                  ? Dayclosedata == null
+                                                  ? ''
+                                                  : Dayclosedata!['cheque_deposited_amount']
+                                                  : cheqdepo)),
+                                          width: SizeConfig.safeBlockHorizontal! * 17,
+                                          height: SizeConfig.safeBlockVertical! * 2.4,
+                                          decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(3),
+                                              border: Border.all(color: Colors.grey)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Divider(),
+
+                                  // No of Cheque Handed Over (commented out, kept as-is)
+                                  // Row(
+                                  //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  //   children: [
+                                  //     Text('No of Cheque Handed Over'),
+                                  //     GestureDetector(
+                                  //       onTap: isdayclose == false
+                                  //           ? null
+                                  //           : () {
+                                  //               _showDialog(NoofChequeHandedOvercontrol, 'cheqhandedovr');
+                                  //             },
+                                  //       child: Container(
+                                  //         child: Center(
+                                  //             child: Text(isdayclose == false
+                                  //                 ? Dayclosedata == null
+                                  //                     ? ''
+                                  //                     : "${Dayclosedata!['no_of_cheque_hand_over']}"
+                                  //                 : cheqhandedovr)),
+                                  //         width: SizeConfig.safeBlockHorizontal! * 17,
+                                  //         height: SizeConfig.safeBlockVertical! * 2.4,
+                                  //         decoration: BoxDecoration(
+                                  //             borderRadius: BorderRadius.circular(3),
+                                  //             border: Border.all(color: Colors.grey)),
+                                  //       ),
+                                  //     ),
+                                  //   ],
+                                  // ),
+                                  // Divider(),
+
+                                  // Cheque Handed Over Amount
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Cheque Handed Over Amount'),
+                                      GestureDetector(
+                                        onTap: isdayclose == false
+                                            ? null
+                                            : () {
+                                          _showDialog(
+                                              ChequeHandedOverAmountcontrol,
+                                              'cheqhandedamt',
+                                              'Cheque Handed Over Amount');
+                                        },
+                                        child: Container(
+                                          child: Center(
+                                              child: Text(isdayclose == false
+                                                  ? Dayclosedata == null
+                                                  ? ''
+                                                  : Dayclosedata!['cheque_hand_over_amount']
+                                                  : cheqhandedamt)),
+                                          width: SizeConfig.safeBlockHorizontal! * 17,
+                                          height: SizeConfig.safeBlockVertical! * 2.4,
+                                          decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(3),
+                                              border: Border.all(color: Colors.grey)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Divider(),
+
+                                  // Balance Cash in Hand
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Balance Cash in Hand'),
+                                      Container(
+                                        child: Center(
+                                            child: Text(isdayclose == false
+                                                ? Dayclosedata == null
+                                                ? ''
+                                                : "${Dayclosedata!['balance_cash_in_hand']}"
+                                                : balcash)),
+                                        width: SizeConfig.safeBlockHorizontal! * 17,
+                                        height: SizeConfig.safeBlockVertical! * 2.4,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade300,
+                                          borderRadius: BorderRadius.circular(3),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Divider(),
+
+                                  // No of Cheque in Hand (commented out, kept as-is)
+                                  // Row(
+                                  //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  //   children: [
+                                  //     Text('No of Cheque in Hand'),
+                                  //     GestureDetector(
+                                  //       onTap: () {
+                                  //         print("isdayclose$isdayclose");
+                                  //         print("Dayclosedata${Dayclosedata == null ? '' : Dayclosedata!['no_of_cheque_in_hand']}");
+                                  //         print("cheqhand$cheqhand");
+                                  //       },
+                                  //       child: Container(
+                                  //         child: Center(
+                                  //           child: Text(isdayclose == false
+                                  //               ? Dayclosedata == null
+                                  //                   ? ''
+                                  //                   : "${Dayclosedata!['no_of_cheque_in_hand']}"
+                                  //               : cheqhand),
+                                  //         ),
+                                  //         width: SizeConfig.safeBlockHorizontal! * 17,
+                                  //         height: SizeConfig.safeBlockVertical! * 2.4,
+                                  //         decoration: BoxDecoration(
+                                  //           color: Colors.grey.shade300,
+                                  //           borderRadius: BorderRadius.circular(3),
+                                  //         ),
+                                  //       ),
+                                  //     ),
+                                  //   ],
+                                  // ),
+                                  // Divider(),
+
+                                  // Cheque Amount in Hand (last item — no trailing divider)
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Cheque Amount in Hand'),
+                                      Container(
+                                        child: Center(
+                                          child: Text(isdayclose == false
+                                              ? Dayclosedata == null
+                                              ? ''
+                                              : "${Dayclosedata!['cheque_amount_in_hand']}"
+                                              : amtinhand),
+                                        ),
+                                        width: SizeConfig.safeBlockHorizontal! * 17,
+                                        height: SizeConfig.safeBlockVertical! * 2.4,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade300,
+                                          borderRadius: BorderRadius.circular(3),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                              Text('Expense'),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical!*1.2,
-                              ),
-                              Text('Cash Deposited'),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical!*1.2,
-                              ),
-                              Text('Cash Handed Over'),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical!*1.2,
-                              ),
-                              // Text('No of Cheque Deposited'),
-                              // SizedBox(
-                              //   height: SizeConfig.safeBlockVertical!*1.2,
-                              // ),
-                              Text('Cheque Deposited Amount'),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical!*1.2,
-                              ),
-                              // Text('No of Cheque Handed Over'),
-                              // SizedBox(
-                              //   height: SizeConfig.safeBlockVertical!*1.2,
-                              // ),
-                              Text('Cheque Handed Over Amount'),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical!*1.2,
-                              ),
-                              Text('Balance Cash in Hand'),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical!*1.2,
-                              ),
-                              // Text('No of Cheque in Hand'),
-                              // SizedBox(
-                              //   height: SizeConfig.safeBlockVertical!*1.2,
-                              // ),
-                              Text('Cheque Amount in Hand'),
-                            ],
+                            ),
                           ),
-                          Column(
-                            children: [
-                              Container(
-                                child:
-                                Center(child: Text("${data['petty_cash']}")),
-                                width: SizeConfig.safeBlockHorizontal!*17,
-                                height: SizeConfig.safeBlockVertical!*2.4,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade300,
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical!*1.2,
-                              ),
-                              Container(
-                                child:
-                                    Center(child: Text("${data['expense']}")),
-                                width: SizeConfig.safeBlockHorizontal!*17,
-                                height: SizeConfig.safeBlockVertical!*2.4,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade300,
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical!*1.2,
-                              ),
-                              GestureDetector(
-                                onTap: isdayclose == false
-                                    ? null
-                                    : () {
-                                        _showDialog(CashDepositedcontrol,
-                                            'cashdeposit', 'Cash Deposited');
-                                      },
-                                child: Container(
-                                  child: Center(
-                                      child: Text(isdayclose == false
-                                          ? Dayclosedata == null
-                                              ? ''
-                                              : Dayclosedata!['cash_deposited']
-                                          : cashdeposit)),
-                                  width: SizeConfig.safeBlockHorizontal!*17,
-                                  height: SizeConfig.safeBlockVertical!*2.4,
-                                  decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(3),
-                                      border: Border.all(color: Colors.grey)),
-                                ),
-                              ),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical!*1.2,
-                              ),
-                              GestureDetector(
-                                onTap: isdayclose == false
-                                    ? null
-                                    : () {
-                                        _showDialog(CashHandedOvercontrol,
-                                            'cashHanded', 'Cash Handed Over');
-                                      },
-                                child: Container(
-                                  child: Center(
-                                      child: Text(isdayclose == false
-                                          ? Dayclosedata == null
-                                              ? ''
-                                              : Dayclosedata!['cash_hand_over']
-                                          : cashHanded)),
-                                  width: SizeConfig.safeBlockHorizontal!*17,
-                                  height: SizeConfig.safeBlockVertical!*2.4,
-                                  decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(3),
-                                      border: Border.all(color: Colors.grey)),
-                                ),
-                              ),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical!*1.2,
-                              ),
-                              // GestureDetector(
-                              //   onTap: isdayclose == false
-                              //       ? null
-                              //       :
-                              //       () {
-                              //         print("Ncheqdepo$Ncheqdepo");
-                              //           _showDialog(NoofChequeDepositedcontrol,
-                              //               'Ncheqdepo');
-                              //           print(Ncheqdepo);
-                              //         },
-                              //   child: Container(
-                              //     child: Center(
-                              //         child: Text(isdayclose == false
-                              //             ? Dayclosedata == null
-                              //                 ? ''
-                              //                 : "${Dayclosedata!['no_of_cheque_deposited']}"
-                              //             : Ncheqdepo)),
-                              //     width: SizeConfig.safeBlockHorizontal!*17,
-                              //     height: SizeConfig.safeBlockVertical!*2.4,
-                              //     decoration: BoxDecoration(
-                              //         borderRadius: BorderRadius.circular(3),
-                              //         border: Border.all(color: Colors.grey)),
-                              //   ),
-                              // ),
-                              // SizedBox(
-                              //   height: SizeConfig.safeBlockVertical!*1.2,
-                              // ),
-                              GestureDetector(
-                                onTap: isdayclose == false
-                                    ? null
-                                    : () {
-                                        _showDialog(
-                                            ChequeDepositedAmountcontrol,
-                                            'cheqdepoamt','Cheque Deposited Amount');
-                                        print(double.tryParse(
-                                            Dayclosedata?['cheque_amount_in_hand']?.toString() ?? '0'
-                                        ) ?? 0.0);
-                                },
-                                child: Container(
-                                  child: Center(
-                                      child: Text(isdayclose == false
-                                          ? Dayclosedata == null
-                                              ? ''
-                                              : Dayclosedata![
-                                                  'cheque_deposited_amount']
-                                          : cheqdepo)),
-                                  width: SizeConfig.safeBlockHorizontal!*17,
-                                  height: SizeConfig.safeBlockVertical!*2.4,
-                                  decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(3),
-                                      border: Border.all(color: Colors.grey)),
-                                ),
-                              ),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical!*1.2,
-                              ),
-                              // GestureDetector(
-                              //   onTap: isdayclose == false
-                              //       ? null
-                              //       : () {
-                              //           _showDialog(NoofChequeHandedOvercontrol,
-                              //               'cheqhandedovr');
-                              //         },
-                              //   child: Container(
-                              //     child: Center(
-                              //         child: Text(isdayclose == false
-                              //             ? Dayclosedata == null
-                              //                 ? ''
-                              //                 : "${Dayclosedata!['no_of_cheque_hand_over']}"
-                              //             : cheqhandedovr)),
-                              //     width: SizeConfig.safeBlockHorizontal!*17,
-                              //     height: SizeConfig.safeBlockVertical!*2.4,
-                              //     decoration: BoxDecoration(
-                              //         borderRadius: BorderRadius.circular(3),
-                              //         border: Border.all(color: Colors.grey)),
-                              //   ),
-                              // ),
-                              // SizedBox(
-                              //   height: SizeConfig.safeBlockVertical!*1.2,
-                              // ),
-                              GestureDetector(
-                                onTap: isdayclose == false
-                                    ? null
-                                    : () {
-                                        _showDialog(
-                                            ChequeHandedOverAmountcontrol,
-                                            'cheqhandedamt', 'Cheque Handed Over Amount');
-                                      },
-                                child: Container(
-                                  child: Center(
-                                      child: Text(isdayclose == false
-                                          ? Dayclosedata == null
-                                              ? ''
-                                              : Dayclosedata![
-                                                  'cheque_hand_over_amount']
-                                          : cheqhandedamt)),
-                                  width: SizeConfig.safeBlockHorizontal!*17,
-                                  height: SizeConfig.safeBlockVertical!*2.4,
-                                  decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(3),
-                                      border: Border.all(color: Colors.grey)),
-                                ),
-                              ),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical!*1.2,
-                              ),
-                              Container(
-                                child: Center(
-                                    child: Text(
-                                        isdayclose == false
-                                        ? Dayclosedata == null
-                                            ? ''
-                                            : "${Dayclosedata!['balance_cash_in_hand']}"
-                                        : balcash
-                                    )),
-                                width: SizeConfig.safeBlockHorizontal!*17,
-                                height: SizeConfig.safeBlockVertical!*2.4,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade300,
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical!*1.2,
-                              ),
-                              // GestureDetector(
-                              //   onTap: () {
-                              //     print("isdayclose$isdayclose");
-                              //     print("Dayclosedata${Dayclosedata == null?'':Dayclosedata!['no_of_cheque_in_hand']}");
-                              //     print("cheqhand$cheqhand");
-                              //   },
-                              //   child: Container(
-                              //     child: Center(
-                              //       child: Text(
-                              //           isdayclose == false
-                              //           ? Dayclosedata == null
-                              //               ? ''
-                              //               : "${Dayclosedata!['no_of_cheque_in_hand']}"
-                              //           : cheqhand),
-                              //     ),
-                              //     width: SizeConfig.safeBlockHorizontal!*17,
-                              //     height: SizeConfig.safeBlockVertical!*2.4,
-                              //     decoration: BoxDecoration(
-                              //       color: Colors.grey.shade300,
-                              //       borderRadius: BorderRadius.circular(3),
-                              //     ),
-                              //   ),
-                              // ),
-                              // SizedBox(
-                              //   height: SizeConfig.safeBlockVertical!*1.2,
-                              // ),
-                              Container(
-                                child: Center(
-                                  child: Text(isdayclose == false
-                                      ? Dayclosedata == null
-                                          ? ''
-                                          : "${Dayclosedata!['cheque_amount_in_hand']}"
-                                      : amtinhand),
-                                ),
-                                width: SizeConfig.safeBlockHorizontal!*17,
-                                height: SizeConfig.safeBlockVertical!*2.4,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade300,
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                            ],
-                          ),
+                          SizedBox(width: SizeConfig.safeBlockHorizontal! * 2),
                           Container(
                               decoration: BoxDecoration(
                                   color: AppConfig.colorPrimary,

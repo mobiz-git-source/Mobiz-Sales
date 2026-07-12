@@ -181,7 +181,7 @@ class _DayReportState extends State<DayReport> {
                         pw.Text('${report.sales!.indexOf(sale) + 1}',textAlign: pw.TextAlign.center), // SI NO
                         pw.Text(formattedShopName), // SHOP NAME
                         pw.Text('${sale.invoiceNo}'), // INVOICE NO
-                        pw.Text('${sale.grandTotal!.toStringAsFixed(2)}',textAlign: pw.TextAlign.right), // Amount
+                        pw.Text('${sale.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)}',textAlign: pw.TextAlign.right), // Amount
                       ],
                     );
                   }).toList(),
@@ -192,7 +192,7 @@ class _DayReportState extends State<DayReport> {
                       pw.SizedBox(), // Empty SHOP NAME column
                       pw.Text('Total:',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text('${totalSales.toStringAsFixed(2)}',
+                      pw.Text('${totalSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),textAlign: pw.TextAlign.right),
                     ],
                   ),
@@ -256,7 +256,7 @@ class _DayReportState extends State<DayReport> {
                       pw.SizedBox(), // Empty SHOP NAME column
                       pw.Text('Total:',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text('${totalSalesreturn.toStringAsFixed(2)}',
+                      pw.Text('${totalSalesreturn.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),textAlign: pw.TextAlign.right),
                     ],
                   ),
@@ -320,7 +320,7 @@ class _DayReportState extends State<DayReport> {
                       pw.SizedBox(), // Empty SHOP NAME column
                       pw.Text('Total:',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text('${totalCollections.toStringAsFixed(2)}',
+                      pw.Text('${totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),textAlign: pw.TextAlign.right),
                     ],
                   ),
@@ -379,7 +379,7 @@ class _DayReportState extends State<DayReport> {
                       pw.SizedBox(), // Empty Type column
                       pw.Text('Total:',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text('${totalExpenses.toStringAsFixed(2)}',
+                      pw.Text('${totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),textAlign: pw.TextAlign.center),
                     ],
                   ),
@@ -392,7 +392,7 @@ class _DayReportState extends State<DayReport> {
             pw.Row(
               children: [
                 pw.Text(
-                    'Net Cash Balance: ${report.data!.netCashBalance!.toStringAsFixed(2)}'),
+                    'Net Cash Balance: ${report.data!.netCashBalance!.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
               ],
             ),
           ],
@@ -522,7 +522,7 @@ class _DayReportState extends State<DayReport> {
               "${(report.sales!.indexOf(sale) + 1).toString().padRight(columnWidth1)}"
               "${customerNameLines[0].padRight(columnWidth2)}"
               "${sale.invoiceNo!.padRight(columnWidth3)}"
-              "${sale.grandTotal!.toStringAsFixed(2).padLeft(columnWidth4)}";
+              "${sale.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(columnWidth4)}";
 
           printer.printCustom(firstLine, 1, 0);
 
@@ -534,7 +534,7 @@ class _DayReportState extends State<DayReport> {
           }
         }
         printer.printNewLine();
-        printAlignedText('', 'Total Sales: ${totalSales.toStringAsFixed(2)}');
+        printAlignedText('', 'Total Sales: ${totalSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         printer.printNewLine();
       }
 
@@ -574,7 +574,7 @@ class _DayReportState extends State<DayReport> {
               "${(report.salesReturn!.indexOf(salesReturn) + 1).toString().padRight(columnWidth1)}"
               "${customerNameLines[0].padRight(columnWidth2)}"
               "${(salesReturn.invoiceNo ?? 'No Type').padRight(columnWidth3)}"
-              "${salesReturn.grandTotal!.toStringAsFixed(2).padLeft(columnWidth4)}";
+              "${salesReturn.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(columnWidth4)}";
 
           printer.printCustom(firstLine, 1, 0);
           for (int i = 1; i < customerNameLines.length; i++) {
@@ -585,7 +585,7 @@ class _DayReportState extends State<DayReport> {
         }
         printer.printNewLine();
         printAlignedText(
-            '', 'Total Sales Return: ${totalSalesreturn.toStringAsFixed(2)}');
+            '', 'Total Sales Return: ${totalSalesreturn.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         // printer.printCustom('Total Collections: $totalCollections', 1, 0);
         printer.printNewLine();
         // printer.printCustom('Return', 1, 0);
@@ -644,7 +644,7 @@ class _DayReportState extends State<DayReport> {
               "${(report.collection!.indexOf(collection) + 1).toString().padRight(columnWidth1)}"
               "${customerNameLines[0].padRight(columnWidth2)}"
               "${(collection.collectionType ?? 'No Type').padRight(columnWidth3)}"
-              "${(double.tryParse(collection.totalAmount ?? '0')?.toStringAsFixed(2) ?? '0.00').padLeft(columnWidth4)}";
+              "${(double.tryParse(collection.totalAmount ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00').padLeft(columnWidth4)}";
 
           printer.printCustom(firstLine, 1, 0);
           for (int i = 1; i < customerNameLines.length; i++) {
@@ -655,7 +655,7 @@ class _DayReportState extends State<DayReport> {
         }
         printer.printNewLine();
         printAlignedText(
-            '', 'Total Collections: ${totalCollections.toStringAsFixed(2)}');
+            '', 'Total Collections: ${totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         // printer.printCustom('Total Collections: $totalCollections', 1, 0);
         printer.printNewLine();
       }
@@ -695,7 +695,7 @@ class _DayReportState extends State<DayReport> {
               "${(report.expense!.indexOf(expense) + 1).toString().padRight(columnWidth1)}"
               "${customerNameLines[0].padRight(columnWidth2)}"
               "${(expense.description ?? 'No Type').padRight(columnWidth3)}"
-              "${(double.tryParse(expense.amount ?? '0')?.toStringAsFixed(2) ?? '0.00').padLeft(columnWidth4)}";
+              "${(double.tryParse(expense.amount ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00').padLeft(columnWidth4)}";
 
           printer.printCustom(firstLine, 1, 0);
           for (int i = 1; i < customerNameLines.length; i++) {
@@ -713,7 +713,7 @@ class _DayReportState extends State<DayReport> {
         }
         printer.printNewLine();
         printAlignedText(
-            '', 'Total Expenses: ${totalExpenses.toStringAsFixed(2)}');
+            '', 'Total Expenses: ${totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         printer.printNewLine();
       }
 
@@ -722,7 +722,7 @@ class _DayReportState extends State<DayReport> {
       //     // (report.data!.pettyCash ?? 0) +
       //         totalCollections - totalExpenses;
       printer.printCustom(
-          'Net Cash Balance: ${report.data!.netCashBalance!.toStringAsFixed(2)}',
+          'Net Cash Balance: ${report.data!.netCashBalance!.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
           1,
           0);
       printer.printNewLine();
@@ -762,12 +762,12 @@ class _DayReportState extends State<DayReport> {
 
             double totalSale = sales.fold(0.0, (sum, returns) {
               return sum +
-                  (double.tryParse(returns.grandTotal!.toStringAsFixed(2)) ??
+                  (double.tryParse(returns.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)) ??
                       0.0);
             });
             double totalSum = salesReturns.fold(0.0, (sum, returns) {
               return sum +
-                  (double.tryParse(returns.grandTotal!.toStringAsFixed(2)) ??
+                  (double.tryParse(returns.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)) ??
                       0.0);
             });
             // Calculate totals only if the lists are not empty
@@ -777,13 +777,13 @@ class _DayReportState extends State<DayReport> {
             });
 
             String totalCollectionsFormatted =
-                totalCollections.toStringAsFixed(2);
+                totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2);
 
             double totalExpenses = expenses.fold(0.0, (sum, returns) {
               return sum + (double.tryParse(returns.amount.toString()) ?? 0.0);
             });
 
-            String totalExpenseFormated = totalExpenses.toStringAsFixed(2);
+            String totalExpenseFormated = totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2);
             double netCashBalance =
                 // (report.data?.pettyCash ?? 0) +
                 totalCollections - totalExpenses;
@@ -950,7 +950,7 @@ class _DayReportState extends State<DayReport> {
                                     Expanded(
                                       flex: 3, // More space for Amount
                                       child: Text(
-                                        '${sale.grandTotal?.toStringAsFixed(2)}', // Amount
+                                        '${sale.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2)}', // Amount
                                         textAlign: TextAlign
                                             .right, // Align amount to the right
                                       ),
@@ -967,7 +967,7 @@ class _DayReportState extends State<DayReport> {
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
                                 Text(
-                                  'Total: ${totalSale.toStringAsFixed(2)}',
+                                  'Total: ${totalSale.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
                                       fontSize: 13),
@@ -1083,7 +1083,7 @@ class _DayReportState extends State<DayReport> {
                                     Expanded(
                                       flex: 3, // More space for Amount
                                       child: Text(
-                                          '${returns.grandTotal!.toStringAsFixed(2)}',
+                                          '${returns.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                                           textAlign: TextAlign.right), // Amount
                                     ),
                                   ],
@@ -1098,7 +1098,7 @@ class _DayReportState extends State<DayReport> {
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
                                 Text(
-                                  'Total: ${totalSum.toStringAsFixed(2)}',
+                                  'Total: ${totalSum.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
                                       fontSize: 13),
@@ -1393,7 +1393,7 @@ class _DayReportState extends State<DayReport> {
                           style: TextStyle(fontWeight: FontWeight.w500),
                         ),
                         Text(
-                          report.data!.netCashBalance!.toStringAsFixed(2),
+                          report.data!.netCashBalance!.toStringAsFixed(AppState().noOfDecimals ?? 2),
                         )
                       ],
                     )

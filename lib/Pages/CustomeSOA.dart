@@ -283,7 +283,7 @@ class _SOAState extends State<SOA> {
                     ),
                     pw.Padding(
                       padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text(opening.toStringAsFixed(2)),
+                      child: pw.Text(opening.toStringAsFixed(AppState().noOfDecimals ?? 2)),
                     ),
                   ],
                 ),
@@ -314,18 +314,18 @@ class _SOAState extends State<SOA> {
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(4),
                         child: pw.Text(row[2] != null
-                            ? double.parse(row[2].toString()).toStringAsFixed(2)
+                            ? double.parse(row[2].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2)
                             : "0.00",textAlign: pw.TextAlign.right),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(4),
                         child: pw.Text(row[3] != null
-                            ? double.parse(row[3].toString()).toStringAsFixed(2)
+                            ? double.parse(row[3].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2)
                             : "0.00",textAlign: pw.TextAlign.right),
                       ),
                       pw.Padding(
                         padding:  pw.EdgeInsets.all(4),
-                        child: pw.Text(balance.toStringAsFixed(2),textAlign: pw.TextAlign.right),
+                        child: pw.Text(balance.toStringAsFixed(AppState().noOfDecimals ?? 2),textAlign: pw.TextAlign.right),
                       ),
                     ],
                   );
@@ -352,7 +352,7 @@ class _SOAState extends State<SOA> {
                     ),
                     pw.Padding(
                       padding: const pw.EdgeInsets.symmetric(vertical: 20),
-                      child: pw.Text(closing.toStringAsFixed(2),
+                      child: pw.Text(closing.toStringAsFixed(AppState().noOfDecimals ?? 2),
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                     ),
                   ],
@@ -437,7 +437,7 @@ class _SOAState extends State<SOA> {
 
     // 6. OPENING ROW
     printer.printCustom(
-        "${''.padRight(10)} ${''.padRight(30)} ${''.padRight(7)} ${'Opening'.padRight(7)} ${opening.toStringAsFixed(2)}",
+        "${''.padRight(10)} ${''.padRight(30)} ${''.padRight(7)} ${'Opening'.padRight(7)} ${opening.toStringAsFixed(AppState().noOfDecimals ?? 2)}",
         1,
         0);
 
@@ -455,9 +455,9 @@ class _SOAState extends State<SOA> {
       printer.printCustom(
         '${dateStr.padRight(12)}'
             '${refStr.padRight(8)}'
-            '${amount.toStringAsFixed(2).padLeft(9)}'
-            '${payment.toStringAsFixed(2).padLeft(9)}'
-            '${balance.toStringAsFixed(2).padLeft(10)}',
+            '${amount.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(9)}'
+            '${payment.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(9)}'
+            '${balance.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(10)}',
         1,
         0,
       );
@@ -467,7 +467,7 @@ class _SOAState extends State<SOA> {
 
     // 8. CLOSING BALANCE
     printer.printCustom(
-        "Closing Balance: ${closing.toStringAsFixed(2)}", 2, 1);
+        "Closing Balance: ${closing.toStringAsFixed(AppState().noOfDecimals ?? 2)}", 2, 1);
 
     printer.printNewLine();
 
@@ -874,7 +874,7 @@ class _SOAState extends State<SOA> {
                                               MainAxisAlignment.spaceEvenly,
                                           children: [
                                             Text(
-                                              "Opening Balance : ${opening.toStringAsFixed(2)}",
+                                              "Opening Balance : ${opening.toStringAsFixed(AppState().noOfDecimals ?? 2)}",
                                               // style: TextStyle(
                                               //   fontSize: 15,
                                               // ),
@@ -959,21 +959,21 @@ class _SOAState extends State<SOA> {
                                             Padding(
                                               padding: EdgeInsets.all(6.0),
                                               child: Text(
-                                                row[2].toStringAsFixed(2),
+                                                row[2].toStringAsFixed(AppState().noOfDecimals ?? 2),
                                                 style: TextStyle(fontSize: 13),
                                               ),
                                             ),
                                             Padding(
                                               padding: EdgeInsets.all(6.0),
                                               child: Text(
-                                                row[3].toStringAsFixed(2),
+                                                row[3].toStringAsFixed(AppState().noOfDecimals ?? 2),
                                                 style: TextStyle(fontSize: 13),
                                               ),
                                             ),
                                             Padding(
                                               padding: EdgeInsets.all(6.0),
                                               child: Text(
-                                                row[4].toStringAsFixed(2),
+                                                row[4].toStringAsFixed(AppState().noOfDecimals ?? 2),
                                                 style: TextStyle(fontSize: 13),
                                               ),
                                             ),
@@ -995,7 +995,7 @@ class _SOAState extends State<SOA> {
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
                                   Text(
-                                    "Balance Due: ${balanceDue.toStringAsFixed(2)}",
+                                    "Balance Due: ${balanceDue.toStringAsFixed(AppState().noOfDecimals ?? 2)}",
                                     style:
                                         TextStyle(fontWeight: FontWeight.bold),
                                   ),
@@ -1085,7 +1085,7 @@ class _SOAState extends State<SOA> {
                                               MainAxisAlignment.spaceEvenly,
                                           children: [
                                             Text(
-                                              "Opening Balance : ${opening.toStringAsFixed(2)}",
+                                              "Opening Balance : ${opening.toStringAsFixed(AppState().noOfDecimals ?? 2)}",
                                               // style: TextStyle(
                                               //   fontSize: 15,
                                               // ),
@@ -1207,7 +1207,7 @@ class _SOAState extends State<SOA> {
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
                                   Text(
-                                    "Balance Due: ${balanceDue.toStringAsFixed(2)}",
+                                    "Balance Due: ${balanceDue.toStringAsFixed(AppState().noOfDecimals ?? 2)}",
                                     style:
                                         TextStyle(fontWeight: FontWeight.bold),
                                   ),

@@ -448,7 +448,7 @@ class _ExpenseAddState extends State<ExpenseAdd> {
         if (amount != null && vatAmount != null) {
           double totalAmount = amount + vatAmount;
           _totalAmountController.text =
-              totalAmount.toStringAsFixed(2); // Format to 2 decimal places
+              totalAmount.toStringAsFixed(AppState().noOfDecimals ?? 2); // Format to 2 decimal places
         } else {
           _totalAmountController.clear();
         }

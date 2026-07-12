@@ -51,6 +51,7 @@ class _CopyScreenState extends State<CopyScreen> {
   var attendanceData;
 
   String roundoff = '';
+  String _billType = 'Cash';
   @override
   void initState() {
     super.initState();
@@ -279,8 +280,8 @@ class _CopyScreenState extends State<CopyScreen> {
     Map<String, dynamic> grandTotalMap = CalculatedValue();
 
     double tax = _ifVat == 1 ? calculateTax() : 0;
-    double roundedGrandTotal = double.parse(double.parse(grandTotalMap['rounded'].toString()).toStringAsFixed(2));
-    double roundOffValue = double.parse(double.parse(grandTotalMap['roundOffValue'].toString()).toStringAsFixed(2));
+    double roundedGrandTotal = double.parse(double.parse(grandTotalMap['rounded'].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2));
+    double roundOffValue = double.parse(double.parse(grandTotalMap['roundOffValue'].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2));
     double total;
     if (ModalRoute.of(context)!.settings.arguments != null) {
       final Map<String, dynamic>? params =
@@ -309,7 +310,7 @@ class _CopyScreenState extends State<CopyScreen> {
         }).toList();
         List<double> amounts = savedProducts.map<double>((product) {
           return double.parse(
-              double.parse(product['amount'].toString()).toStringAsFixed(2));
+              double.parse(product['amount'].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2));
         }).toList();
 
         List<double> quantity = savedProducts.map<double>((product) {
@@ -345,7 +346,9 @@ class _CopyScreenState extends State<CopyScreen> {
           "round_off": roundOffValue,
           "grand_total": roundedGrandTotal,
           'remarks': _remarksText,
-          'serial_numbers': serialNumbers
+          'serial_numbers': serialNumbers,
+          // 'bill_type': _billType,
+          'cash_card': _billType
         };
         var body = json.encode(data);
 
@@ -391,7 +394,7 @@ class _CopyScreenState extends State<CopyScreen> {
               },
             );
           }
-          print(response.body);
+          // print(response.body);
         } else {
           print('Post failed with status: ${response.statusCode}');
           print(response.body);
@@ -646,7 +649,7 @@ class _CopyScreenState extends State<CopyScreen> {
                     ),
                   ),
                   SizedBox(
-                    height: MediaQuery.of(context).size.height * .550,
+                    height: MediaQuery.of(context).size.height * .5,
                     child: ListView.builder(
                       physics: BouncingScrollPhysics(),
                       scrollDirection: Axis.vertical,
@@ -755,7 +758,7 @@ class _CopyScreenState extends State<CopyScreen> {
                                       Text(' | '),
                                       Text('Rate: ${product['amount']}'),
                                       Text(' | '),
-                                      Text('Amt: ${total.toStringAsFixed(2)}')
+                                      Text('Amt: ${total.toStringAsFixed(AppState().noOfDecimals ?? 2)}')
                                     ],
                                   )
                                 ],
@@ -773,6 +776,79 @@ class _CopyScreenState extends State<CopyScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Text(
+                              "Bill Type",
+                              style: TextStyle(
+                                fontSize: AppConfig.textCaption3Size,
+                              ),
+                            ),
+                            CommonWidgets.horizontalSpace(2),
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _billType = 'Cash';
+                                });
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.black),
+                                    color: (_billType == 'Cash')
+                                        ? AppConfig.colorPrimary
+                                        : AppConfig.backButtonColor,
+                                    borderRadius: const BorderRadius.only(
+                                        topLeft: Radius.circular(3),
+                                        bottomLeft: Radius.circular(3))),
+                                width: SizeConfig.blockSizeHorizontal * 20,
+                                height: SizeConfig.blockSizeVertical * 3,
+                                child: Center(
+                                  child: Text(
+                                    'CASH',
+                                    style: TextStyle(
+                                      fontSize: AppConfig.textCaption3Size,
+                                      color: (_billType == 'Cash')
+                                          ? AppConfig.backButtonColor
+                                          : AppConfig.textBlack,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _billType = 'Credit';
+                                });
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.black),
+                                    color: (_billType == 'Credit')
+                                        ? AppConfig.colorPrimary
+                                        : AppConfig.backButtonColor,
+                                    borderRadius: const BorderRadius.only(
+                                        topRight: Radius.circular(3),
+                                        bottomRight: Radius.circular(3))),
+                                width: SizeConfig.blockSizeHorizontal * 20,
+                                height: SizeConfig.blockSizeVertical * 3,
+                                child: Center(
+                                  child: Text(
+                                    'Credit',
+                                    style: TextStyle(
+                                      fontSize: AppConfig.textCaption3Size,
+                                      color: (_billType == 'Credit')
+                                          ? AppConfig.backButtonColor
+                                          : AppConfig.textBlack,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 10),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
@@ -969,8 +1045,8 @@ class _CopyScreenState extends State<CopyScreen> {
                                 ],
                               )
                             : SizedBox.shrink(),
-                        Text('Total: ${totalAmount.toStringAsFixed(2)}'),
-                        Text('Tax: ${tax.toStringAsFixed(2)}'),
+                        Text('Total: ${totalAmount.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
+                        Text('Tax: ${tax.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
@@ -1011,13 +1087,13 @@ class _CopyScreenState extends State<CopyScreen> {
                                           Radius.circular(5))),
                                   child: Center(
                                     child: Text(''
-                                        '${roundoff == '' ? roundOffValue.toStringAsFixed(2) : roundoff}'),
+                                        '${roundoff == '' ? roundOffValue.toStringAsFixed(AppState().noOfDecimals ?? 2) : roundoff}'),
                                   )),
                             ),
                           ],
                         ),
                         Text('Grand Total: '
-                            '${roundedGrandTotal.toStringAsFixed(2)}'
+                            '${roundedGrandTotal.toStringAsFixed(AppState().noOfDecimals ?? 2)}'
                             ''),
                         ElevatedButton(
                           style: ButtonStyle(
@@ -1053,19 +1129,21 @@ class _CopyScreenState extends State<CopyScreen> {
                               },
                             );
                           },
-                          child: Text(
-                            'Save to cart',
-                            style: TextStyle(
-                              fontSize: AppConfig.textCaption3Size,
-                              color: AppConfig.backgroundColor,
-                              fontWeight: AppConfig.headLineWeight,
-                            ),
-                          ),
+                          child: Icon(Icons.add_shopping_cart,color: AppConfig.backgroundColor,),
+                          // Text(
+                          //   'Save to cart',
+                          //   style: TextStyle(
+                          //     fontSize: AppConfig.textCaption3Size,
+                          //     color: AppConfig.backgroundColor,
+                          //     fontWeight: AppConfig.headLineWeight,
+                          //   ),
+                          // ),
                         ),
 
                       ],
                     ),
                   ),
+                  SizedBox(height: 50,)
                 ],
               ),
       ),

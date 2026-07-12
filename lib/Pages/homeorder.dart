@@ -371,7 +371,7 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
                         child: Row(
                           children: [
                             Text(
-                              'Round Off: ${(double.tryParse(data.roundOff ?? '0')?.toStringAsFixed(2)) ?? ''}',
+                              'Round Off: ${(double.tryParse(data.roundOff ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2)) ?? ''}',
                               style: TextStyle(
                                 fontSize: AppConfig.textCaption3Size,
                               ),
@@ -402,7 +402,7 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
                         ),
                       ),
                       Text(
-                        'Total Vat: ${data.totalTax?.toStringAsFixed(2) ?? ''}',
+                        'Total Vat: ${data.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? ''}',
                         style: TextStyle(
                           fontSize: AppConfig.textCaption3Size,
                         ),
@@ -482,7 +482,7 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
                                       ),
                                       const Text(' | '),
                                       Text(
-                                        'Amount: ${data.detail![i].amount?.toStringAsFixed(2)}',
+                                        'Amount: ${data.detail![i].amount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                                         style: TextStyle(
                                           fontSize: AppConfig.textCaption3Size,
                                         ),
@@ -677,8 +677,8 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
       (invoice.data!.detail![k].productType!.toLowerCase() == "foc")
           ? '1'
           : '0';
-      row.cells[6].value = '${invoice.data!.detail![k].taxAmt!.toStringAsFixed(2)}';
-      row.cells[7].value = '${invoice.data!.detail![k].amount!.toStringAsFixed(2)}';
+      row.cells[6].value = '${invoice.data!.detail![k].taxAmt!.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
+      row.cells[7].value = '${invoice.data!.detail![k].amount!.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
     }
 
     // Define no border style
@@ -739,10 +739,10 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
     String bottomInvoiceDetails = '''
   ${num.parse(invoice.data!.roundOff.toString()) != 0 ? 'Discount: ${invoice.data!.discount}' : '\t'}
   Total: ${invoice.data!.total}
-  Vat: ${invoice.data!.totalTax!.toStringAsFixed(2)}
+  Vat: ${invoice.data!.totalTax!.toStringAsFixed(AppState().noOfDecimals ?? 2)}
 ${invoice.data?.roundOff != null && double.tryParse(invoice.data!.roundOff.toString()) != 0
-        ? 'Round off: ${double.tryParse(invoice.data!.roundOff.toString())?.toStringAsFixed(2) ?? '0.00'}\nGrand Total: ${invoice.data!.grandTotal!.toStringAsFixed(2)}'
-        : 'Grand Total: ${invoice.data!.grandTotal!.toStringAsFixed(2)}'}
+        ? 'Round off: ${double.tryParse(invoice.data!.roundOff.toString())?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00'}\nGrand Total: ${invoice.data!.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)}'
+        : 'Grand Total: ${invoice.data!.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)}'}
 
 
   ''';

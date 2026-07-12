@@ -233,7 +233,7 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
           : (amt * taxPercentage) / 100;
       tax = Tax;
     }
-    return double.parse(tax.toStringAsFixed(2));
+    return double.parse(tax.toStringAsFixed(AppState().noOfDecimals ?? 2));
   }
 
 
@@ -386,9 +386,9 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
     Map<String, dynamic> grandTotalMap = CalculatedValue();
 
     double tax = _ifVat == 1 ? calculateTax() : 0;
-    String taxpost = tax.toStringAsFixed(2);
-    double roundedGrandTotal = double.parse(double.parse(grandTotalMap['rounded'].toString()).toStringAsFixed(2));
-    double roundOffValue = double.parse(double.parse(grandTotalMap['roundOffValue'].toString()).toStringAsFixed(2));
+    String taxpost = tax.toStringAsFixed(AppState().noOfDecimals ?? 2);
+    double roundedGrandTotal = double.parse(double.parse(grandTotalMap['rounded'].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2));
+    double roundOffValue = double.parse(double.parse(grandTotalMap['roundOffValue'].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2));
     double total;
     if (ModalRoute.of(context)!.settings.arguments != null) {
       final Map<String, dynamic>? params =
@@ -403,7 +403,7 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
         final discount = double.tryParse(_discountData.text) ?? 0;
         final tax = _ifVat == 1 ? calculateTax() : 0;
         final grandTotalMap = CalculatedValue();
-        final roundedGrandTotal = double.parse(double.parse(grandTotalMap['rounded'].toString()).toStringAsFixed(2));
+        final roundedGrandTotal = double.parse(double.parse(grandTotalMap['rounded'].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2));
 
         late http.Response response;
 
@@ -463,10 +463,10 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
             'customer_id': customerId,
             'if_vat': _ifVat,
             'product_type': savedProducts.map((p) => int.parse(p['type_id'].toString())).toList(),
-            'total_tax': tax.toStringAsFixed(2),
+            'total_tax': tax.toStringAsFixed(AppState().noOfDecimals ?? 2),
             "discount": _discountData.text.isEmpty ? '0' : _discountData.text,
             "total": totalAmount,
-            "round_off": roundOffValue.toStringAsFixed(2),
+            "round_off": roundOffValue.toStringAsFixed(AppState().noOfDecimals ?? 2),
             "grand_total": roundedGrandTotal,
             'remarks': _remarksText,
             'scheduled_date': _selectedDate.toString(),
@@ -912,7 +912,7 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
                                 Text(' | '),
                                 Text('Rate: ${product['amount']}'),
                                 Text(' | '),
-                                Text('Amt: ${total.toStringAsFixed(2)}')
+                                Text('Amt: ${total.toStringAsFixed(AppState().noOfDecimals ?? 2)}')
                               ],
                             )
                           ],
@@ -1126,8 +1126,8 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
                     ],
                   )
                       : SizedBox.shrink(),
-                  Text('Total: ${totalAmount.toStringAsFixed(2)}'),
-                  Text('Tax: ${tax.toStringAsFixed(2)}'),
+                  Text('Total: ${totalAmount.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
+                  Text('Tax: ${tax.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
@@ -1168,13 +1168,13 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
                                     Radius.circular(5))),
                             child: Center(
                               child: Text(''
-                                  '${roundoff == '' ? roundOffValue.toStringAsFixed(2) : roundoff}'),
+                                  '${roundoff == '' ? roundOffValue.toStringAsFixed(AppState().noOfDecimals ?? 2) : roundoff}'),
                             )),
                       ),
                     ],
                   ),
                   Text('Grand Total: '
-                      '${roundedGrandTotal.toStringAsFixed(2)}'
+                      '${roundedGrandTotal.toStringAsFixed(AppState().noOfDecimals ?? 2)}'
                       ''),
                 ],
               ),

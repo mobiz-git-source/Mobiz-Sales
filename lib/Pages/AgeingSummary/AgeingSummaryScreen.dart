@@ -189,7 +189,7 @@ class _AgeingSummaryScreenState extends State<AgeingSummaryScreen> {
 
   String _formatAmount(dynamic amount) {
     if (amount is num) {
-      return amount.toStringAsFixed(2);
+      return amount.toStringAsFixed(AppState().noOfDecimals ?? 2);
     }
     return amount?.toString() ?? '0.00';
   }

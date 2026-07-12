@@ -3,8 +3,14 @@ class LoginModel {
   User? user;
   Settings? settings;
   Authorisation? authorisation;
+  Currency? currency;
 
-  LoginModel({this.status, this.user, this.authorisation, this.settings});
+  LoginModel(
+      {this.status,
+      this.user,
+      this.authorisation,
+      this.settings,
+      this.currency});
 
   LoginModel.fromJson(Map<String, dynamic> json) {
     status = json['status'];
@@ -14,6 +20,9 @@ class LoginModel {
         : null;
     authorisation = json['authorisation'] != null
         ? new Authorisation.fromJson(json['authorisation'])
+        : null;
+    currency = json['currency'] != null
+        ? new Currency.fromJson(json['currency'])
         : null;
   }
 
@@ -25,6 +34,9 @@ class LoginModel {
     }
     if (this.authorisation != null) {
       data['authorisation'] = this.authorisation!.toJson();
+    }
+    if (this.currency != null) {
+      data['currency'] = this.currency!.toJson();
     }
     return data;
   }
@@ -134,6 +146,39 @@ class Authorisation {
     final Map<String, dynamic> data = new Map<String, dynamic>();
     data['token'] = this.token;
     data['type'] = this.type;
+    return data;
+  }
+}
+
+class Currency {
+  int? id;
+  String? code;
+  String? currency;
+  String? countryName;
+  int? noOfDecimals;
+
+  Currency(
+      {this.id,
+      this.code,
+      this.currency,
+      this.countryName,
+      this.noOfDecimals});
+
+  Currency.fromJson(Map<String, dynamic> json) {
+    id = json['id'];
+    code = json['code'];
+    currency = json['currency'];
+    countryName = json['country_name'];
+    noOfDecimals = json['no_of_decimals'];
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = new Map<String, dynamic>();
+    data['id'] = this.id;
+    data['code'] = this.code;
+    data['currency'] = this.currency;
+    data['country_name'] = this.countryName;
+    data['no_of_decimals'] = this.noOfDecimals;
     return data;
   }
 }
