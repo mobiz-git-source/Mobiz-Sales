@@ -44,6 +44,7 @@ class Data {
   String? van;
   String? user;
   String? date;
+  String? time;
   num? pettyCash; // Changed from int? to num?
   num? amountOfSales; // Changed from int? to num?
   num? amountOfSalesReturn; // Changed from int? to num?
@@ -55,6 +56,7 @@ class Data {
     this.van,
     this.user,
     this.date,
+    this.time,
     this.pettyCash,
     this.amountOfSales,
     this.amountOfSalesReturn,
@@ -68,6 +70,7 @@ class Data {
       van: json['van'],
       user: json['user'],
       date: json['date'],
+      time: json['time'],
       pettyCash: json['petty_cash'],
       amountOfSales: json['amount_of_sales'],
       amountOfSalesReturn: json['amount_of_sales_return'],

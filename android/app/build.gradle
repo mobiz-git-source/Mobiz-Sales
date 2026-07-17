@@ -15,7 +15,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 def flutterVersionCode = keystoreProperties.getProperty('flutter.versionCode') ?: '1'
-def flutterVersionName = keystoreProperties.getProperty('flutter.versionName') ?: '3.3.5'
+def flutterVersionName = keystoreProperties.getProperty('flutter.versionName') ?: '3.4.3'
 
 android {
     namespace "com.mobiz.sales"

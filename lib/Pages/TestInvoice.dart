@@ -714,6 +714,9 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
       String customerTRN =
               invoice.data?.customer?.firstOrNull?.trn ??
               '';
+      num amount = invoice.data!.grandTotal ?? 0.0;
+      int wholePart = amount.floor();
+      int decimalPart = ((amount - wholePart) * 1000).round(); // 3 decimal places
       String invoiceNumber = invoice.data!.invoiceNo ?? 'N/A';
       String invoiceDate = DateFormat('dd MMMM yyyy')
           .format(DateTime.parse(invoice.data!.inDate!));
@@ -734,7 +737,15 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
         Discount = '';
       }
       String amountInWords =
-          "Amount in Words: ${AppState().code} ${NumberToWord().convert('en-in', invoice.data!.grandTotal?.toInt() ?? 0).toUpperCase()} ONLY";
+          "Amount in Words: ${AppState().code} "
+          "${NumberToWord().convert('en-in', wholePart).toUpperCase()}";
+
+      if (decimalPart > 0) {
+        amountInWords +=
+        " AND ${NumberToWord().convert('en-in', decimalPart).toUpperCase()} ${AppState().minor}";
+      }
+
+      amountInWords += " ONLY";
       String van = invoice.data!.van![0].name ?? 'N/A';
       String salesman = invoice.data!.user![0].name ?? 'N/A';
 
@@ -760,14 +771,23 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
           Uint8List imageBytes = response.bodyBytes;
 
           // Decode image and convert to monochrome bitmap if needed
-          img.Image originalImage = img.decodeImage(imageBytes)!;
-          img.Image monoLogo = img.grayscale(originalImage);
+          img.Image? originalImage = img.decodeImage(imageBytes)!;
+          if (originalImage != null) {
+            // Resize image to fit thermal printer width (typically 384 or 576 pixels)
+            // 200-250px is a safe width for logos on most thermal printers.
+            img.Image resizedImage = img.copyResize(originalImage, width: 250);
 
-          // Encode the image to the required format (e.g., PNG)
-          Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
+            // Convert to grayscale
+            img.Image monoLogo = img.grayscale(resizedImage);
 
-          // Print the logo image
-          printer.printImageBytes(logoBytes);
+            // Encode the image to PNG
+            Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
+
+            // Print the logo image
+            await printer.printImageBytes(logoBytes);
+            // Small delay to allow printer to process image data
+            await Future.delayed(const Duration(milliseconds: 500));
+          }
         } else {
           print('Failed to load image: ${response.statusCode}');
         }
@@ -783,6 +803,7 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
 
       printer.printCustom("-" * 72, 1, 1); // Centered
       printAlignedText("Invoice No: ${invoiceNumber}", "Date: ${invoiceDate}");
+      printAlignedText("", "Time: ${invoice.data!.inTime}");
       printAlignedText("", "${remarks != null ? remarks : ''}");
       // printer.printCustom("Invoice No: ${invoiceNumber} | Date: ${invoiceDate}", 1, 1);
       printer.printNewLine();
@@ -796,7 +817,9 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
       // printAlignedText("Email: $customerEmail", "");
       printAlignedText("Contact No: $customerContact", "");
       printAlignedText("${invoice.data?.store?.firstOrNull?.vat_label}: $customerTRN", " ");
-      printAlignedText("Bill Type: ${invoice.data!.cashCard}", " ");
+      if(invoice.data!.cashCard != null && invoice.data!.cashCard!.isNotEmpty) {
+        printAlignedText("Bill Type: ${invoice.data!.cashCard}", " ");
+      }
       printer.printNewLine();
 
       // Print horizontal line
@@ -1005,17 +1028,18 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
     );
 
     String address = '''
-  Customer: ${invoice.data!.customer![0].code} | ${invoice.data!.customer![0].name}
-  Email: ${invoice.data!.customer![0].email}
-  Contact No:  ${invoice.data!.customer![0].contactNumber}
-  ${invoice.data?.store?.firstOrNull?.vat_label}:  $customerTRN
-  Bill Type: ${invoice.data!.cashCard}
-  ''';
+Customer: ${invoice.data!.customer![0].code} | ${invoice.data!.customer![0].name}
+Email: ${invoice.data!.customer![0].email}
+Contact No: ${invoice.data!.customer![0].contactNumber}
+${invoice.data?.store?.firstOrNull?.vat_label}: $customerTRN
+${invoice.data!.cashCard != null && invoice.data!.cashCard!.isNotEmpty ? 'Bill Type: ${invoice.data!.cashCard}' : ''}
+''';
 
     String invoiceDetails = '''
   Invoice No: ${invoice.data!.invoiceNo!}
   Date: ${DateFormat('dd MMMM yyyy').format(DateTime.parse(invoice.data!.inDate!))}
   Due Date: ${DateFormat('dd MMMM yyyy').format(DateTime.parse(invoice.data!.inDate!))}
+  Time: ${invoice.data!.inTime}
   ${remarks != null ? remarks : ''}
   ''';
 
@@ -1249,6 +1273,21 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
       return words.trim();
     }
 
+    String amountToWords(double amount) {
+      int wholePart = amount.floor();
+
+      // 3 decimal places (for values like 100.987)
+      int decimalPart = ((amount - wholePart) * 1000).round();
+
+      String words = numberToWords(wholePart).toUpperCase();
+
+      if (decimalPart > 0) {
+        words += " POINT ${numberToWords(decimalPart).toUpperCase()}";
+      }
+
+      return words;
+    }
+
 // Usage
 // Adjust the vertical position for the van details
     double vanDetailsTop = tableBottom + 20 + 100 + 10;
@@ -1275,9 +1314,9 @@ Salesman: ${invoice.data!.user![0].name}
 
     final PdfStandardFont sfont = PdfStandardFont(PdfFontFamily.helvetica, 12);
 
-// Prepare the text data
     String textData =
-        'Amount in Words: ${AppState().code} ${numberToWords(invoice.data!.grandTotal!.toInt()).toUpperCase()} ONLY';
+        'Amount in Words: ${AppState().code} '
+        '${amountToWords(invoice.data!.grandTotal!.toDouble())} ONLY';
     String? infoot = invoice.data!.store![0].invoice_footer;
 
 // Measure the height of both text strings

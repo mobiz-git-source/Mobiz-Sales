@@ -1144,6 +1144,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                             pw.Text("${dayClose.data!.invoiceNo}"),
                             // pw.SizedBox(height: 10),
                             pw.Text("${dayClose.data!.inDate}"),
+                            pw.Text("${dayClose.data!.inTime}"),
                           ]
                         )
                       ]),
@@ -1463,20 +1464,28 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                 var exp = entry.value;
                 return [
                   '${entry.key + 1}',
-                  exp.invoiceNo?.toString() ?? 'Expense',
+                  exp.description?.toString() ?? 'Expense',
+                  exp.expense != null && exp.expense!.isNotEmpty
+                      ? (exp.expense![0].name ?? '')
+                      : '',
                   exp.amount ?? '0.00',
                 ];
               }).toList();
 
               // Add total row
-              expenseRows.add(['', 'Total:', totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2)]);
-
+              expenseRows.add([
+                '',
+                'Total:',
+                '',
+                totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2),
+              ]);
               pageContent.add(buildCompactTable(
-                headers: ['SI NO', 'Description', 'Amount'],
+                headers: ['SI NO', 'Description', 'Type', 'Amount'],
                 rows: expenseRows,
-                columnWidths: [20, 130, 100],
+                columnWidths: [20, 70, 80, 80],
                 alignments: [
                   pw.TextAlign.center,
+                  pw.TextAlign.left,
                   pw.TextAlign.left,
                   pw.TextAlign.right,
                 ],
@@ -1613,6 +1622,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
       //     1,
       //     0);
       printer.printCustom('Date ${report.data!.inDate}', 1, 0);
+      printer.printCustom('Time ${report.data!.inTime}', 1, 0);
       printer.printCustom('SalesMan: ${AppState().name}', 1, 0);
       printer.printCustom('VAN:$vanName', 1, 0);
       printer.printCustom('Petty Cash:${report.data!.pettyCash}', 1, 0);
@@ -1832,15 +1842,17 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
       // Printing Expense Section
       if (report.expense != null && report.expense!.isNotEmpty) {
         const int columnWidth1 = 10; // S.No
-        const int columnWidth2 = 30; // Shop Name
-        const int columnWidth3 = 12; // Invoice No
-        const int columnWidth4 = 8; // Amount
+        const int columnWidth2 = 20; // Shop Name
+        const int columnWidth3 = 10; // Shop Name
+        const int columnWidth4 = 12; // Invoice No
+        const int columnWidth5 = 8; // Amount
 
         // Print the table header
         String headers = "${'SI NO'.padRight(columnWidth1)}"
             "${'EXPENSE NAME'.padRight(columnWidth2)}"
-            "${'Reference'.padRight(columnWidth3)}"
-            "${'Amount'.padLeft(columnWidth4)}";
+            "${'Type'.padRight(columnWidth2)}"
+            "${'Reference'.padRight(columnWidth4)}"
+            "${'Amount'.padLeft(columnWidth5)}";
         printer.printCustom('Expense', 1, 0); // Section title
         printer.printCustom(headers, 1, 0); // Print table headers
 
@@ -1863,8 +1875,9 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
           String firstLine =
               "${(report.expense!.indexOf(expense) + 1).toString().padRight(columnWidth1)}"
               "${customerNameLines[0].padRight(columnWidth2)}"
-              "${(expense.invoiceNo ?? 'No Type').padRight(columnWidth3)}"
-              "${(double.tryParse(expense.amount ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00').padLeft(columnWidth4)}";
+              "${(expense.description ?? 'No Type').padRight(columnWidth3)}"
+              "${(expense.invoiceNo ?? 'No Type').padRight(columnWidth4)}"
+              "${(double.tryParse(expense.amount ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00').padLeft(columnWidth5)}";
 
           printer.printCustom(firstLine, 1, 0);
           for (int i = 1; i < customerNameLines.length; i++) {

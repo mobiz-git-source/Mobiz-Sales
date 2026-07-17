@@ -184,6 +184,7 @@ class _GroupPrintState extends State<GroupPrint> {
       String invoiceNumber =
           invoice.sales?.invoiceNo ?? invoice.returnData?.invoiceNo ?? 'N/A';
       String? rawDate = invoice.sales?.inDate ?? invoice.returnData?.inDate;
+      String? rawTime = invoice.sales?.inTime ?? invoice.returnData?.inTime;
       String invoiceDate = rawDate != null && rawDate.isNotEmpty
           ? DateFormat('dd MMMM yyyy').format(DateTime.parse(rawDate))
           : 'N/A';
@@ -242,6 +243,7 @@ class _GroupPrintState extends State<GroupPrint> {
 
       printer.printCustom("-" * 72, 1, 1);
       printAlignedText("Invoice No: $invoiceNumber", "Date: $invoiceDate");
+      printAlignedText("", "Time: $rawTime");
       printer.printNewLine();
 
       printAlignedText("Customer: $firstLine", "");
@@ -261,8 +263,7 @@ class _GroupPrintState extends State<GroupPrint> {
             .toStringAsFixed(AppState().noOfDecimals ?? 2);
         String salesGrandTotal = invoice.sales!.grandTotal
             .toStringAsFixed(AppState().noOfDecimals ?? 2);
-        String salesAmountInWords =
-            "Amount in Words: ${AppState().code} ${NumberToWord().convert('en-in', invoice.sales!.grandTotal.toInt()).toUpperCase()} ONLY";
+        String salesAmountInWords = _getAmountInWords(invoice.sales!.grandTotal);
         String salesman = invoice.sales!.user?.name ?? 'N/A';
 
         printAlignedText("Sales", " ");
@@ -308,8 +309,7 @@ class _GroupPrintState extends State<GroupPrint> {
             .toStringAsFixed(AppState().noOfDecimals ?? 2);
         String returnGrandTotal = invoice.returnData!.grandTotal
             .toStringAsFixed(AppState().noOfDecimals ?? 2);
-        String returnAmountInWords =
-            "Amount in Words: ${AppState().code} ${NumberToWord().convert('en-in', invoice.returnData!.grandTotal.toInt()).toUpperCase()} ONLY";
+        String returnAmountInWords = _getAmountInWords(invoice.returnData!.grandTotal);
         String salesman = invoice.returnData!.user?.name ?? 'N/A';
         String van = invoice.returnData!.van?.name ?? invoice.sales?.van?.name ?? 'N/A';
 
@@ -369,7 +369,8 @@ class _GroupPrintState extends State<GroupPrint> {
         printer.printCustom("-" * 72, 1, 1);
 
         if (invoice.collection!.totalAmount != null) {
-          printAlignedText('Amount: ${invoice.collection!.totalAmount}', ' ');
+          double amt = double.tryParse(invoice.collection!.totalAmount!) ?? 0;
+          printAlignedText('Amount: ${amt.toStringAsFixed(AppState().noOfDecimals ?? 2)}', ' ');
         }
         if (invoice.collection!.collectionType == 'Cheque') {
           printAlignedText('Collection Type: Cheque', ' ');
@@ -385,16 +386,17 @@ class _GroupPrintState extends State<GroupPrint> {
             invoice.collection!.sales!.isNotEmpty) {
           printer.printNewLine();
           printer.printCustom("-" * 72, 1, 1);
-          const int colc0 = 4, colc1 = 14, colc2 = 20, colc3 = 14, colc4 = 5;
+          const int colc0 = 4, colc1 = 14, colc2 = 20, colc3 = 14, colc4 = 8;
           String headersc =
-              "${''.padRight(colc0)}${'SI.NO'.padRight(colc1)} ${'Reference NO'.padRight(colc2)} ${'Type'.padRight(colc3)}${'Amount'.padRight(colc4)}";
+              "${''.padRight(colc0)}${'SI.NO'.padRight(colc1)} ${'Reference NO'.padRight(colc2)} ${'Type'.padRight(colc3)}${'Amount'.padLeft(colc4)}";
           printer.printCustom(headersc, 1, 0);
           printer.printCustom("-" * 72, 1, 1);
 
           for (var i = 0; i < invoice.collection!.sales!.length; i++) {
             var sale = invoice.collection!.sales![i];
+            double saleAmount = double.tryParse(sale.amount ?? '0') ?? 0;
             String line =
-                "${('').padRight(colc0)}${(i + 1).toString().padRight(colc1)} ${sale.invoiceNo?.padRight(colc2) ?? 'N/A'.padRight(colc2)}${formatInvoiceType(sale.invoiceType).padRight(colc3)}${sale.amount?.padRight(colc4) ?? 'N/A'.padRight(colc4)}";
+                "${('').padRight(colc0)}${(i + 1).toString().padRight(colc1)} ${sale.invoiceNo?.padRight(colc2) ?? 'N/A'.padRight(colc2)}${formatInvoiceType(sale.invoiceType).padRight(colc3)}${saleAmount.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(colc4)}";
             printer.printCustom(line, 1, 0);
           }
           printer.printNewLine();
@@ -406,7 +408,8 @@ class _GroupPrintState extends State<GroupPrint> {
           printAlignedText('',
               'Round Off: ${double.parse(invoice.collection!.roundOff!).toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         }
-        printAlignedText('', 'Total: ${invoice.collection!.totalAmount}');
+        double totalCollAmt = double.tryParse(invoice.collection!.totalAmount ?? '0') ?? 0;
+        printAlignedText('', 'Total: ${totalCollAmt.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         if (invoice.collection!.van != null &&
             invoice.collection!.van!.isNotEmpty) {
           printAlignedText("Van: ${invoice.collection!.van![0].name}", "");
@@ -446,5 +449,22 @@ class _GroupPrintState extends State<GroupPrint> {
         return invoiceType[0].toUpperCase() +
             invoiceType.substring(1).toLowerCase();
     }
+  }
+
+  String _getAmountInWords(double amount) {
+    int wholePart = amount.toInt();
+    int decimalPart = ((amount - wholePart).abs() * 100).round();
+
+    String wholePartWords =
+        NumberToWord().convert('en-in', wholePart).toUpperCase();
+    String amountInWords = "${AppState().code} $wholePartWords";
+
+    if (decimalPart > 0) {
+      String decimalPartWords =
+          NumberToWord().convert('en-in', decimalPart).toUpperCase();
+      amountInWords += " AND ${AppState().minor ?? 'FILS'} $decimalPartWords";
+    }
+
+    return "Amount in Words: $amountInWords ONLY";
   }
 }

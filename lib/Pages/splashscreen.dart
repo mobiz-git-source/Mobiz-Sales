@@ -66,6 +66,7 @@ class _SplashScreenState extends State<SplashScreen> {
     appState.printer = json['printer'];
     appState.noOfDecimals = json['no_of_decimals'];
     appState.code = json['code'];
+    appState.minor = json['minor_unit'];
     appState.devices = json['devices'];
     appState.initialConsent = json['initial_consent'];
     appState.country = json['country'];

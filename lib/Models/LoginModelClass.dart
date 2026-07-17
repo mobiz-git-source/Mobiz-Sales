@@ -153,6 +153,7 @@ class Authorisation {
 class Currency {
   int? id;
   String? code;
+  String? minor;
   String? currency;
   String? countryName;
   int? noOfDecimals;
@@ -160,6 +161,7 @@ class Currency {
   Currency(
       {this.id,
       this.code,
+      this.minor,
       this.currency,
       this.countryName,
       this.noOfDecimals});
@@ -167,6 +169,7 @@ class Currency {
   Currency.fromJson(Map<String, dynamic> json) {
     id = json['id'];
     code = json['code'];
+    minor = json['minor_unit'];
     currency = json['currency'];
     countryName = json['country_name'];
     noOfDecimals = json['no_of_decimals'];
@@ -176,6 +179,7 @@ class Currency {
     final Map<String, dynamic> data = new Map<String, dynamic>();
     data['id'] = this.id;
     data['code'] = this.code;
+    data['minor_unit'] = this.minor;
     data['currency'] = this.currency;
     data['country_name'] = this.countryName;
     data['no_of_decimals'] = this.noOfDecimals;

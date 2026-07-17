@@ -519,6 +519,7 @@ class ReportData {
   String? deletedAt;
   List<Salesy>? sales;
   List<Customer>? customer;
+  List<Storey>? store;   // <-- add this
   List<Customer>? customerdata;
   List<Van>? van;
   List<User>? user;
@@ -544,6 +545,7 @@ class ReportData {
     this.deletedAt,
     this.sales,
     this.customer,
+    this.store,
     this.customerdata,
     this.van,
     this.user,
@@ -582,6 +584,12 @@ class ReportData {
     } else if (json['customerdata'] != null) {
       customer = <Customer>[];
       customer!.add(new Customer.fromJson(json['customerdata']));
+    }
+    if (json['store'] != null) {           // <-- add this block
+      store = <Storey>[];
+      json['store'].forEach((v) {
+        store!.add(Storey.fromJson(v));
+      });
     }
     if (json['van'] != null) {
       van = <Van>[];
@@ -722,6 +730,34 @@ class Salesy {
       'updated_at': updatedAt,
       'deleted_at': deletedAt,
     };
+  }
+}
+
+class Storey {
+  int? id;
+  String? name;
+  String? address;
+  String? trn;
+  String? vatLabel;
+
+  Storey({this.id, this.name, this.address, this.trn, this.vatLabel});
+
+  Storey.fromJson(Map<String, dynamic> json) {
+    id = json['id'];
+    name = json['name'];
+    address = json['address'];
+    trn = json['trn'];
+    vatLabel = json['vat_label'];
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['id'] = this.id;
+    data['name'] = this.name;
+    data['address'] = this.address;
+    data['trn'] = this.trn;
+    data['vat_label'] = this.vatLabel;
+    return data;
   }
 }
 

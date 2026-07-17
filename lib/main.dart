@@ -180,7 +180,7 @@ void main() async {
     print("♻ Token refreshed: $newToken");
     sendTokenToBackend(newToken);
   });
-// print("Code: ${AppState().code}");
+print("Code: ${AppState().minor}");
   runApp(MyApp());
 }
 

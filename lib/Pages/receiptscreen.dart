@@ -192,6 +192,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
       final response = await http.get(Uri.parse(
           '${RestDatasource().BASE_URL}/api/get_sales_pending_outstanding?store_id=${AppState().storeId}&customer_id=$customerId'));
       if (response.statusCode == 200) {
+        print(response.request);
         final responseData = jsonDecode(response.body);
         if (responseData['success'] == true) {
           return responseData['data'].toString();
@@ -291,7 +292,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                         // pw.SizedBox(height: 3),
                         // pw.Text('Market: ${data.customer![0].address}'),
                         pw.SizedBox(height: 3),
-                        pw.Text('TRN: ${data.customer![0].trn}'),
+                        pw.Text('${data.store![0].vatLabel}: ${data.customer![0].trn}'),
                       ],
                     ),
                     pw.Column(
@@ -302,6 +303,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                         ),
                         pw.Text('Date: ${data.sales![0].inDate}'),
+                        pw.Text('Time: ${data.sales![0].inTime}'),
                         pw.Text('Due Date: ${data.sales![0].inDate}'),
                       ],
                     ),
@@ -451,7 +453,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                         // pw.SizedBox(height: 3),
                         // pw.Text('Market: ${data.customer![0].address}'),
                         pw.SizedBox(height: 3),
-                        pw.Text('TRN: ${data.customer![0].trn}'),
+                        pw.Text('${data.store![0].vatLabel}: ${data.customer![0].trn}'),
                       ],
                     ),
                     pw.Column(
@@ -940,16 +942,14 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
           final response = await http.get(Uri.parse(logoUrl));
           if (response.statusCode == 200) {
             Uint8List imageBytes = response.bodyBytes;
-
-            // Decode image and convert to monochrome bitmap if needed
-            img.Image originalImage = img.decodeImage(imageBytes)!;
-            img.Image monoLogo = img.grayscale(originalImage);
-
-            // Encode the image to the required format (e.g., PNG)
-            Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
-
-            // Print the logo image
-            printer.printImageBytes(logoBytes);
+            img.Image? originalImage = img.decodeImage(imageBytes)!;
+            if (originalImage != null) {
+              img.Image resizedImage = img.copyResize(originalImage, width: 250);
+              img.Image monoLogo = img.grayscale(resizedImage);
+              Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
+              await printer.printImageBytes(logoBytes);
+              await Future.delayed(const Duration(milliseconds: 500));
+            }
           } else {
             print('Failed to load image: ${response.statusCode}');
           }
@@ -974,9 +974,17 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
               // 'Market:  ${data.customer![0].address}',
               '',
               'Date: ${data.sales![0].inDate}');
+          printAlignedText(
+              // 'Market:  ${data.customer![0].address}',
+              '',
+              'Time: ${data.sales![0].inTime}');
           // printer.printLeftRight('Market: ${data.customer![0].address}', '', 1);
-          printAlignedText('TRN: ${data.customer![0].trn}',
-              'Due Date: ${data.sales![0].inDate}');
+          printAlignedText(
+            (data.customer![0].trn != null && data.customer![0].trn!.isNotEmpty)
+                ? '${data.store![0].vatLabel}: ${data.customer![0].trn}'
+                : '',
+            'Due Date: ${data.sales![0].inDate}',
+          );
           // printer.printLeftRight('TRN: ${data.customer![0].trn}', '', 1);
         }
         printer.printNewLine();

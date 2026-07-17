@@ -5,6 +5,7 @@ class StoreDetail {
   final String name;
   final String email;
   final String? address;
+  final String? vatLabel;
   final String? emirate;
   final String? country;
   final String? contactNumber;
@@ -24,6 +25,7 @@ class StoreDetail {
     required this.name,
     required this.email,
     this.address,
+    this.vatLabel,
     this.emirate,
     this.country,
     this.contactNumber,
@@ -53,6 +55,7 @@ class StoreDetail {
       name: json['data']['name'],
       email: json['data']['email'],
       address: json['data']['address'],
+      vatLabel: json['data']['vat_label'],
       emirate: json['data']['emirate'],
       country: json['data']['country'],
       contactNumber: json['data']['contact_number'],

@@ -1,13 +1,17 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:mobizapp/Models/appstate.dart';
 import 'package:mobizapp/Pages/DayReport.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:image/image.dart' as img;
 
 import '../Components/commonwidgets.dart';
 import '../Utilities/rest_ds.dart';
@@ -48,6 +52,7 @@ class _DaycloseState extends State<Dayclose> {
   bool isPending = false;
   bool _isPosting = false;
   int _pendingExpensesCount = 0;
+  List<File> _attachedImages = [];
 
   Random random = Random();
   @override
@@ -75,6 +80,81 @@ class _DaycloseState extends State<Dayclose> {
   bool isdayclose = false;
   Map<String, dynamic>? Dayclosedata;
 
+  void _attachDocuments() async {
+    final picker = ImagePicker();
+
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: <Widget>[
+              ListTile(
+                leading: Icon(Icons.photo_library),
+                title: Text('Photo Library'),
+                onTap: () async {
+                  final List<XFile>? pickedFiles = await picker.pickMultiImage();
+                  if (pickedFiles != null && pickedFiles.isNotEmpty) {
+                    for (var xFile in pickedFiles) {
+                      final compressedImage =
+                      await _compressImage(File(xFile.path));
+                      setState(() {
+                        _attachedImages.add(compressedImage);
+                      });
+                    }
+                  }
+                  Navigator.of(context).pop();
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.photo_camera),
+                title: Text('Camera'),
+                onTap: () async {
+                  final pickedFile = await picker.pickImage(
+                    source: ImageSource.camera,
+                  );
+                  if (pickedFile != null) {
+                    final compressedImage =
+                        await _compressImage(File(pickedFile.path));
+                    setState(() {
+                      _attachedImages.add(compressedImage);
+                    });
+                  }
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<File> _compressImage(File file) async {
+    final image = img.decodeImage(file.readAsBytesSync())!;
+    final compressedImage = img.copyResize(image, width: 800);
+    final compressedBytes =
+        img.encodeJpg(compressedImage, quality: 75); // Compress the image
+
+    final tempDir = await getTemporaryDirectory();
+    final compressedFile =
+        File('${tempDir.path}/compressed_${file.path.split('/').last}');
+    await compressedFile.writeAsBytes(compressedBytes);
+
+    print(
+        'Compressed image size: ${compressedFile.lengthSync()} bytes'); // Debug statement
+
+    // Check file size and further compress if necessary
+    if (compressedFile.lengthSync() > 200 * 1024) {
+      final furtherCompressedBytes =
+          img.encodeJpg(compressedImage, quality: 65);
+      await compressedFile.writeAsBytes(furtherCompressedBytes);
+      print(
+          'Further compressed image size: ${compressedFile.lengthSync()} bytes'); // Debug statement
+    }
+
+    return compressedFile;
+  }
 
   Future<bool> fetchPendingStatus() async {
     var apiUrl = '${RestDatasource().BASE_URL}/api/get_dayclose_user_pending?user_id=${AppState().userId}&store_id=${AppState().storeId}';
@@ -173,48 +253,50 @@ class _DaycloseState extends State<Dayclose> {
               final data = snapshot.data!['data'];
               Future<bool> postData() async {
                 var url = '${RestDatasource().BASE_URL}/api/dayclose.store';
+                var request = http.MultipartRequest('POST', Uri.parse(url));
 
-                var Data = {
-                  "expense": data['expense'],
-                  "petty_cash": data['petty_cash'],
-                  "in_date": formattedDate,
-                  "store_id": AppState().storeId,
-                  "van_id": AppState().vanId,
-                  "user_id": AppState().userId,
-                  "scheduled": data['sheduled'],
-                  "visited": data['vist_customer'],
-                  "not_visited": data['non_vist_customer'],
-                  "visit_pending": data['pending'],
-                  "no_of_sales": data['no_of_sales'],
-                  "amount_of_sales": data['amount_of_sales'],
-                  "no_of_order": data['no_of_sales_order'],
-                  "amount_of_order": data['amount_of_sales_order'],
-                  "no_of_returns": data['no_of_sales_return'],
-                  "amount_of_returns": data['amount_of_sales_return'],
-                  "collection_cash_amount": data['collection_cash'],
-                  "collection_cheque_amount": data['collection_cheque'],
-                  "last_day_balance_amount": data['last_day_balance_amount'],
-                  "last_day_balance_no_of_cheque": data['last_day_balance_no_of_cheque'],
-                  "last_day_balance_cheque_amount": data['last_day_balance_cheque_amount'],
-                  "cash_deposited": cashdeposit,
-                  "cash_hand_over": cashHanded,
-                  "no_of_cheque_deposited": Ncheqdepo,
-                  "cheque_deposited_amount": cheqdepo,
-                  "no_of_cheque_hand_over": cheqhandedovr,
-                  "cheque_hand_over_amount": cheqhandedamt,
-                  "balance_cash_in_hand": balcash,
-                  "no_of_cheque_in_hand": cheqhand,
-                  "cheque_amount_in_hand": amtinhand,
-                  "collection_no_of_cheque": data['collection_no_cheque']
-                };
+                request.fields["expense"] = data['expense'].toString();
+                request.fields["petty_cash"] = data['petty_cash'].toString();
+                request.fields["in_date"] = formattedDate;
+                request.fields["store_id"] = AppState().storeId.toString();
+                request.fields["van_id"] = AppState().vanId.toString();
+                request.fields["user_id"] = AppState().userId.toString();
+                request.fields["scheduled"] = data['sheduled'].toString();
+                request.fields["visited"] = data['vist_customer'].toString();
+                request.fields["not_visited"] = data['non_vist_customer'].toString();
+                request.fields["visit_pending"] = data['pending'].toString();
+                request.fields["no_of_sales"] = data['no_of_sales'].toString();
+                request.fields["amount_of_sales"] = data['amount_of_sales'].toString();
+                request.fields["no_of_order"] = data['no_of_sales_order'].toString();
+                request.fields["amount_of_order"] = data['amount_of_sales_order'].toString();
+                request.fields["no_of_returns"] = data['no_of_sales_return'].toString();
+                request.fields["amount_of_returns"] = data['amount_of_sales_return'].toString();
+                request.fields["collection_cash_amount"] = data['collection_cash'].toString();
+                request.fields["collection_cheque_amount"] = data['collection_cheque'].toString();
+                request.fields["last_day_balance_amount"] = data['last_day_balance_amount'].toString();
+                request.fields["last_day_balance_no_of_cheque"] = data['last_day_balance_no_of_cheque'].toString();
+                request.fields["last_day_balance_cheque_amount"] = data['last_day_balance_cheque_amount'].toString();
+                request.fields["cash_deposited"] = cashdeposit;
+                request.fields["cash_hand_over"] = cashHanded;
+                request.fields["no_of_cheque_deposited"] = Ncheqdepo;
+                request.fields["cheque_deposited_amount"] = cheqdepo;
+                request.fields["no_of_cheque_hand_over"] = cheqhandedovr;
+                request.fields["cheque_hand_over_amount"] = cheqhandedamt;
+                request.fields["balance_cash_in_hand"] = balcash;
+                request.fields["no_of_cheque_in_hand"] = cheqhand;
+                request.fields["cheque_amount_in_hand"] = amtinhand;
+                request.fields["collection_no_of_cheque"] = data['collection_no_cheque'].toString();
+
+                for (var file in _attachedImages) {
+                  request.files.add(await http.MultipartFile.fromPath(
+                    'document_name[]',
+                    file.path,
+                  ));
+                }
+
                 try {
-                  var response = await http.post(
-                    Uri.parse(url),
-                    headers: <String, String>{
-                      'Content-Type': 'application/json; charset=UTF-8',
-                    },
-                    body: jsonEncode(Data),
-                  );
+                  var streamedResponse = await request.send();
+                  var response = await http.Response.fromStream(streamedResponse);
 
                   if (response.statusCode == 200) {
                     print('Data posted successfully');
@@ -233,6 +315,7 @@ class _DaycloseState extends State<Dayclose> {
                         cheqdepo = '';
                         cheqhandedovr = '';
                         cheqhandedamt = '';
+                        _attachedImages = [];
 
                         CashDepositedcontrol.clear();
                         CashHandedOvercontrol.clear();
@@ -430,15 +513,29 @@ class _DaycloseState extends State<Dayclose> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text('Hello ${AppState().name}'),
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.pushNamed(
-                                        context, DayReport.routeName);
-                                  },
-                                  child: Icon(
-                                    CupertinoIcons.doc_plaintext,
-                                    color: Colors.red,
-                                  ),
+                                Row(
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () {
+                                        _attachDocuments();
+                                      },
+                                      child: Icon(
+                                        CupertinoIcons.paperclip,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                    SizedBox(width: 20,),
+                                    GestureDetector(
+                                      onTap: () {
+                                        Navigator.pushNamed(
+                                            context, DayReport.routeName);
+                                      },
+                                      child: Icon(
+                                        CupertinoIcons.doc_plaintext,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -504,7 +601,7 @@ class _DaycloseState extends State<Dayclose> {
                         children: [
                           Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -516,7 +613,8 @@ class _DaycloseState extends State<Dayclose> {
                                       Container(
                                         child: Center(child: Text("${data['petty_cash']}")),
                                         width: SizeConfig.safeBlockHorizontal! * 17,
-                                        height: SizeConfig.safeBlockVertical! * 2.4,
+                                        // margin: EdgeInsets.only(top: 5),
+                                        height: SizeConfig.safeBlockVertical! * 2.6,
                                         decoration: BoxDecoration(
                                           color: Colors.grey.shade300,
                                           borderRadius: BorderRadius.circular(3),
@@ -534,7 +632,7 @@ class _DaycloseState extends State<Dayclose> {
                                       Container(
                                         child: Center(child: Text("${data['expense']}")),
                                         width: SizeConfig.safeBlockHorizontal! * 17,
-                                        height: SizeConfig.safeBlockVertical! * 2.4,
+                                        height: SizeConfig.safeBlockVertical! * 2.6,
                                         decoration: BoxDecoration(
                                           color: Colors.grey.shade300,
                                           borderRadius: BorderRadius.circular(3),
@@ -564,7 +662,7 @@ class _DaycloseState extends State<Dayclose> {
                                                   : Dayclosedata!['cash_deposited']
                                                   : cashdeposit)),
                                           width: SizeConfig.safeBlockHorizontal! * 17,
-                                          height: SizeConfig.safeBlockVertical! * 2.4,
+                                          height: SizeConfig.safeBlockVertical! * 2.6,
                                           decoration: BoxDecoration(
                                               borderRadius: BorderRadius.circular(3),
                                               border: Border.all(color: Colors.grey)),
@@ -594,7 +692,7 @@ class _DaycloseState extends State<Dayclose> {
                                                   : Dayclosedata!['cash_hand_over']
                                                   : cashHanded)),
                                           width: SizeConfig.safeBlockHorizontal! * 17,
-                                          height: SizeConfig.safeBlockVertical! * 2.4,
+                                          height: SizeConfig.safeBlockVertical! * 2.6,
                                           decoration: BoxDecoration(
                                               borderRadius: BorderRadius.circular(3),
                                               border: Border.all(color: Colors.grey)),
@@ -662,7 +760,7 @@ class _DaycloseState extends State<Dayclose> {
                                                   : Dayclosedata!['cheque_deposited_amount']
                                                   : cheqdepo)),
                                           width: SizeConfig.safeBlockHorizontal! * 17,
-                                          height: SizeConfig.safeBlockVertical! * 2.4,
+                                          height: SizeConfig.safeBlockVertical! * 2.6,
                                           decoration: BoxDecoration(
                                               borderRadius: BorderRadius.circular(3),
                                               border: Border.all(color: Colors.grey)),
@@ -723,7 +821,7 @@ class _DaycloseState extends State<Dayclose> {
                                                   : Dayclosedata!['cheque_hand_over_amount']
                                                   : cheqhandedamt)),
                                           width: SizeConfig.safeBlockHorizontal! * 17,
-                                          height: SizeConfig.safeBlockVertical! * 2.4,
+                                          height: SizeConfig.safeBlockVertical! * 2.6,
                                           decoration: BoxDecoration(
                                               borderRadius: BorderRadius.circular(3),
                                               border: Border.all(color: Colors.grey)),
@@ -746,7 +844,7 @@ class _DaycloseState extends State<Dayclose> {
                                                 : "${Dayclosedata!['balance_cash_in_hand']}"
                                                 : balcash)),
                                         width: SizeConfig.safeBlockHorizontal! * 17,
-                                        height: SizeConfig.safeBlockVertical! * 2.4,
+                                        height: SizeConfig.safeBlockVertical! * 2.6,
                                         decoration: BoxDecoration(
                                           color: Colors.grey.shade300,
                                           borderRadius: BorderRadius.circular(3),
@@ -801,7 +899,7 @@ class _DaycloseState extends State<Dayclose> {
                                               : amtinhand),
                                         ),
                                         width: SizeConfig.safeBlockHorizontal! * 17,
-                                        height: SizeConfig.safeBlockVertical! * 2.4,
+                                        height: SizeConfig.safeBlockVertical! * 2.6,
                                         decoration: BoxDecoration(
                                           color: Colors.grey.shade300,
                                           borderRadius: BorderRadius.circular(3),
@@ -813,21 +911,54 @@ class _DaycloseState extends State<Dayclose> {
                               ),
                             ),
                           ),
-                          SizedBox(width: SizeConfig.safeBlockHorizontal! * 2),
-                          Container(
-                              decoration: BoxDecoration(
-                                  color: AppConfig.colorPrimary,
-                                  borderRadius: BorderRadius.circular(50)),
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Icon(
-                                  Icons.upload,
-                                  size: 35,
-                                  color: Colors.white,
-                                ),
-                              )),
+                          // SizedBox(width: SizeConfig.safeBlockHorizontal! * 2),
+                          // Container(
+                          //     decoration: BoxDecoration(
+                          //         color: AppConfig.colorPrimary,
+                          //         borderRadius: BorderRadius.circular(50)),
+                          //     child: Padding(
+                          //       padding: const EdgeInsets.all(8.0),
+                          //       child: Icon(
+                          //         Icons.upload,
+                          //         size: 35,
+                          //         color: Colors.white,
+                          //       ),
+                          //     )),
                         ],
                       ),
+                      SizedBox(
+                        height: 20,
+                      ),
+                      _attachedImages.isEmpty
+                          ? Container()
+                          : Wrap(
+                              children: _attachedImages.map((File file) {
+                                return Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Stack(
+                                    children: [
+                                      Image.file(
+                                        file,
+                                        width: 100,
+                                        height: 100,
+                                        fit: BoxFit.cover,
+                                      ),
+                                      Positioned(
+                                        right: 0,
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            setState(() {
+                                              _attachedImages.remove(file);
+                                            });
+                                          },
+                                          child: Icon(Icons.close, color: Colors.red,),
+                                        ),
+                                      )
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
                       SizedBox(
                         height: 30,
                       ),

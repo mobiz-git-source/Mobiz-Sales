@@ -22,6 +22,7 @@ class AppState {
   int? rolId;
   int? noOfDecimals;
   String? code;
+  String? minor;
   String? appVersion;
   String? buildNumber;
   String? osType;
@@ -57,6 +58,7 @@ class AppState {
     vanId;
     noOfDecimals;
     code = "";
+    minor = "";
     appVersion = "";
     buildNumber = "";
     osType = "";
@@ -94,6 +96,7 @@ class AppState {
     email = json['email'];
     noOfDecimals = json['no_of_decimals'];
     code=json['code'];
+    minor=json['minor_unit'];
     appVersion = json['app_version'];
     buildNumber = json['build_number'];
     userId = json['id'];
@@ -131,6 +134,7 @@ class AppState {
     data['route_id'] = routeId;
     data['no_of_decimals'] = noOfDecimals;
     data['code'] = code;
+    data['minor_unit'] = minor;
     data['app_version'] = appVersion;
     data['build_number'] = buildNumber;
     data['os_type'] = osType;

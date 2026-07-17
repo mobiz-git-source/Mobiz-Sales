@@ -285,6 +285,7 @@ class _LoginScreenState extends State<LoginScreen> {
           appState.printer = loginResp.settings?.printer ?? '';
           appState.noOfDecimals = loginResp.currency?.noOfDecimals;
           appState.code = loginResp.currency?.code;
+          appState.minor = loginResp.currency?.minor;
           appState.loginState = 'LOGGED_IN';
 
           bool appStateRetrieved = await sharedPref.containsKey('app_state');

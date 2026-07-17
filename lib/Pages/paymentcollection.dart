@@ -1042,8 +1042,8 @@ print(AppState().storeId);
         print('Data posted successfully');
 
         int? payId;
-        if (responseBody['data'].isNotEmpty) {
-          payId = responseBody['data'][0]['id'];
+        if (responseBody.isNotEmpty) {
+          payId = responseBody['collection_id'];
         }
 
         setState(() {
