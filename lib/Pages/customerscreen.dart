@@ -1,20 +1,16 @@
 import 'dart:convert';
-
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:mobizapp/Models/appstate.dart';
 import 'package:mobizapp/Models/customerdetails.dart';
 import 'package:mobizapp/Pages/customerdetailscreen.dart';
 import 'package:mobizapp/Pages/customerregistration.dart';
-import 'package:mobizapp/Pages/salesscreen.dart';
 import 'package:mobizapp/Utilities/rest_ds.dart';
 import 'package:mobizapp/confg/appconfig.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:http/http.dart'as http;
+import 'package:http/http.dart' as http;
 import '../Components/commonwidgets.dart';
 import '../Models/Store_model.dart';
 import '../confg/sizeconfig.dart';
@@ -22,6 +18,7 @@ import 'Mapscreen.dart';
 
 class CustomersDataScreen extends StatefulWidget {
   static const routeName = "/CustomersScreen";
+  static List<Data> loadedCustomerList = [];
   const CustomersDataScreen({super.key});
 
   @override
@@ -42,18 +39,16 @@ class _CustomersDataScreenState extends State<CustomersDataScreen> {
     super.initState();
     getCustomerDetails();
     requestLocationPermission();
-    fetchStoreDetail() .then((storeDetail) {
+    fetchStoreDetail().then((storeDetail) {
       if (storeDetail != null && storeDetail.comapny_id == 5) {
         setState(() {
-          showFields = true; // Show fields for company_id 5
+          showFields = true;
         });
       } else {
         setState(() {
-          showFields = false; // Hide fields otherwise
+          showFields = false;
         });
       }
-      print("SSSSS${storeDetail!.comapny_id}");
-      print("Fields$showFields");
     });
   }
 
@@ -113,7 +108,7 @@ class _CustomersDataScreenState extends State<CustomersDataScreen> {
               )
             : const Text(
                 'Shops',
-                style: TextStyle(color: AppConfig.backButtonColor),
+                style: AppConfig.pageTitleStyle,
               ),
         actions: [
           _isSearching
@@ -141,9 +136,18 @@ class _CustomersDataScreenState extends State<CustomersDataScreen> {
               size: 30,
               color: AppConfig.backgroundColor,
             ),
-            onPressed: () {
-              Navigator.pushNamed(context, CustomerRegistration.routeName);
-            },
+          onPressed: () async {
+  final result = await Navigator.pushNamed(
+    context,
+    CustomerRegistration.routeName,
+    arguments: {
+      'customerList': customer.data ?? CustomersDataScreen.loadedCustomerList,
+    },
+  );
+  if (result == true) {
+    getCustomerDetails(); // 🆕 CHANGED: list fresh ആയി reload ചെയ്യുന്നു
+  }
+},
           ),
           CommonWidgets.horizontalSpace(3),
         ],
@@ -152,21 +156,20 @@ class _CustomersDataScreenState extends State<CustomersDataScreen> {
         child: Column(
           children: [
             (_initDone && !_nodata)
-                ? SizedBox(
-                    height: SizeConfig.blockSizeVertical * 78,
-                    child: ListView.separated(
-                      separatorBuilder: (BuildContext context, int index) =>
-                          CommonWidgets.verticalSpace(1),
-                      itemCount: (searchQuery.isEmpty
-                              ? customer.data!
-                              : filteredCustomers)
-                          .length,
-                      shrinkWrap: true,
-                      itemBuilder: (context, index) => _customersCard(
-                          searchQuery.isEmpty
-                              ? customer.data![index]
-                              : filteredCustomers[index]),
-                    ),
+                ? ListView.separated(
+                    padding: EdgeInsets.zero,
+                    physics: const NeverScrollableScrollPhysics(),
+                    shrinkWrap: true,
+                    separatorBuilder: (BuildContext context, int index) =>
+                        const SizedBox(height: 2),
+                    itemCount: (searchQuery.isEmpty
+                            ? customer.data!
+                            : filteredCustomers)
+                        .length,
+                    itemBuilder: (context, index) => _customersCard(
+                        searchQuery.isEmpty
+                            ? customer.data![index]
+                            : filteredCustomers[index]),
                   )
                 : (_nodata && _initDone)
                     ? Column(
@@ -193,15 +196,6 @@ class _CustomersDataScreenState extends State<CustomersDataScreen> {
                               CommonWidgets.loadingContainers(
                                   height: SizeConfig.blockSizeVertical * 10,
                                   width: SizeConfig.blockSizeHorizontal * 90),
-                              CommonWidgets.loadingContainers(
-                                  height: SizeConfig.blockSizeVertical * 10,
-                                  width: SizeConfig.blockSizeHorizontal * 90),
-                              CommonWidgets.loadingContainers(
-                                  height: SizeConfig.blockSizeVertical * 10,
-                                  width: SizeConfig.blockSizeHorizontal * 90),
-                              CommonWidgets.loadingContainers(
-                                  height: SizeConfig.blockSizeVertical * 10,
-                                  width: SizeConfig.blockSizeHorizontal * 90),
                             ],
                           ),
                         ),
@@ -211,7 +205,33 @@ class _CustomersDataScreenState extends State<CustomersDataScreen> {
       ),
     );
   }
+// 🆕 PUTHIYA METHOD - class-il add cheyyuka
+Future<String> _loadImage(String img) async {
+ 
+  final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+  String productUrl = '${RestDatasource().Product_URL}/uploads/customer/$img?v=$cacheBuster';
+  String baseUrl = '${RestDatasource().BASE_URL}/uploads/customer/$img?v=$cacheBuster';
+  
 
+  try {
+    final response = await http
+        .head(Uri.parse(productUrl))
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode == 200) {
+      return productUrl;
+    }
+  } catch (e) {}
+
+  try {
+    final response = await http
+        .head(Uri.parse(baseUrl))
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode == 200) {
+      return baseUrl;
+    }
+  } catch (e) {}
+  throw Exception('Image not found');
+}
   Widget _customersCard(Data data) {
     void _openMapScreen() async {
       String coordinates = data.location ?? '';
@@ -221,7 +241,6 @@ class _CustomersDataScreenState extends State<CustomersDataScreen> {
           msg: "Location are not available",
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.CENTER,
-          timeInSecForIosWeb: 1,
           backgroundColor: Colors.red,
           textColor: Colors.white,
           fontSize: 16.0,
@@ -242,33 +261,36 @@ class _CustomersDataScreenState extends State<CustomersDataScreen> {
       );
     }
 
-    return InkWell(
-      onTap: () {
-        Navigator.of(context).pushNamed(CustomerDetailsScreen.routeName, arguments: {
-          'name': data.name!,
-          'address': data.address,
-          'phone': data.contactNumber,
-          'mail': data.email,
-          'location': data.location,
-          'cust_image':data.img,
-          'customerType': '',
-          'days': data.creditDays,
-          'creditLimit': data.creditLimit,
-          'paymentTerms': data.paymentTerms,
-          'provinceId': data.provinceId,
-          'routeId': data.routeId,
-          'price_group_id':data.pricegroupId,
-          'trn': data.trn,
-          'whatsappNumber': data.whatsappNumber,
-          'code': data.code,
-          'balance': '',
-          'total': '',
-          'id': data.id,
-        });
-        print("sssdds${data.img}");
-      },
-      child: Card(
+  return InkWell(
+  onTap: () async {
+    final result = await Navigator.of(context).pushNamed(CustomerDetailsScreen.routeName, arguments: {
+      'name': data.name!,
+      'address': data.address,
+      'phone': data.contactNumber,
+      'mail': data.email,
+      'location': data.location,
+      'cust_image': data.img,
+      'customerType': '',
+      'days': data.creditDays,
+      'creditLimit': data.creditLimit,
+      'paymentTerms': data.paymentTerms,
+      'provinceId': data.provinceId,
+      'routeId': data.routeId,
+      'price_group_id': data.pricegroupId,
+      'trn': data.trn,
+      'whatsappNumber': data.whatsappNumber,
+      'code': data.code,
+      'balance': '',
+      'total': '',
+      'id': data.id,
+    });
+    if (result == true) {
+      getCustomerDetails(); // 🆕 list fresh ആയി reload ചെയ്യുന്നു
+    }
+  },
+  child: Card(
         elevation: 3,
+        margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 0),
         child: Container(
           width: SizeConfig.blockSizeHorizontal * 90,
           decoration: const BoxDecoration(
@@ -279,24 +301,34 @@ class _CustomersDataScreenState extends State<CustomersDataScreen> {
             padding: const EdgeInsets.all(5.0),
             child: Row(
               children: [
-                SizedBox(
-                  width: 50,
-                  height: 50,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(15.0),
-                    child: FadeInImage(
-                      image: NetworkImage(
-                          'http://68.183.92.8:3696/uploads/customer/cust_image/${data.img}'),
-                      placeholder:
-                          const AssetImage('Assets/Images/no_image.jpg'),
-                      imageErrorBuilder: (context, error, stackTrace) {
-                        return Image.asset('Assets/Images/no_image.jpg',
-                            fit: BoxFit.fitWidth);
-                      },
-                      fit: BoxFit.fitWidth,
-                    ),
-                  ),
-                ),
+               SizedBox(
+  width: 50,
+  height: 50,
+  child: ClipRRect(
+    borderRadius: BorderRadius.circular(15.0),
+  child: (data.img != null && data.img!.isNotEmpty)
+    ? FutureBuilder<String>(
+        future: _loadImage(data.img!),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+          } else if (snapshot.hasError || !snapshot.hasData) {
+            return Image.asset('Assets/Images/no_image.jpg', fit: BoxFit.cover);
+          } else {
+          return Image.network(
+  snapshot.data!,
+  fit: BoxFit.cover,
+  filterQuality: FilterQuality.high,
+  errorBuilder: (context, error, stackTrace) {
+    return Image.asset('Assets/Images/no_image.jpg', fit: BoxFit.cover);
+  },
+);
+          }
+        },
+      )
+    : Image.asset('Assets/Images/no_image.jpg', fit: BoxFit.cover),
+  ),
+),
                 CommonWidgets.horizontalSpace(3),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -312,25 +344,27 @@ class _CustomersDataScreenState extends State<CustomersDataScreen> {
                     ),
                     SizedBox(
                       width: SizeConfig.blockSizeHorizontal * 70,
-                      child: Row(children: [
-                        SizedBox(
-                          width: SizeConfig.blockSizeHorizontal * 60,
-                          child: Text(
-                            'Address:${data.address ?? ''}',
-                            style:
-                                TextStyle(fontSize: AppConfig.textCaption3Size),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: SizeConfig.blockSizeHorizontal * 60,
+                            child: Text(
+                              'Address:${data.address ?? ''}',
+                              style: TextStyle(fontSize: AppConfig.textCaption3Size),
+                            ),
                           ),
-                        ),
-                        const Spacer(),
-                        GestureDetector(
-                          onTap: _openMapScreen,
-                          child: Image.asset(
-                            'Assets/Images/vecteezy_google-maps-icon_16716478.png',
-                            fit: BoxFit.cover,
-                            height: 30,
-                          ),
-                        )
-                      ]),
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: _openMapScreen,
+                            child: Image.asset(
+                              'Assets/Images/vecteezy_google-maps-icon_16716478.png',
+                              fit: BoxFit.cover,
+                              height: 18,
+                            ),
+                          )
+                        ],
+                      ),
                     ),
                     Text(
                       'Contact:${data.contactNumber}',
@@ -375,8 +409,6 @@ class _CustomersDataScreenState extends State<CustomersDataScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        // print("data:::${data['company_id']}");
-        // print(showFields);
         if (data['company_id'] == 5) {
           setState(() {
             showFields = true;
@@ -388,7 +420,6 @@ class _CustomersDataScreenState extends State<CustomersDataScreen> {
         }
         return StoreDetail.fromJson(data);
       } else {
-        // Handle error
         print('Failed to fetch data: ${response.statusCode}');
         return null;
       }
@@ -407,6 +438,7 @@ class _CustomersDataScreenState extends State<CustomersDataScreen> {
     print('Cust $resJson');
     if (resJson['data'] != null && resJson['data'].length > 0) {
       customer = CustomerData.fromJson(resJson);
+      CustomersDataScreen.loadedCustomerList = customer.data ?? [];
 
       setState(() {
         customer = CustomerData.fromJson(resJson);

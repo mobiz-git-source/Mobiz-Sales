@@ -225,8 +225,32 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
     return balance.toStringAsFixed(AppState().noOfDecimals ?? 2);
   }
 
+Future<String> _loadImage(String img) async {
+ 
+  final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+  String productUrl = '${RestDatasource().Product_URL}/uploads/customer/$img?v=$cacheBuster';
+  String baseUrl = '${RestDatasource().BASE_URL}/uploads/customer/$img?v=$cacheBuster';
+  
 
+  try {
+    final response = await http
+        .head(Uri.parse(productUrl))
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode == 200) {
+      return productUrl;
+    }
+  } catch (e) {}
 
+  try {
+    final response = await http
+        .head(Uri.parse(baseUrl))
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode == 200) {
+      return baseUrl;
+    }
+  } catch (e) {}
+  throw Exception('Image not found');
+}
   @override
   Widget build(BuildContext context) {
 
@@ -236,10 +260,10 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppConfig.colorPrimary,
-        title: const Text(
-          'Customers',
-          style: TextStyle(color: AppConfig.backgroundColor),
-        ),
+       title: const Text(
+  'Customers',
+  style: AppConfig.pageTitleStyle,
+),
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
       ),
       body: SingleChildScrollView(
@@ -255,26 +279,36 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                     fontSize: AppConfig.headLineSize,
                     fontWeight: AppConfig.headLineWeight),
               ),
-              Row(
-                children: [
-                  SizedBox(
-                    width: SizeConfig.blockSizeHorizontal * 35,
-                    height: SizeConfig.blockSizeVertical * 20,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10.0),
-                      child: FadeInImage(
-                        image: NetworkImage(
-                            'http://68.183.92.8:3696/uploads/customer/cust_image/$img'),
-                        placeholder:
-                            const AssetImage('Assets/Images/no_image.jpg'),
-                        imageErrorBuilder: (context, error, stackTrace) {
-                          return Image.asset('Assets/Images/no_image.jpg',
-                              fit: BoxFit.fitWidth);
-                        },
-                        fit: BoxFit.fitWidth,
-                      ),
-                    ),
-                  ),
+            Row(
+  children: [
+SizedBox(
+  width: SizeConfig.blockSizeHorizontal * 35,
+  height: SizeConfig.blockSizeVertical * 20,
+  child: ClipRRect(
+    borderRadius: BorderRadius.circular(10.0),
+    child: (img != null && img!.isNotEmpty)
+        ? FutureBuilder<String>(
+            future: _loadImage(img!),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+              } else if (snapshot.hasError || !snapshot.hasData) {
+                return Image.asset('Assets/Images/no_image.jpg', fit: BoxFit.contain);
+              } else {
+            return Image.network(
+  snapshot.data!,
+  fit: BoxFit.contain,
+  filterQuality: FilterQuality.high,
+  errorBuilder: (context, error, stackTrace) {
+    return Image.asset('Assets/Images/no_image.jpg', fit: BoxFit.contain);
+  },
+);
+              }
+            },
+          )
+        : Image.asset('Assets/Images/no_image.jpg', fit: BoxFit.contain),
+  ),
+),
                   CommonWidgets.horizontalSpace(2),
                   Container(
                     constraints: BoxConstraints(
@@ -713,39 +747,43 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
   //   );
   // }
 
-  Widget _iconButtons({
-    IconData? icon,
-    required String title,
-    String? image,
-    String? routeName,
-  }) {
-    return GestureDetector(
-      onTap: () {
-        if (routeName != null) {
-          switch (routeName) {
-            case 'CustomerRegistration':
-              Navigator.pushNamed(context, CustomerRegistration.routeName,
-                  arguments: {
-                    'name': name,
-                    'address': address,
-                    'building': building,
-                    'flat_no': flat_no,
-                    'phone': phone,
-                    'whatsappNumber': whatsappNumber,
-                    'email': email,
-                    'location': location,
-                    'payment_terms': customerType,
-                    'credit_days': creditDays,
-                    'credit_limit': creditLimit,
-                    'paymentTerms': paymentTerms,
-                    'trn': trn,
-                    'cust_image': img,
-                    'code': code,
-                    'provinceId': provinceId,
-                    'routeId': routeId,
-                    'id': id,
-                  });
-              break;
+Widget _iconButtons({
+  IconData? icon,
+  required String title,
+  String? image,
+  String? routeName,
+}) {
+  return GestureDetector(
+    onTap: () async {
+      if (routeName != null) {
+        switch (routeName) {
+          case 'CustomerRegistration':
+            final result = await Navigator.pushNamed(
+                context, CustomerRegistration.routeName,
+                arguments: {
+                  'name': name,
+                  'address': address,
+                  'building': building,
+                  'flat_no': flat_no,
+                  'phone': phone,
+                  'whatsappNumber': whatsappNumber,
+                  'email': email,
+                  'location': location,
+                  'payment_terms': customerType,
+                  'credit_days': creditDays,
+                  'credit_limit': creditLimit,
+                  'paymentTerms': paymentTerms,
+                  'trn': trn,
+                  'cust_image': img,
+                  'code': code,
+                  'provinceId': provinceId,
+                  'routeId': routeId,
+                  'id': id,
+                });
+            if (result == true && mounted) {
+              Navigator.pop(context, true); // 🆕 Shops list-നെ refresh ചെയ്യാൻ അറിയിക്കുന്നു
+            }
+            break;
             case 'SOA':
               Navigator.pushNamed(context, SOA.routeName, arguments: {
                 'customerId': id,

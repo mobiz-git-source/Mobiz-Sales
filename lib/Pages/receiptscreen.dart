@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;                                    // NEW
 
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+
 import 'package:intl/intl.dart';
 import 'package:mobizapp/Components/commonwidgets.dart';
 import 'package:mobizapp/Models/appstate.dart';
@@ -19,6 +22,7 @@ import 'package:pdf/pdf.dart';
 import 'package:http/http.dart' as http;
 import '../Models/Store_model.dart';
 import '../Models/receiptdatamodel.dart';
+import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
 import 'TestReceipt.dart';
@@ -47,7 +51,6 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
   Timer? _searchDebounce;
-
 
   @override
   void initState() {
@@ -141,14 +144,14 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
       if (searchQuery != null && searchQuery.isNotEmpty) {
         apiUrl = Uri.parse(
             "${RestDatasource().BASE_URL}/api/get_collection_report_search?"
-                "store_id=${AppState().storeId}&"
-                "van_id=${AppState().vanId}&"
-                "user_id=${AppState().userId}&"
-                "page=$_currentPage&"
-                "value=$searchQuery");
+            "store_id=${AppState().storeId}&"
+            "van_id=${AppState().vanId}&"
+            "user_id=${AppState().userId}&"
+            "page=$_currentPage&"
+            "value=$searchQuery");
       } else {
-        apiUrl = Uri.parse(
-            "${RestDatasource().BASE_URL}/api/get_collection_report?"
+        apiUrl =
+            Uri.parse("${RestDatasource().BASE_URL}/api/get_collection_report?"
                 "store_id=${AppState().storeId}&"
                 "van_id=${AppState().vanId}&"
                 "user_id=${AppState().userId}&"
@@ -203,13 +206,64 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     }
     return '0.00';
   }
+  // NEW: Renders Arabic text to a PNG bitmap for thermal printing — same
+// approach as the invoice screen's _arabicTextToImageBytes(). ESC/POS
+// text commands only cover Latin/ASCII, so Arabic must go as an image.
+Future<Uint8List> _arabicTextToImageBytes(
+  String text, {
+  double fontSize = 26,
+  double maxWidth = 380,
+}) async {
+  final TextPainter textPainter = TextPainter(
+    text: TextSpan(
+      text: text,
+      style: TextStyle(
+        color: Colors.black,
+        fontSize: fontSize,
+        fontWeight: FontWeight.bold,
+        fontFamily: 'NotoNaskhArabic',
+      ),
+    ),
+    textDirection: ui.TextDirection.rtl,
+    textAlign: TextAlign.center,
+  );
+  textPainter.layout(maxWidth: maxWidth);
 
+  // Thermal printers need bitmap width byte-aligned (multiple of 8).
+  double rawWidth = textPainter.width.ceilToDouble();
+  final double width = (rawWidth / 8).ceil() * 8;
+  final double height = textPainter.height.ceilToDouble();
+
+  final ui.PictureRecorder recorder = ui.PictureRecorder();
+  final Canvas canvas = Canvas(
+    recorder,
+    Rect.fromLTWH(0, 0, width, height),
+  );
+
+  canvas.drawRect(
+    Rect.fromLTWH(0, 0, width, height),
+    Paint()..color = Colors.white,
+  );
+  textPainter.paint(canvas, Offset.zero);
+
+  final ui.Image image = await recorder.endRecording().toImage(
+        width.toInt(),
+        height.toInt(),
+      );
+  final ByteData? byteData =
+      await image.toByteData(format: ui.ImageByteFormat.png);
+  return byteData!.buffer.asUint8List();
+}
+Future<pw.Font> _loadArabicPwFont() async {
+  final fontData =
+      await rootBundle.load('Assets/fonts/NotoNaskhArabic-Regular.ttf');
+  return pw.Font.ttf(fontData);
+}
   Future<void> generatePdf(ReportData data) async {
     String outstanding = await _getOutstanding(data.customerId);
     final response = await http.get(Uri.parse(
         '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
     if (response.statusCode == 200) {
-      // Parse JSON response into StoreDetail object
       StoreDetail storeDetail =
           StoreDetail.fromJson(json.decode(response.body));
 
@@ -222,6 +276,13 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
       }
       final Uint8List logoBytes = logoResponse.bodyBytes;
 
+      // NEW: load Arabic font ONCE, before build() — build() is sync,
+      // so the font can't be awaited inside it.
+      final pw.Font? arabicFont = (storeDetail.name_ar != null &&
+              storeDetail.name_ar!.trim().isNotEmpty)
+          ? await _loadArabicPwFont()
+          : null;
+
       pdf.addPage(
         pw.MultiPage(
           build: (pw.Context context) => [
@@ -230,33 +291,45 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
               children: [
                 pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.SizedBox(height: 10),
-                        pw.Text(
-                          storeDetail.name,
-                          style: pw.TextStyle(
-                            fontSize: 18,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                        pw.SizedBox(height: 3),
-                        pw.Text('${storeDetail.address ?? 'N/A'}'),
-                        pw.SizedBox(height: 3),
-                        pw.Text('TRN: ${storeDetail.trn ?? 'N/A'}'),
-                        pw.SizedBox(height: 3),
-                      ]
-                    ),
-                    pw.Image(
-                      pw.MemoryImage(logoBytes),
-                      height: 100,
-                      width: 100,
-                      fit: pw.BoxFit.fitWidth,
-                    ),
-                  ]
-                ),
+                    children: [
+                                              pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                children: [
+                                  pw.SizedBox(height: 10),
+                                  pw.Text(
+                                    storeDetail.name,
+                                    style: pw.TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: pw.FontWeight.bold,
+                                    ),
+                                  ),
+                              pw.SizedBox(height: 3),
+// NEW: Arabic company name — same size/weight/color as English name
+if (arabicFont != null)
+  pw.Text(
+    storeDetail.name_ar!,
+    textDirection: pw.TextDirection.rtl,
+    textAlign: pw.TextAlign.right,
+    style: pw.TextStyle(
+      font: arabicFont,
+      fontSize: 18,                          // was 14 → now matches English name's 18
+      fontWeight: pw.FontWeight.bold,
+      color: PdfColors.black,                // was default grey → now solid black
+    ),
+  ),
+pw.SizedBox(height: 3),
+                                  pw.Text('${storeDetail.address ?? 'N/A'}'),
+                                  pw.SizedBox(height: 3),
+                                  pw.Text('TRN: ${storeDetail.trn ?? 'N/A'}'),
+                                  pw.SizedBox(height: 3),
+                                ]),
+                      pw.Image(
+                        pw.MemoryImage(logoBytes),
+                        height: 100,
+                        width: 100,
+                        fit: pw.BoxFit.fitWidth,
+                      ),
+                    ]),
                 pw.Center(
                   child: pw.Text(
                     'RECEIPT VOUCHER',
@@ -292,7 +365,8 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                         // pw.SizedBox(height: 3),
                         // pw.Text('Market: ${data.customer![0].address}'),
                         pw.SizedBox(height: 3),
-                        pw.Text('${data.store![0].vatLabel}: ${data.customer![0].trn}'),
+                        pw.Text(
+                            '${data.store![0].vatLabel}: ${data.customer![0].trn}'),
                       ],
                     ),
                     pw.Column(
@@ -302,9 +376,9 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                           'Reference: ${data.sales![0].voucherNo ?? 'N/A'}',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                         ),
-                        pw.Text('Date: ${data.sales![0].inDate}'),
+                      pw.Text('Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
                         pw.Text('Time: ${data.sales![0].inTime}'),
-                        pw.Text('Due Date: ${data.sales![0].inDate}'),
+                        pw.Text('Due Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
                       ],
                     ),
                   ],
@@ -312,21 +386,19 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                 pw.SizedBox(height: 10),
                 pw.Divider(color: PdfColors.grey, height: 1, thickness: .5),
                 pw.SizedBox(height: 10),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    if (data.collectionType == 'Cheque') ...[
-                      pw.Text('Collection Type: Cheque'),
-                      pw.Text('Bank Name: ${data.bank ?? 'N/A'}'),
-                      pw.Text('Cheque No: ${data.chequeNo ?? 'N/A'}'),
-                      pw.Text('Cheque Date: ${data.chequeDate ?? 'N/A'}'),
-                    ] else if (data.collectionType == 'Cash') ...[
-                      // Add any text or elements specific to Cash collection type if needed
-                      // For example:
-                      pw.Text('Collection Type: Cash'),
-                    ]
-                  ],
-                ),
+              pw.Column(
+  crossAxisAlignment: pw.CrossAxisAlignment.start,
+  children: [
+    if ((data.collectionType ?? '').toLowerCase() == 'cheque') ...[
+      pw.Text('Collection Type: Cheque'),
+      pw.Text('Bank Name: ${data.bank ?? 'N/A'}'),
+      pw.Text('Cheque No: ${data.chequeNo ?? 'N/A'}'),
+      pw.Text('Cheque Date: ${data.chequeDate != null ? DateHelper.displayDate(data.chequeDate) : 'N/A'}'),
+    ] else ...[
+      pw.Text('Collection Type: ${data.collectionType ?? 'Cash'}'),
+    ]
+  ],
+),
                 pw.SizedBox(height: 10),
                 pw.SizedBox(height: 10),
               ],
@@ -362,14 +434,13 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     }
   }
 
-  Future<void> generateWifiPdf(ReportData data) async {
+   Future<void> generateWifiPdf(ReportData data) async {
     String outstanding = await _getOutstanding(data.customerId);
     final response = await http.get(Uri.parse(
         '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
     if (response.statusCode == 200) {
-      // Parse JSON response into StoreDetail object
       StoreDetail storeDetail =
-      StoreDetail.fromJson(json.decode(response.body));
+          StoreDetail.fromJson(json.decode(response.body));
 
       final pdf = pw.Document();
       final String api =
@@ -379,6 +450,12 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         throw Exception('Failed to load logo image');
       }
       final Uint8List logoBytes = logoResponse.bodyBytes;
+
+      // NEW: same as generatePdf()
+      final pw.Font? arabicFont = (storeDetail.name_ar != null &&
+              storeDetail.name_ar!.trim().isNotEmpty)
+          ? await _loadArabicPwFont()
+          : null;
 
       pdf.addPage(
         pw.MultiPage(
@@ -419,13 +496,13 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                 //   ),
                 // ),
                 pw.Center(
-                 child:  pw.Text(
-                   'RECEIPT VOUCHER',
-                   style: pw.TextStyle(
-                     fontSize: 16,
-                     fontWeight: pw.FontWeight.bold,
-                   ),
-                 ),
+                  child: pw.Text(
+                    'RECEIPT VOUCHER',
+                    style: pw.TextStyle(
+                      fontSize: 16,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
                 ),
                 pw.SizedBox(height: 20),
                 pw.Divider(color: PdfColors.grey, height: 1, thickness: 1),
@@ -438,7 +515,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                       children: [
                         pw.Text('Customer:',
                             style:
-                            pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                         pw.Text(
                           (data.customer!.isNotEmpty)
                               ? data.customer![0].code ?? ''
@@ -453,7 +530,8 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                         // pw.SizedBox(height: 3),
                         // pw.Text('Market: ${data.customer![0].address}'),
                         pw.SizedBox(height: 3),
-                        pw.Text('${data.store![0].vatLabel}: ${data.customer![0].trn}'),
+                        pw.Text(
+                            '${data.store![0].vatLabel}: ${data.customer![0].trn}'),
                       ],
                     ),
                     pw.Column(
@@ -463,8 +541,8 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                           'Reference: ${data.sales![0].voucherNo ?? 'N/A'}',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                         ),
-                        pw.Text('Date: ${data.sales![0].inDate}'),
-                        pw.Text('Due Date: ${data.sales![0].inDate}'),
+                       pw.Text('Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
+                        pw.Text('Due Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
                       ],
                     ),
                   ],
@@ -475,16 +553,14 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    if (data.collectionType == 'Cheque') ...[
-                      pw.Text('Collection Type: Cheque'),
-                      pw.Text('Bank Name: ${data.bank ?? 'N/A'}'),
-                      pw.Text('Cheque No: ${data.chequeNo ?? 'N/A'}'),
-                      pw.Text('Cheque Date: ${data.chequeDate ?? 'N/A'}'),
-                    ] else if (data.collectionType == 'Cash') ...[
-                      // Add any text or elements specific to Cash collection type if needed
-                      // For example:
-                      pw.Text('Collection Type: Cash'),
-                    ]
+                if ((data.collectionType ?? '').toLowerCase() == 'cheque') ...[
+  pw.Text('Collection Type: Cheque'),
+  pw.Text('Bank Name: ${data.bank ?? 'N/A'}'),
+  pw.Text('Cheque No: ${data.chequeNo ?? 'N/A'}'),
+  pw.Text('Cheque Date: ${data.chequeDate != null ? DateHelper.displayDate(data.chequeDate) : 'N/A'}'),
+] else ...[
+  pw.Text('Collection Type: ${data.collectionType ?? 'Cash'}'),
+]
                   ],
                 ),
                 pw.SizedBox(height: 10),
@@ -495,7 +571,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
             pw.SizedBox(height: 20),
             pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
               pw.Text((data.roundoff != null &&
-                  double.parse(data.roundoff!) != 0)
+                      double.parse(data.roundoff!) != 0)
                   ? 'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(AppState().noOfDecimals ?? 2)}'
                   : ''),
             ]),
@@ -573,28 +649,29 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
         title: _isSearching
             ? TextField(
-          controller: _searchController,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Search by voucher or customer...',
-            hintStyle: TextStyle(color: Colors.white70),
-            border: InputBorder.none,
-          ),
-          style: const TextStyle(color: Colors.white),
-          onChanged: (value) {
-            // Cancel previous debounce timer
-            _searchDebounce?.cancel();
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Search by voucher or customer...',
+                  hintStyle: TextStyle(color: Colors.white70),
+                  border: InputBorder.none,
+                ),
+                style: const TextStyle(color: Colors.white),
+                onChanged: (value) {
+                  // Cancel previous debounce timer
+                  _searchDebounce?.cancel();
 
-            // Start new debounce timer
-            _searchDebounce = Timer(const Duration(milliseconds: 500), () {
-              _onSearchChanged();
-            });
-          },
-        )
+                  // Start new debounce timer
+                  _searchDebounce =
+                      Timer(const Duration(milliseconds: 500), () {
+                    _onSearchChanged();
+                  });
+                },
+              )
             : const Text(
-          'Receipts',
-          style: TextStyle(color: AppConfig.backgroundColor),
-        ),
+                'Receipts',
+                style: AppConfig.pageTitleStyle,
+              ),
         backgroundColor: AppConfig.colorPrimary,
         actions: [
           IconButton(
@@ -614,23 +691,23 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
           ),
         ],
       ),
-
       body: Column(
         children: [
-          if (_isSearching && receiptsData.isEmpty && _searchController.text.isNotEmpty)
+          if (_isSearching &&
+              receiptsData.isEmpty &&
+              _searchController.text.isNotEmpty)
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Text('No results found'),
             ),
-
           CommonWidgets.verticalSpace(1),
           (_initDone && !_noData)
-              ? SizedBox(
-                  height: SizeConfig.blockSizeVertical * 85,
+              ? Expanded(
                   child: ListView.separated(
                     controller: _scrollController,
-                    separatorBuilder: (BuildContext context, int index) =>
-                        CommonWidgets.verticalSpace(1),
+                    padding: EdgeInsets.zero,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 0),
                     itemCount: receiptsData.length + (_isLoading ? 1 : 0),
                     shrinkWrap: true,
                     itemBuilder: (context, index) {
@@ -703,11 +780,10 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     );
   }
 
-  Widget _productsCard(ReportData data) {
+ Widget _productsCard(ReportData data) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
       child: Container(
-        // width: SizeConfig.blockSizeHorizontal * 90,
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
@@ -723,123 +799,137 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(5.0),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 6,
+            vertical: 1,
+          ),
           child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 2.0),
+            childrenPadding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
-            trailing: SizedBox(
-              width: AppState().printer == "Wifi" ? 92 : 60,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  GestureDetector(
-                      onTap: () => _print(data),
-                      child: Icon(Icons.print, color: Colors.blueAccent)),
-                  SizedBox(width: 10),
-                  if(AppState().printer=="Wifi")...[
-                    InkWell(
-                      onTap: () =>generateWifiPdf(data),
-                      child: const Icon(
-                        Icons.document_scanner,
-                        color: Colors.green,
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                  ],
-                  GestureDetector(
-                    onTap: () => generatePdf(data),
-                    child: Icon(Icons.document_scanner, color: Colors.red),
-                  ),
-                ],
-              ),
+            // trailing icons kept ONLY here, not duplicated inside title Row.
+            // This is what was forcing the extra vertical gap around
+            // "Round Off" — the title Column was being stretched by a
+            // sibling Row(spaceBetween) that wrapped the trailing icons.
+        // ── FIX: same pattern as Sale Invoice screen — widened tap targets
+// (~40x40 via InkWell + Padding) instead of just the bare icon glyph,
+// and widened the SizedBox to fit them without clipping. ──
+trailing: SizedBox(
+  width: AppState().printer == "Wifi" ? 130 : 90,
+  child: Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => _print(data),
+        child: const Padding(
+          padding: EdgeInsets.all(8.0),
+          child: Icon(Icons.print, color: Colors.blueAccent, size: 26),
+        ),
+      ),
+      if (AppState().printer == "Wifi")
+        InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => generateWifiPdf(data),
+          child: const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: Icon(
+              Icons.document_scanner,
+              color: Colors.green,
+              size: 26,
             ),
+          ),
+        ),
+      InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => generatePdf(data),
+        child: const Padding(
+          padding: EdgeInsets.all(8.0),
+          child: Icon(Icons.document_scanner, color: Colors.red, size: 26),
+        ),
+      ),
+    ],
+  ),
+),
             backgroundColor: AppConfig.backgroundColor,
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // title is now just the Column directly — no wrapping Row that
+            // used to be forced to spaceBetween against the trailing icons.
+            title: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      // width: SizeConfig.blockSizeHorizontal * 70,
-                      child: Text(
-                        '${DateFormat('dd MMMM yyyy').format(DateTime.parse(data.inDate!))} ${data.inTime} | ${data.voucherNo}',
-                        style: TextStyle(
-                          fontSize: AppConfig.textCaption3Size,
-                        ),
-                      ),
+                  SizedBox(
+                  child: Text(
+                    '${DateHelper.displayDate(data.inDate)} ${data.inTime} | ${data.voucherNo}',
+                    style: TextStyle(
+                      fontSize: AppConfig.textCaption3Size,
+                      height: 1.15,
                     ),
-                    Row(
-                      children: [
-                        // Text(
-                        //   (data.customer != null && data.customer!.isNotEmpty)
-                        //       ? data.customer![0].code ?? ''
-                        //       : (data.customerdata != null)
-                        //       ? data.customerdata![0].code ?? ''
-                        //       : '',
-                        //   style: TextStyle(
-                        //     fontSize: AppConfig.textCaption3Size,
-                        //     fontWeight: AppConfig.headLineWeight,
-                        //   ),
-                        // ),
-                        // Text(' | '),
-                        Text(
-                          overflow: TextOverflow.fade,
-                          (data.customer != null && data.customer!.isNotEmpty)
-                              ? data.customer![0].name ?? ''
-                              : (data.customerdata != null)
+                  ),
+                ),
+                Row(
+                  children: [
+                    Text(
+                      overflow: TextOverflow.fade,
+                      (data.customer != null && data.customer!.isNotEmpty)
+                          ? data.customer![0].name ?? ''
+                          : (data.customerdata != null)
                               ? data.customerdata![0].name ?? ''
                               : '',
-                          style: TextStyle(
-                            fontSize: AppConfig.textCaption3Size,
-                            fontWeight: AppConfig.headLineWeight,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      'Amount: ${data.totalAmount}',
                       style: TextStyle(
                         fontSize: AppConfig.textCaption3Size,
+                        height: 1.15,
+                        fontWeight: AppConfig.headLineWeight,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  'Amount: ${data.totalAmount}',
+                  style: TextStyle(
+                    fontSize: AppConfig.textCaption3Size,
+                  ),
+                ),
+                Text(
+                  'Round Off: ${data.roundoff ?? '0.00'}',
+                  style: TextStyle(
+                    fontSize: AppConfig.textCaption3Size,
+                    height: 1.15,
+                  ),
+                ),
+                Text(
+  'Type:  ${(data.collectionType ?? '').toLowerCase() == 'cheque' ? 'Cheque | ${data.bank} | ${data.chequeNo} \nCheque Date: ${DateHelper.displayDate(data.chequeDate)}' : (data.collectionType ?? 'Cash')}',
+  style: TextStyle(
+    fontSize: AppConfig.textCaption3Size,
+    height: 1.15,
+  ),
+),
+                Row(
+                  children: [
+                    Text(
+                      'Status: ',
+                      style: TextStyle(
+                        fontSize: AppConfig.textCaption3Size,
+                        height: 1.15,
                       ),
                     ),
                     Text(
-                      'Round Off: ${data.roundoff ?? '0.00'}',
+                      // Receipt screen: status 2 = Confirmed only.
+                      // There is no "Approved" status for receipts.
+                      data.status == 0
+                          ? 'Cancelled'
+                          : data.status == 2
+                              ? 'Confirmed'
+                              : '',
                       style: TextStyle(
                         fontSize: AppConfig.textCaption3Size,
+                        height: 1.15,
+                        color: data.status == 0 ? Colors.red : Colors.green,
+                        fontWeight: AppConfig.headLineWeight,
                       ),
-                    ),
-                    Text(
-                      'Type:  ${data.collectionType == 'cheque' ? 'Cheque | ${data.bank} | ${data.chequeNo} \nCheque Date: ${data.chequeDate}' : data.collectionType}',
-                      style: TextStyle(
-                        fontSize: AppConfig.textCaption3Size,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          'Status: ',
-                          style: TextStyle(
-                            fontSize: AppConfig.textCaption3Size,
-                          ),
-                        ),
-                        Text(
-                          (data.status == 0)
-                              ? 'Cancelled'
-                              : (data.status == 1)
-                                  ? 'Confirmed'
-                                  : 'Approved',
-                          style: TextStyle(
-                              fontSize: AppConfig.textCaption3Size,
-                              color: (data.status == 0)
-                                  ? Colors.red
-                                  : (data.status == 1)
-                                      ? Colors.green
-                                      : Colors.orange,
-                              fontWeight: AppConfig.headLineWeight),
-                        ),
-                      ],
                     ),
                   ],
                 ),
@@ -851,15 +941,16 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                   final sale = data.sales![index];
                   return Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 8.0, vertical: 4.0),
+                        horizontal: 8.0, vertical: 2.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Divider(),
+                        Divider(height: 12),
                         Text(
                           'Reference No: ${sale.invoiceNo ?? 'N/A'}',
                           style: TextStyle(
                             fontSize: AppConfig.textCaption3Size,
+                            height: 1.15,
                           ),
                         ),
                         Text(
@@ -872,6 +963,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                           'Amount: ${sale.amount ?? 'N/A'}',
                           style: TextStyle(
                             fontSize: AppConfig.textCaption3Size,
+                            height: 1.15,
                           ),
                         ),
                       ],
@@ -944,7 +1036,8 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
             Uint8List imageBytes = response.bodyBytes;
             img.Image? originalImage = img.decodeImage(imageBytes)!;
             if (originalImage != null) {
-              img.Image resizedImage = img.copyResize(originalImage, width: 250);
+              img.Image resizedImage =
+                  img.copyResize(originalImage, width: 250);
               img.Image monoLogo = img.grayscale(resizedImage);
               Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
               await printer.printImageBytes(logoBytes);
@@ -955,9 +1048,24 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
           }
         }
 
-        printer.printNewLine();
+               printer.printNewLine();
         String companyName = '${storeDetail.name}';
         printer.printCustom(companyName, 3, 1);
+
+        // NEW: Arabic company name — Arabic can't go through printCustom
+        // (ESC/POS only covers Latin/ASCII), so print it as a bitmap.
+        String companyNameAr = storeDetail.name_ar ?? '';
+        if (companyNameAr.trim().isNotEmpty) {
+          try {
+            final Uint8List arabicNameBytes =
+                await _arabicTextToImageBytes(companyNameAr, fontSize: 30);
+            await printer.printImageBytes(arabicNameBytes);
+            await Future.delayed(const Duration(milliseconds: 300));
+          } catch (e) {
+            print('Failed to print Arabic company name: $e');
+          }
+        }
+
         printer.printNewLine();
 
         printer.printCustom("${storeDetail.address ?? 'N/A'}", 1, 1);
@@ -970,20 +1078,19 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
           printAlignedText('Customer: ${data.customer![0].name}',
               'Reference: ${data.sales![0].voucherNo ?? 'N/A'}');
           // printer.printLeftRight('Customer: ${data.customer![0].name}', '', 1);
-          printAlignedText(
+         printAlignedText(
               // 'Market:  ${data.customer![0].address}',
               '',
-              'Date: ${data.sales![0].inDate}');
+              'Date: ${DateHelper.displayDate(data.sales![0].inDate)}');
           printAlignedText(
               // 'Market:  ${data.customer![0].address}',
               '',
               'Time: ${data.sales![0].inTime}');
-          // printer.printLeftRight('Market: ${data.customer![0].address}', '', 1);
           printAlignedText(
             (data.customer![0].trn != null && data.customer![0].trn!.isNotEmpty)
                 ? '${data.store![0].vatLabel}: ${data.customer![0].trn}'
                 : '',
-            'Due Date: ${data.sales![0].inDate}',
+            'Due Date: ${DateHelper.displayDate(data.sales![0].inDate)}',
           );
           // printer.printLeftRight('TRN: ${data.customer![0].trn}', '', 1);
         }
@@ -998,15 +1105,17 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         // printer.printNewLine();
 
         // Collection Information
-        if (data.collectionType == 'Cheque') {
-          printAlignedText('Collection Type: Cheque', ' ');
-          printAlignedText('Bank Name: ${data.bank}', ' ');
-          printAlignedText('Cheque No: ${data.chequeNo}', ' ');
-          printAlignedText('Cheque Date: ${data.chequeDate}', ' ');
-        } else if (data.collectionType == 'Cash') {
-          // Optional: Print something specific for cash or leave it out
-          printAlignedText('Collection Type: Cash', ' '); // Uncomment if needed
-        }
+       if ((data.collectionType ?? '').toLowerCase() == 'cheque') {
+  printAlignedText('Collection Type: Cheque', ' ');
+  printAlignedText('Bank Name: ${data.bank}', ' ');
+  printAlignedText('Cheque No: ${data.chequeNo}', ' ');
+  printAlignedText(
+    'Cheque Date: ${data.chequeDate != null ? DateHelper.displayDate(data.chequeDate) : 'N/A'}',
+    ' ',
+  );
+} else {
+  printAlignedText('Collection Type: ${data.collectionType ?? 'Cash'}', ' ');
+}
         printAlignedText('Amount: ${data.totalAmount}', ' ');
         // printer.printLeftRight('Collection Type:', '${data.collectionType}', 1);
         // printer.printLeftRight('Bank Name:', '${data.bank}', 1);

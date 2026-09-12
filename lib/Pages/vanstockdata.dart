@@ -281,7 +281,7 @@ class _VanStockScreenState extends State<VanStockScreen>
           iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
           title: const Text(
             'Van Stocks',
-            style: TextStyle(color: AppConfig.backgroundColor),
+           style: AppConfig.pageTitleStyle,
           ),
           backgroundColor: AppConfig.colorPrimary,
           actions: [

@@ -163,7 +163,7 @@ class _SelectProductsScreenoffState extends State<SelectProductsScreenoff> {
           iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
           title: const Text(
             'Select Products',
-            style: TextStyle(color: AppConfig.backgroundColor),
+             style: AppConfig.pageTitleStyle,
           ),
           backgroundColor: AppConfig.colorPrimary,
           actions: [
@@ -428,6 +428,11 @@ class _SelectProductsScreenoffState extends State<SelectProductsScreenoff> {
                             'Available Qty: ${selectedUnit!['stock']}',
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
+                          SizedBox(height: 5.h),
+
+
+
+SizedBox(height: 5.h),
                         ],
                         SizedBox(height: 10.h),
                         DropdownButtonFormField<String>(

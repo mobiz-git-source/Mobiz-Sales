@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:mobizapp/Models/appstate.dart';
 import 'package:shimmer/shimmer.dart';
 import '../Components/commonwidgets.dart';
 import '../Models/visit_model.dart';
-import 'package:intl/intl.dart';
 import '../Utilities/rest_ds.dart';
+import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
 
@@ -61,7 +62,7 @@ class _VisitspageState extends State<Visitspage> {
         backgroundColor: AppConfig.colorPrimary,
         title: Text(
           'Visit',
-          style: TextStyle(color: AppConfig.backgroundColor),
+          style: AppConfig.pageTitleStyle,
         ),
       ),
       body: FutureBuilder<List<CustomerVisit>>(
@@ -154,8 +155,8 @@ class _VisitspageState extends State<Visitspage> {
                                           ),
                                         ],
                                       ),
-                                      Text(
-                                          "${visit.inDate}   ${formatTime(visit.inTime)}"),
+                                    Text(
+                                          "${DateHelper.displayDate(visit.inDate)}   ${formatTime(visit.inTime)}"),
                                       Text("Reason: ${reason.reason}"),
                                       Text("Remarks: ${visit.description}"),
                                     ],

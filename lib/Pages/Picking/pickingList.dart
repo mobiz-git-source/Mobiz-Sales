@@ -92,7 +92,7 @@ class _PickingListPageState extends State<PickingListPage> {
       appBar: AppBar(
         title: const Text(
           'Picking',
-          style: TextStyle(color: Colors.white),
+           style: AppConfig.pageTitleStyle,
         ),
         backgroundColor: AppConfig.colorPrimary,
       ),

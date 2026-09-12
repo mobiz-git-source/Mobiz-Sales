@@ -137,7 +137,7 @@ class _DriverDetailsState extends State<DriverDetails> {
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
         title: const Text(
           'Driver Details',
-          style: TextStyle(color: AppConfig.backgroundColor),
+          style: AppConfig.pageTitleStyle,
         ),
         backgroundColor: AppConfig.colorPrimary,
       ),

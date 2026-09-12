@@ -510,6 +510,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
 import '../Models/DayReport.dart';
 import '../Models/Store_model.dart';
+import '../Utilities/date_helper.dart';
+import '../Models/routedatamodelclass.dart';
 import '../confg/appconfig.dart';
 
 class DayCloseResponse123 {
@@ -542,7 +544,7 @@ class DayCloseResponse123 {
           .map((i) => Collection.fromJson(i))
           .toList(),
       expense:
-      (json['expense'] as List).map((i) => Expense.fromJson(i)).toList(),
+          (json['expense'] as List).map((i) => Expense.fromJson(i)).toList(),
       success: json['success'],
       messages: List<String>.from(json['messages']),
     );
@@ -647,45 +649,48 @@ class DayCloseData123 {
       noOfOrder: json['no_of_order'] ?? 0,
       amountOfOrder: double.tryParse(json['amount_of_order'] ?? '0.0') ?? 0.0,
       noOfReturns: json['no_of_returns'] ?? 0,
-      amountOfReturns: double.tryParse(json['amount_of_returns'] ?? '0.0') ?? 0.0,
+      amountOfReturns:
+          double.tryParse(json['amount_of_returns'] ?? '0.0') ?? 0.0,
       collectionCashAmount:
-      double.tryParse(json['collection_cash_amount'] ?? '0.0') ?? 0.0,
+          double.tryParse(json['collection_cash_amount'] ?? '0.0') ?? 0.0,
       collectionNoOfCheque: json['collection_no_of_cheque'] ?? 0,
       collectionChequeAmount:
-      double.tryParse(json['collection_cheque_amount'] ?? '0.0') ?? 0.0,
+          double.tryParse(json['collection_cheque_amount'] ?? '0.0') ?? 0.0,
       lastDayBalanceAmount:
-      double.tryParse(json['last_day_balance_amount'] ?? '0.0') ?? 0.0,
+          double.tryParse(json['last_day_balance_amount'] ?? '0.0') ?? 0.0,
       lastDayBalanceNoOfCheque:
-      int.tryParse(json['last_day_balance_no_of_cheque'] ?? '0') ?? 0,
+          int.tryParse(json['last_day_balance_no_of_cheque'] ?? '0') ?? 0,
       lastDayBalanceChequeAmount:
-      double.tryParse(json['last_day_balance_cheque_amount'] ?? '0.0') ?? 0.0,
+          double.tryParse(json['last_day_balance_cheque_amount'] ?? '0.0') ??
+              0.0,
       expense: double.tryParse(json['expense'] ?? '0.0') ?? 0.0,
       cashDeposited: double.tryParse(json['cash_deposited'] ?? '0.0') ?? 0.0,
       cashHandOver: double.tryParse(json['cash_hand_over'] ?? '0.0') ?? 0.0,
       noOfChequeDeposited: json['no_of_cheque_deposited'] ?? 0,
       chequeDepositedAmount:
-      double.tryParse(json['cheque_deposited_amount'] ?? '0.0') ?? 0.0,
+          double.tryParse(json['cheque_deposited_amount'] ?? '0.0') ?? 0.0,
       noOfChequeHandOver: json['no_of_cheque_hand_over'] ?? 0,
       chequeHandOverAmount:
-      double.tryParse(json['cheque_hand_over_amount'] ?? '0.0') ?? 0.0,
+          double.tryParse(json['cheque_hand_over_amount'] ?? '0.0') ?? 0.0,
       balanceCashInHand:
-      double.tryParse(json['balance_cash_in_hand'] ?? '0.0') ?? 0.0,
+          double.tryParse(json['balance_cash_in_hand'] ?? '0.0') ?? 0.0,
       noOfChequeInHand: json['no_of_cheque_in_hand'] ?? 0,
       chequeAmountInHand:
-      double.tryParse(json['cheque_amount_in_hand'] ?? '0.0') ?? 0.0,
+          double.tryParse(json['cheque_amount_in_hand'] ?? '0.0') ?? 0.0,
       approvel: json['approvel'] ?? 0,
       pettyCash: json['petty_cash'] ?? 0,
       invoiceNo: json['invoice_no'] ?? '',
-      createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toString()),
-      updatedAt: DateTime.parse(json['updated_at'] ?? DateTime.now().toString()),
+      createdAt:
+          DateTime.parse(json['created_at'] ?? DateTime.now().toString()),
+      updatedAt:
+          DateTime.parse(json['updated_at'] ?? DateTime.now().toString()),
       van: (json['van'] as List<dynamic>?)
-          ?.map((item) => Van.fromJson(item))
-          .toList() ??
+              ?.map((item) => Van.fromJson(item))
+              .toList() ??
           [],
     );
   }
 }
-
 
 class Van {
   final int id;
@@ -720,9 +725,9 @@ class Van {
       status: json['status'] ?? 0,
       storeId: json['store_id'] ?? 0,
       createdAt:
-      DateTime.parse(json['created_at'] ?? DateTime.now().toString()),
+          DateTime.parse(json['created_at'] ?? DateTime.now().toString()),
       updatedAt:
-      DateTime.parse(json['updated_at'] ?? DateTime.now().toString()),
+          DateTime.parse(json['updated_at'] ?? DateTime.now().toString()),
     );
   }
 }
@@ -834,7 +839,7 @@ class SaleReturn {
       grandTotal: json['grand_total'],
       customer: json['customer'] != null
           ? List<Customer123>.from(
-          json['customer'].map((x) => Customer123.fromJson(x)))
+              json['customer'].map((x) => Customer123.fromJson(x)))
           : [],
     );
   }
@@ -854,20 +859,19 @@ class Collection {
   List<Customer123>? customer;
   List<CollectionSale>? sales;
 
-  Collection({
-    this.id,
-    this.customerId,
-    this.inDate,
-    this.inTime,
-    this.collectionType,
-    this.bank,
-    this.chequeDate,
-    this.chequeNo,
-    this.voucherNo,
-    this.totalAmount,
-    this.customer,
-    this.sales
-  });
+  Collection(
+      {this.id,
+      this.customerId,
+      this.inDate,
+      this.inTime,
+      this.collectionType,
+      this.bank,
+      this.chequeDate,
+      this.chequeNo,
+      this.voucherNo,
+      this.totalAmount,
+      this.customer,
+      this.sales});
 
   factory Collection.fromJson(Map<String, dynamic> json) {
     return Collection(
@@ -883,7 +887,7 @@ class Collection {
       totalAmount: json['total_amount'],
       customer: json['customer'] != null
           ? List<Customer123>.from(
-          json['customer'].map((x) => Customer123.fromJson(x)))
+              json['customer'].map((x) => Customer123.fromJson(x)))
           : [],
       sales: (json['sales'] as List<dynamic>)
           .map((saleJson) => CollectionSale.fromJson(saleJson))
@@ -911,7 +915,6 @@ class CollectionSale {
     );
   }
 }
-
 
 class Expense {
   int? id;
@@ -954,7 +957,7 @@ class Expense {
       status: json['status'],
       expense: json['expense'] != null
           ? List<ExpenseDetails>.from(
-          json['expense'].map((x) => ExpenseDetails.fromJson(x)))
+              json['expense'].map((x) => ExpenseDetails.fromJson(x)))
           : [],
     );
   }
@@ -990,6 +993,7 @@ class DayClosePagessss extends StatefulWidget {
 
 class _DayClosePagessssState extends State<DayClosePagessss> {
   late Future<DayCloseResponse123> futureDayCloseData;
+  String? routeName;
   List<BluetoothDevice> _devices = [];
   BluetoothDevice? _selectedDevice;
   bool _connected = false;
@@ -1038,6 +1042,30 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
     super.initState();
     futureDayCloseData = fetchDayCloseData(widget.id);
     _initPrinter();
+    _getRouteName();
+  }
+
+  Future<void> _getRouteName() async {
+    try {
+      RestDatasource api = RestDatasource();
+      String endpoint =
+          '/api/get_route?store_id=${AppState().storeId}&user_id=${AppState().userId}';
+      dynamic resJson = await api.getDetails(endpoint, AppState().token);
+      RouteDataModel routeModel = RouteDataModel.fromJson(resJson);
+
+      if (routeModel.data != null && routeModel.data!.isNotEmpty) {
+        final matches =
+            routeModel.data!.where((r) => r.id == AppState().routeId);
+        final match = matches.isNotEmpty ? matches.first : null;
+        if (match != null && mounted) {
+          setState(() {
+            routeName = match.name;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error fetching route name: $e');
+    }
   }
 
   Future<DayCloseResponse123> fetchDayCloseData(int id) async {
@@ -1131,22 +1159,32 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                   pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text(
-                          'SalesMan: ${AppState().name!.toUpperCase()}',  // Added .toUpperCase()
-                          style: pw.TextStyle(
-                              fontSize: 12,
-                              fontWeight: pw.FontWeight.bold
-                          ),
+                        pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'SalesMan: ${AppState().name!.toUpperCase()}', // Added .toUpperCase()
+                              style: pw.TextStyle(
+                                  fontSize: 12, fontWeight: pw.FontWeight.bold),
+                            ),
+                            if (routeName != null && routeName!.isNotEmpty)
+                              pw.Text(
+                                'Route: $routeName',
+                                style: pw.TextStyle(fontSize: 10),
+                              ),
+                          ],
                         ),
                         pw.Column(
-                          // crossAxisAlignment: pw.CrossAxisAlignment.start,
-                          children: [
-                            pw.Text("${dayClose.data!.invoiceNo}"),
-                            // pw.SizedBox(height: 10),
-                            pw.Text("${dayClose.data!.inDate}"),
-                            pw.Text("${dayClose.data!.inTime}"),
-                          ]
-                        )
+                            crossAxisAlignment: pw.CrossAxisAlignment.end,
+                            children: [
+                              pw.Text("${dayClose.data!.invoiceNo}"),
+                              pw.Text(
+                                '${DateHelper.displayDate(dayClose.data!.inDate)}   ${dayClose.data!.inTime}',
+                                style: pw.TextStyle(fontSize: 9),
+                                softWrap: false,
+                                maxLines: 1,
+                              ),
+                            ])
                       ]),
                   pw.SizedBox(height: 10),
                   pw.Divider(height: 1, thickness: 0.5),
@@ -1248,11 +1286,18 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                   '${entry.key + 1}',
                   formatCustomerName(customerNames),
                   sale.invoiceNo ?? '',
-                  sale.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00',
+                  sale.grandTotal
+                          ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
+                      '0.00',
                 ];
               }).toList();
 
-              salesRows.add(['', '', 'Total:', totalSales.toStringAsFixed(AppState().noOfDecimals ?? 2)]);
+              salesRows.add([
+                '',
+                '',
+                'Total:',
+                totalSales.toStringAsFixed(AppState().noOfDecimals ?? 2)
+              ]);
 
               pageContent.add(buildCompactTable(
                 headers: ['SI NO', 'SHOP NAME', 'INVOICE NO', 'Amount'],
@@ -1315,13 +1360,19 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                   '${entry.key + 1}',
                   formatCustomerName(customerNames),
                   ret.invoiceNo ?? '',
-                  ret.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00',
+                  ret.grandTotal
+                          ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
+                      '0.00',
                 ];
               }).toList();
 
               // Add total row
-              returnRows
-                  .add(['', '', 'Total:', totalReturns.toStringAsFixed(AppState().noOfDecimals ?? 2)]);
+              returnRows.add([
+                '',
+                '',
+                'Total:',
+                totalReturns.toStringAsFixed(AppState().noOfDecimals ?? 2)
+              ]);
 
               pageContent.add(buildCompactTable(
                 headers: ['SI NO', 'SHOP NAME', 'Reference', 'Amount'],
@@ -1353,7 +1404,8 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                   fontWeight: pw.FontWeight.bold,
                 ),
               ));
-              String formatReferenceTextSmart(List<Map<String, dynamic>> sales) {
+              String formatReferenceTextSmart(
+                  List<Map<String, dynamic>> sales) {
                 const maxLineLength = 50;
                 List<String> lines = [];
                 String currentLine = '';
@@ -1362,7 +1414,8 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                   String saleText = '${sale['invoiceNo']} : ${sale['amount']}';
                   if (currentLine.isEmpty) {
                     currentLine = saleText;
-                  } else if ((currentLine + ', ' + saleText).length <= maxLineLength) {
+                  } else if ((currentLine + ', ' + saleText).length <=
+                      maxLineLength) {
                     currentLine += ', $saleText';
                   } else {
                     lines.add(currentLine);
@@ -1377,12 +1430,12 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                 return lines.join('\n');
               }
 
-
-              var collectionRows = dayClose.collection!.asMap().entries.map((entry) {
+              var collectionRows =
+                  dayClose.collection!.asMap().entries.map((entry) {
                 var col = entry.value;
 
                 String customerNames =
-                col.customer!.map((customer) => customer.name).join(", ");
+                    col.customer!.map((customer) => customer.name).join(", ");
 
                 String formatCustomerName(String name) {
                   const maxLineLength = 42;
@@ -1392,7 +1445,8 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                   while (remaining.length > maxLineLength) {
                     int breakPoint = remaining.lastIndexOf(' ', maxLineLength);
                     if (breakPoint < 0) {
-                      lines.add('${remaining.substring(0, maxLineLength - 1)}-');
+                      lines
+                          .add('${remaining.substring(0, maxLineLength - 1)}-');
                       remaining = remaining.substring(maxLineLength - 1);
                     } else {
                       lines.add(remaining.substring(0, breakPoint));
@@ -1409,9 +1463,9 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                 if (col.sales != null && col.sales!.isNotEmpty) {
                   referenceText = formatReferenceTextSmart(col.sales!
                       .map((sale) => {
-                    'invoiceNo': sale.invoiceNo,
-                    'amount': sale.amount,
-                  })
+                            'invoiceNo': sale.invoiceNo,
+                            'amount': sale.amount,
+                          })
                       .toList());
                 }
 
@@ -1420,15 +1474,17 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                   formatCustomerName(customerNames),
                   col.collectionType ?? '',
                   col.totalAmount ?? '0.00',
-                  "${col.voucherNo??''} | $referenceText",
+                  "${col.voucherNo ?? ''} | $referenceText",
                 ];
               }).toList();
 
-
-
               // Add total row
-              collectionRows
-                  .add(['', '', 'Total:', totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2)]);
+              collectionRows.add([
+                '',
+                '',
+                'Total:',
+                totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2)
+              ]);
 
               pageContent.add(buildCompactTable(
                 headers: ['SI NO', 'SHOP NAME', 'TYPE', 'Amount', 'Reference'],
@@ -1447,49 +1503,77 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
             }
 
             // EXPENSES SECTION
+            // EXPENSES SECTION
             if (dayClose.expense != null && dayClose.expense!.isNotEmpty) {
               double totalExpenses = dayClose.expense!.fold(0, (sum, exp) {
                 return sum + (double.tryParse(exp.amount.toString()) ?? 0);
               });
 
-              pageContent.add(pw.Text(
-                'EXPENSES',
-                style: pw.TextStyle(
-                  fontSize: 10,
-                  fontWeight: pw.FontWeight.bold,
+              pageContent.add(
+                pw.Text(
+                  'EXPENSES',
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
                 ),
-              ));
+              );
 
               var expenseRows = dayClose.expense!.asMap().entries.map((entry) {
                 var exp = entry.value;
+
                 return [
                   '${entry.key + 1}',
-                  exp.description?.toString() ?? 'Expense',
+
+                  // Reference
+                  exp.invoiceNo ?? '',
+                  // Expense Name
                   exp.expense != null && exp.expense!.isNotEmpty
-                      ? (exp.expense![0].name ?? '')
+                      ? exp.expense![0].name ?? ''
                       : '',
+
+                  // Remarks
+                  exp.description ?? '',
+
+                  // Amount
                   exp.amount ?? '0.00',
                 ];
               }).toList();
 
-              // Add total row
               expenseRows.add([
                 '',
-                'Total:',
                 '',
+                '',
+                'Total:',
                 totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2),
               ]);
-              pageContent.add(buildCompactTable(
-                headers: ['SI NO', 'Description', 'Type', 'Amount'],
-                rows: expenseRows,
-                columnWidths: [20, 70, 80, 80],
-                alignments: [
-                  pw.TextAlign.center,
-                  pw.TextAlign.left,
-                  pw.TextAlign.left,
-                  pw.TextAlign.right,
-                ],
-              ));
+
+              pageContent.add(
+                buildCompactTable(
+                  headers: [
+                    'SI NO',
+                    'REFERENCE',
+                    'EXPENSE NAME',
+                    'REMARKS',
+                    'AMOUNT',
+                  ],
+                  rows: expenseRows,
+                  columnWidths: [
+                    20,
+                    45,
+                    60,
+                    60,
+                    35,
+                  ],
+                  alignments: [
+                    pw.TextAlign.center,
+                    pw.TextAlign.left,
+                    pw.TextAlign.left,
+                    pw.TextAlign.left,
+                    pw.TextAlign.right,
+                  ],
+                ),
+              );
 
               pageContent.add(pw.SizedBox(height: 5));
             }
@@ -1621,9 +1705,13 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
       //     'Date: ${report.data?.inDate != null ? DateFormat('dd-MMM-yyyy').format(DateTime.parse(report.data!.inDate!)) : 'No Date'}',
       //     1,
       //     0);
-      printer.printCustom('Date ${report.data!.inDate}', 1, 0);
+      printer.printCustom(
+          'Date ${DateHelper.displayDate(report.data!.inDate)}', 1, 0);
       printer.printCustom('Time ${report.data!.inTime}', 1, 0);
       printer.printCustom('SalesMan: ${AppState().name}', 1, 0);
+      if (routeName != null && routeName!.isNotEmpty) {
+        printer.printCustom('Route: $routeName', 1, 0);
+      }
       printer.printCustom('VAN:$vanName', 1, 0);
       printer.printCustom('Petty Cash:${report.data!.pettyCash}', 1, 0);
       printer.printCustom('Invoice No: ${report.data!.invoiceNo}', 1, 0);
@@ -1713,7 +1801,8 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
           }
         }
         printer.printNewLine();
-        printAlignedText('', 'Total Sales: ${totalSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
+        printAlignedText('',
+            'Total Sales: ${totalSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         printer.printNewLine();
       }
 
@@ -1763,8 +1852,8 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
           }
         }
         printer.printNewLine();
-        printAlignedText(
-            '', 'Total Sales Return: ${totalSalesreturn.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
+        printAlignedText('',
+            'Total Sales Return: ${totalSalesreturn.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         // printer.printCustom('Total Collections: $totalCollections', 1, 0);
         printer.printNewLine();
         // printer.printCustom('Return', 1, 0);
@@ -1833,78 +1922,90 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
           }
         }
         printer.printNewLine();
-        printAlignedText(
-            '', 'Total Collections: ${totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
+        printAlignedText('',
+            'Total Collections: ${totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         // printer.printCustom('Total Collections: $totalCollections', 1, 0);
         printer.printNewLine();
       }
 
       // Printing Expense Section
+      // Printing Expense Section
       if (report.expense != null && report.expense!.isNotEmpty) {
-        const int columnWidth1 = 10; // S.No
-        const int columnWidth2 = 20; // Shop Name
-        const int columnWidth3 = 10; // Shop Name
-        const int columnWidth4 = 12; // Invoice No
-        const int columnWidth5 = 8; // Amount
+        const int columnWidth1 = 6; // SI NO
+        const int columnWidth2 = 11; // REFERENCE
+        const int columnWidth3 = 12; // EXP.NAME
+        const int columnWidth4 = 11; // REMARKS
+        const int columnWidth5 = 8; // AMOUNT
+        // total = 42, and every header label is now SHORTER than its column
+        // width (so padRight actually adds a visible gap before the next column)
 
-        // Print the table header
         String headers = "${'SI NO'.padRight(columnWidth1)}"
-            "${'EXPENSE NAME'.padRight(columnWidth2)}"
-            "${'Type'.padRight(columnWidth2)}"
-            "${'Reference'.padRight(columnWidth4)}"
-            "${'Amount'.padLeft(columnWidth5)}";
-        printer.printCustom('Expense', 1, 0); // Section title
-        printer.printCustom(headers, 1, 0); // Print table headers
+            "${'REFERENCE'.padRight(columnWidth2)}"
+            "${'EXP.NAME'.padRight(columnWidth3)}"
+            "${'REMARKS'.padRight(columnWidth4)}"
+            "${'AMOUNT'.padLeft(columnWidth5)}";
+        printer.printCustom('Expense', 1, 0);
+        printer.printCustom(headers, 1, 0);
 
-        // Helper function to split text by word count
         List<String> splitByWords(String text, int maxWords) {
           List<String> words = text.split(' ');
           List<String> lines = [];
           for (int i = 0; i < words.length; i += maxWords) {
-            lines.add(words
-                .sublist(i,
-                    i + maxWords > words.length ? words.length : i + maxWords)
-                .join(' '));
+            lines.add(
+              words
+                  .sublist(i,
+                      i + maxWords > words.length ? words.length : i + maxWords)
+                  .join(' '),
+            );
           }
           return lines;
         }
 
         for (var expense in report.expense!) {
-          String expenseTypes = expense.expense!.map((e) => e.name).join(", ");
-          List<String> customerNameLines = splitByWords(expenseTypes, 4);
+          String expenseName = expense.expense!.map((e) => e.name).join(", ");
+          List<String> expenseNameLines = splitByWords(expenseName, 2);
+          String remarks = expense.description ?? '';
+          List<String> remarkLines = splitByWords(remarks, 2);
+
           String firstLine =
               "${(report.expense!.indexOf(expense) + 1).toString().padRight(columnWidth1)}"
-              "${customerNameLines[0].padRight(columnWidth2)}"
-              "${(expense.description ?? 'No Type').padRight(columnWidth3)}"
-              "${(expense.invoiceNo ?? 'No Type').padRight(columnWidth4)}"
+              "${(expense.invoiceNo ?? '').padRight(columnWidth2)}"
+              "${expenseNameLines[0].padRight(columnWidth3)}"
+              "${(remarkLines.isNotEmpty ? remarkLines[0] : '').padRight(columnWidth4)}"
               "${(double.tryParse(expense.amount ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00').padLeft(columnWidth5)}";
 
           printer.printCustom(firstLine, 1, 0);
-          for (int i = 1; i < customerNameLines.length; i++) {
-            String subsequentLine = "${''.padRight(columnWidth1)}"
-                "${customerNameLines[i].padRight(columnWidth2)}";
-            printer.printCustom(subsequentLine, 1, 0);
-          }
 
-          // printer.printCustom(
-          //     '${(report.expense!.indexOf(expense) + 1).toString().padRight(6)}'
-          //         '${expenseTypes.padRight(16)}'
-          //         '${expense.description?.padRight(12) ?? 'No Remarks'.padRight(12)}'
-          //         '${expense.amount.toString().padLeft(8)}',
-          //     1, 0);
+          int maxLines = expenseNameLines.length > remarkLines.length
+              ? expenseNameLines.length
+              : remarkLines.length;
+
+          for (int i = 1; i < maxLines; i++) {
+            String nextLine = "${''.padRight(columnWidth1)}"
+                "${''.padRight(columnWidth2)}"
+                "${(i < expenseNameLines.length ? expenseNameLines[i] : '').padRight(columnWidth3)}"
+                "${(i < remarkLines.length ? remarkLines[i] : '').padRight(columnWidth4)}";
+            printer.printCustom(nextLine, 1, 0);
+          }
         }
+
         printer.printNewLine();
         printAlignedText(
-            '', 'Total Expenses: ${totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
+          '',
+          'Total Expenses: ${totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
+        );
         printer.printNewLine();
       }
       printer.printCustom('Expense ${report.data!.expense}', 1, 0);
       printer.printCustom('Cash Deposited ${report.data!.cashDeposited}', 1, 0);
-      printer.printCustom('Cash Handed Over ${report.data!.cashHandOver}', 1, 0);
+      printer.printCustom(
+          'Cash Handed Over ${report.data!.cashHandOver}', 1, 0);
       printer.printCustom(
           'No of Cheque Deposited ${report.data!.noOfChequeDeposited}', 1, 0);
       printer.printCustom(
-          'Cheque Deposited Amount ${report.data!.chequeDepositedAmount}', 1, 0);
+          'Cheque Deposited Amount ${report.data!.chequeDepositedAmount}',
+          1,
+          0);
       printer.printCustom(
           'No of Cheque Handed Over ${report.data!.noOfChequeHandOver}', 1, 0);
       printer.printCustom(
@@ -1935,7 +2036,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
         backgroundColor: AppConfig.colorPrimary,
         title: Text(
           'Reports',
-          style: TextStyle(color: Colors.white),
+          style: AppConfig.pageTitleStyle,
         ),
       ),
       body: FutureBuilder<DayCloseResponse123>(
@@ -1957,12 +2058,16 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
           final collections = dayCloseResponse.collection ?? [];
           final expenses = dayCloseResponse.expense ?? [];
           double totalSale = sales.fold(0.0, (sum, returns) {
-            return sum + (double.tryParse(returns.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)) ?? 0.0);
+            return sum +
+                (double.tryParse(returns.grandTotal!
+                        .toStringAsFixed(AppState().noOfDecimals ?? 2)) ??
+                    0.0);
           });
 
           double totalSum = salesReturns.fold(0.0, (sum, returns) {
             return sum +
-                (double.tryParse(returns.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)) ??
+                (double.tryParse(returns.grandTotal!
+                        .toStringAsFixed(AppState().noOfDecimals ?? 2)) ??
                     0.0);
           });
 
@@ -1977,7 +2082,8 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
             return sum + (double.tryParse(returns.amount.toString()) ?? 0.0);
           });
 
-          String totalExpenseFormated = totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2);
+          String totalExpenseFormated =
+              totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2);
 
           final vanName = (dayCloseResponse.data!.van != null &&
                   dayCloseResponse.data!.van.isNotEmpty)
@@ -2013,7 +2119,8 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Date: ${dayCloseResponse.data!.inDate}'),
+                        Text(
+                            'Date: ${DateHelper.displayDate(dayCloseResponse.data!.inDate)}'),
                         Text('Hello ${AppState().name}'),
                         RichText(
                           text: TextSpan(
@@ -2135,7 +2242,8 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   SizedBox(
-                                    width: AppConfig.textSubTitleSize, // Fixed width for SI NO
+                                    width: AppConfig
+                                        .textSubTitleSize, // Fixed width for SI NO
                                     child: Text(
                                       'SI NO',
                                       textAlign: TextAlign.left,
@@ -2278,7 +2386,8 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     SizedBox(
-                                      width: AppConfig.textSubTitleSize, // Fixed width for SI NO
+                                      width: AppConfig
+                                          .textSubTitleSize, // Fixed width for SI NO
                                       child: Text(
                                         'SI NO',
                                         textAlign: TextAlign.left,
@@ -2344,7 +2453,8 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                                             MainAxisAlignment.spaceBetween,
                                         children: [
                                           SizedBox(
-                                            width: AppConfig.textSubTitleSize, // Fixed width for SI NO
+                                            width: AppConfig
+                                                .textSubTitleSize, // Fixed width for SI NO
                                             child: Text('${index + 1}',
                                                 textAlign:
                                                     TextAlign.left), // SI NO
@@ -2403,20 +2513,22 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                         ),
                         Text('Collection',
                             style: TextStyle(fontWeight: FontWeight.w500)),
-
                         if (collections.isNotEmpty)
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   SizedBox(
-                                    width: AppConfig.textSubTitleSize, // Fixed width for SI NO
+                                    width: AppConfig
+                                        .textSubTitleSize, // Fixed width for SI NO
                                     child: Text(
                                       'SI NO',
                                       textAlign: TextAlign.left,
-                                      style: TextStyle(fontWeight: FontWeight.w600,
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w600,
                                           fontSize: AppConfig.text3Sizepre),
                                     ),
                                   ),
@@ -2425,7 +2537,8 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                                     child: Text(
                                       'SHOP NAME',
                                       textAlign: TextAlign.left,
-                                      style: TextStyle(fontWeight: FontWeight.w600,
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w600,
                                           fontSize: AppConfig.text3Sizepre),
                                     ),
                                   ),
@@ -2434,7 +2547,8 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                                     child: Text(
                                       'TYPE',
                                       textAlign: TextAlign.left,
-                                      style: TextStyle(fontWeight: FontWeight.w600,
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w600,
                                           fontSize: AppConfig.text3Sizepre),
                                     ),
                                   ),
@@ -2443,7 +2557,8 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                                     child: Text(
                                       'Amount',
                                       textAlign: TextAlign.left,
-                                      style: TextStyle(fontWeight: FontWeight.w600,
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w600,
                                           fontSize: AppConfig.text3Sizepre),
                                     ),
                                   ),
@@ -2458,7 +2573,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                                 itemBuilder: (context, index) {
                                   final collection = collections[index];
                                   double totalAmountsss = double.tryParse(
-                                      collection.totalAmount.toString()) ??
+                                          collection.totalAmount.toString()) ??
                                       0.0;
                                   final returns = collections[index];
                                   String shopName =
@@ -2470,15 +2585,17 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
 
                                   return Padding(
                                     padding: const EdgeInsets.symmetric(
-                                        vertical:
-                                        4.0),
+                                        vertical: 4.0),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
                                         SizedBox(
-                                          width: AppConfig.textSubTitleSize, // Fixed width for SI NO
+                                          width: AppConfig
+                                              .textSubTitleSize, // Fixed width for SI NO
                                           child: Text('${index + 1}',
-                                              textAlign: TextAlign.left), // SI NO
+                                              textAlign:
+                                                  TextAlign.left), // SI NO
                                         ),
                                         Flexible(
                                           flex: 5,
@@ -2514,7 +2631,8 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                                     Text(
                                       'Total: ${totalCollectionsFormatted}',
                                       style: TextStyle(
-                                          fontWeight: FontWeight.w700, fontSize: 13),
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13),
                                     ),
                                   ],
                                 ),
@@ -2530,98 +2648,186 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                           'Expense',
                           style: TextStyle(fontWeight: FontWeight.w500),
                         ),
-
                         if (expenses.isNotEmpty)
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Header Row
+// ---------- EXPENSE HEADER ----------
+// ---------- EXPENSE HEADER ----------
+                              // HEADER
+// ---------- EXPENSE HEADER ----------
+// ---------- EXPENSE HEADER ----------
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   SizedBox(
-                                    width: AppConfig.textSubTitleSize,
+                                    width: 30,
                                     child: Text(
                                       'SI NO',
-                                      textAlign: TextAlign.left,
-                                      style: TextStyle(fontWeight: FontWeight.w600,
-                                          fontSize: AppConfig.text3Sizepre),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: AppConfig.text3Sizepre,
+                                      ),
                                     ),
                                   ),
-                                  Flexible(
-                                    flex: 5,
+
+                                  const SizedBox(
+                                      width:
+                                          10), // CHANGED: 6 -> 10, more even gap
+
+                                  Expanded(
+                                    flex: 3,
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        'REFERENCE',
+                                        maxLines: 1,
+                                        softWrap: false,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: AppConfig.text3Sizepre,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(width: 10), // CHANGED: 6 -> 10
+
+                                  Expanded(
+                                    flex: 4,
                                     child: Text(
                                       'EXPENSE NAME',
-                                      textAlign: TextAlign.left,
-                                      style: TextStyle(fontWeight: FontWeight.w600,
-                                          fontSize: AppConfig.text3Sizepre),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: AppConfig.text3Sizepre,
+                                      ),
                                     ),
                                   ),
-                                  Flexible(
-                                    flex: 11, // Less space for Reference
-                                    child: Text(
-                                      'Reference',
-                                      textAlign: TextAlign.left,
-                                      style: TextStyle(fontWeight: FontWeight.w600,
-                                          fontSize: AppConfig.text3Sizepre),
-                                    ),
-                                  ),
+
+                                  const SizedBox(width: 10), // CHANGED: 6 -> 10
+
                                   Expanded(
-                                    flex: 3, // More space for Amount
+                                    flex:
+                                        2, // CHANGED: 4 -> 2, shrinks the column so leftover whitespace
+                                    // after short text like "test" doesn't pile up before AMOUNT
                                     child: Text(
-                                      'Amount',
+                                      'REMARKS',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: AppConfig.text3Sizepre,
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(width: 10), // CHANGED: 6 -> 10
+
+                                  SizedBox(
+                                    width: 65,
+                                    child: Text(
+                                      'AMOUNT',
                                       textAlign: TextAlign.right,
-                                      style: TextStyle(fontWeight: FontWeight.w600,
-                                          fontSize: AppConfig.text3Sizepre),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: AppConfig.text3Sizepre,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
-                              SizedBox(height: 8), // Space between header and list
 
-                              // ListView for expense data
+// ---------- EXPENSE LIST ----------
                               ListView.builder(
                                 scrollDirection: Axis.vertical,
                                 shrinkWrap: true,
-                                physics: BouncingScrollPhysics(),
+                                physics: const BouncingScrollPhysics(),
                                 itemCount: expenses.length,
                                 itemBuilder: (context, index) {
                                   final expense = expenses[index];
-                                  String expenseName =
-                                      '${expense.expense?.map((exp) => exp.name).join(", ") ?? 'No Expense'}';
+                                  String expenseName = expense.expense
+                                          ?.map((exp) => exp.name)
+                                          .join(", ") ??
+                                      'No Expense';
+                                  String amount = (double.tryParse(
+                                              expense.amount ?? '0')
+                                          ?.toStringAsFixed(
+                                              AppState().noOfDecimals ?? 2)) ??
+                                      '0.00';
+                                  String remarks = expense.description ??
+                                      ''; // unchanged - same data source
 
                                   return Padding(
                                     padding: const EdgeInsets.symmetric(
-                                        vertical: 4.0), // Padding between rows
+                                        vertical: 4.0),
                                     child: Row(
-                                      mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
                                       children: [
                                         SizedBox(
-                                          width: AppConfig.textSubTitleSize, // Fixed width for SI NO
-                                          child: Text('${index + 1}',
-                                              textAlign: TextAlign.left), // SI NO
+                                          width: 30,
+                                          child: Text(
+                                            '${index + 1}',
+                                            textAlign: TextAlign.left,
+                                          ),
                                         ),
-                                        Flexible(
-                                          flex: 6,
+
+                                        const SizedBox(
+                                            width:
+                                                10), // CHANGED: matches header gap (10)
+
+                                        Expanded(
+                                          flex: 3,
                                           child: Align(
                                             alignment: Alignment.centerLeft,
                                             child: Text(
-                                              expenseName,
+                                              expense.invoiceNo ??
+                                                  '', // unchanged - same data mapping
                                               textAlign: TextAlign.left,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
                                         ),
-                                        Flexible(
-                                          flex: 5, // Less space for Reference
-                                          child: Text(
-                                              '${expense.invoiceNo ?? 'No Expenses'}',
-                                              textAlign: TextAlign.left), // Reference
-                                        ),
+
+                                        const SizedBox(
+                                            width:
+                                                10), // CHANGED: matches header gap (10)
+
                                         Expanded(
-                                          flex: 3, // More space for Amount
-                                          child: Text('${expense.amount.toString()}',
-                                              textAlign: TextAlign.right), // Amount
+                                          flex: 4,
+                                          child: Text(
+                                            expenseName, // unchanged - same data mapping
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+
+                                        const SizedBox(
+                                            width:
+                                                10), // CHANGED: matches header gap (10)
+
+                                        Expanded(
+                                          flex:
+                                              2, // CHANGED: matches header REMARKS flex (2)
+                                          child: Text(
+                                            remarks, // unchanged - same data mapping, same source
+                                            textAlign: TextAlign.left,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+
+                                        const SizedBox(
+                                            width:
+                                                10), // CHANGED: matches header gap (10)
+
+                                        SizedBox(
+                                          width: 65,
+                                          child: Text(
+                                            amount, // unchanged - same data mapping
+                                            textAlign: TextAlign.right,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -2636,13 +2842,13 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
                                   children: [
                                     Text(
                                       'Total: ${dayCloseResponse.expense.fold<double>(
-                                        0.0,
+                                            0.0,
                                             (sum, e) =>
-                                        sum +
-                                            (double.tryParse(
-                                                e.totalAmount ?? '0') ??
-                                                0.0),
-                                      ).toStringAsFixed(AppState().noOfDecimals ?? 2)}', // Optional: Format as currency or 2 decimal places
+                                                sum +
+                                                (double.tryParse(
+                                                        e.totalAmount ?? '0') ??
+                                                    0.0),
+                                          ).toStringAsFixed(AppState().noOfDecimals ?? 2)}', // Optional: Format as currency or 2 decimal places
                                       style: TextStyle(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 13,

@@ -157,10 +157,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
     return Scaffold(
       appBar: AppBar(
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
-        title: const Text(
-          'Products',
-          style: TextStyle(color: AppConfig.backgroundColor),
-        ),
+     title: const Text(
+  'Products',
+  style: AppConfig.pageTitleStyle,
+),
         backgroundColor: AppConfig.colorPrimary,
         actions: [
           (_search)

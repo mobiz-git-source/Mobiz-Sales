@@ -10,6 +10,7 @@ import '../../Models/appstate.dart';
 import '../../Models/requestmodelclass.dart';
 import '../../Models/stockData.dart';
 import '../../Utilities/rest_ds.dart';
+import '../../Utilities/date_helper.dart';
 import '../../confg/appconfig.dart';
 import '../../confg/sizeconfig.dart';
 import '../../vanstocktst.dart';
@@ -87,7 +88,7 @@ class _StockName_RequestScreenState extends State<StockName_RequestScreen> {
             child: Icon(Icons.arrow_back,color: Colors.white,)),
         title: const Text(
           'Stock Take Requests',
-          style: TextStyle(color: AppConfig.backgroundColor),
+          style: AppConfig.pageTitleStyle,
         ),
         actions: [
           (_search)
@@ -293,13 +294,13 @@ class _StockName_RequestScreenState extends State<StockName_RequestScreen> {
                           ],
                         ),
                       ),
-                      Text(
-                        data.inDate!.substring(0, 10),
-                        style: TextStyle(
-                          fontSize: AppConfig.textCaption3Size * 0.9,
-                          fontWeight: AppConfig.headLineWeight,
-                        ),
-                      ),
+                    Text(
+  DateHelper.displayDate(data.inDate),
+  style: TextStyle(
+    fontSize: AppConfig.textCaption3Size * 0.9,
+    fontWeight: AppConfig.headLineWeight,
+  ),
+),
                     ],
                   ),
                   ElevatedButton(

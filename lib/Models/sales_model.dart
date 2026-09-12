@@ -233,6 +233,7 @@ class Products {
   final String name;
   final String proImage;
   final String serialbarcode_required;
+  final num taxPercentage;
 
   Products({
     required this.id,
@@ -240,6 +241,7 @@ class Products {
     required this.name,
     required this.proImage,
     required this.serialbarcode_required,
+    this.taxPercentage = 0,
   });
 
   factory Products.fromJson(Map<String, dynamic> json) {
@@ -249,6 +251,7 @@ class Products {
       name: json['name'] ?? '',
       proImage: json['pro_image'] ?? '',
       serialbarcode_required: json['serial_barcode_required'] ?? '',
+      taxPercentage: num.tryParse(json['tax_percentage'].toString()) ?? 0,
     );
   }
 }

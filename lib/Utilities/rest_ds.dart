@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:mime/mime.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart';
@@ -24,7 +25,6 @@ class RestDatasource {
     BASE_URL = "http://68.183.92.8:3699";
     Image_URL = "https://erpadmin.mobiz.ae";
     Product_URL = "http://68.183.92.8:3696";
-    //BASE_URL = "https://unistageapi.cianlogic.com";
   }
 
   Future<String> _timeZone() async {
@@ -39,8 +39,6 @@ class RestDatasource {
     String timeZone = await FlutterTimezone.getLocalTimezone();
     Map<String, String> header;
     PackageInfo packageInfo = await PackageInfo.fromPlatform();
-
-    // print("Is Production ${EnvironmentConfig.IsProduction} Server $BASE_URL");
 
     buildNumber = packageInfo.buildNumber;
     appVersion = packageInfo.version;
@@ -98,28 +96,21 @@ class RestDatasource {
     }
   }
 
-  //// Generic function : Use thsi format now onwards
   Future<Map<String, dynamic>> sendData(
       String subUrl, String? token, dynamic bodyJson) async {
-    var extradetails =
-        await getHeader(); // for sending appVersion/timeZone in url
+    var extradetails = await getHeader();
     var header;
     if (token == null) {
       header = {
         'Content-Type': 'application/json; charset=UTF-8',
       };
-      // header = await getHeader();
-      // print("Header in sendData $header");
     } else {
       header = {
         'Content-Type': 'application/json; charset=UTF-8',
         HttpHeaders.authorizationHeader: "bearer $token"
       };
-      // header = await getHeader();
-      // header['${HttpHeaders.authorizationHeader}'] = "token $token";
-      // print("Header in sendData $header");
     }
-    //String timeZone = await _timeZone();
+
     print("Header $header");
     final SIGN_UP_URL = (subUrl.contains("?") == true)
         ? BASE_URL +
@@ -188,13 +179,17 @@ class RestDatasource {
     if (imageFile != null) {
       try {
         String fileName = imageFile.path.split('/').last;
+        final detectedMime = lookupMimeType(imageFile.path) ?? 'image/jpeg';
+        final mimeParts = detectedMime.split('/');
+        print("Detected MIME type: $detectedMime");
+
         data.files.add(
           MapEntry(
             "cust_image",
             await MultipartFile.fromFile(
               imageFile.path,
               filename: fileName,
-              contentType: MediaType("image", "jpeg"), // Adjust MIME type if needed
+              contentType: MediaType(mimeParts[0], mimeParts[1]),
             ),
           ),
         );
@@ -220,18 +215,48 @@ class RestDatasource {
             CommonWidgets.showDialogueBox(
               context: context,
               title: 'Alert',
-              msg: "Please decrease the image size. Maximum allowed size is 10MB.",
+              msg:
+                  "Please decrease the image size. Maximum allowed size is 10MB.",
             );
           }
-        } else if (e.response?.statusCode == 500 || e.response?.statusCode == 502) {
+        } else if (e.response?.statusCode == 500 ||
+            e.response?.statusCode == 502) {
           print('Server error: ${e.response?.statusCode}');
         }
         return handler.next(e);
       },
     ));
 
+    Options options = Options(
+      headers: token != null
+          ? {HttpHeaders.authorizationHeader: "bearer $token"}
+          : null,
+    );
+
+    print("========== CUSTOMER UPDATE ==========");
+    print("URL: $SIGNUP__URL");
+    print("Customer ID: ${bodyJson['id']}");
+    print("Image path: ${imageFile?.path}");
+    print(
+        "Image exists: ${imageFile != null ? await imageFile.exists() : false}");
+    print("Image size: ${imageFile != null ? await imageFile.length() : 0}");
+    print("FormData fields: ${data.fields}");
+    print("FormData files: ${data.files}");
+    print("Token present: ${token != null}");
+    if (data.files.isNotEmpty) {
+      final multipartFile = data.files.first.value;
+      print(
+          "Multipart file length (bytes dio will send): ${multipartFile.length}");
+      print("Multipart file filename: ${multipartFile.filename}");
+      print("Multipart file contentType: ${multipartFile.contentType}");
+    }
+    print("=====================================");
     try {
-      Response response = await dio.post(SIGNUP__URL, data: data);
+      Response response =
+          await dio.post(SIGNUP__URL, data: data, options: options);
+      print("STATUS: ${response.statusCode}");
+      print("RESPONSE HEADERS: ${response.headers}");
+      print("BODY: ${response.data}");
       print("Response: $response");
       print("bodyJson$imageFile");
       return response;

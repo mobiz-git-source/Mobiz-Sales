@@ -4,13 +4,15 @@ class LoginModel {
   Settings? settings;
   Authorisation? authorisation;
   Currency? currency;
+  Store? store;
 
   LoginModel(
       {this.status,
       this.user,
       this.authorisation,
       this.settings,
-      this.currency});
+      this.currency,
+      this.store});
 
   LoginModel.fromJson(Map<String, dynamic> json) {
     status = json['status'];
@@ -24,6 +26,7 @@ class LoginModel {
     currency = json['currency'] != null
         ? new Currency.fromJson(json['currency'])
         : null;
+    store = json['store'] != null ? new Store.fromJson(json['store']) : null;
   }
 
   Map<String, dynamic> toJson() {
@@ -83,7 +86,16 @@ class User {
     departmentId = json['department_id'];
     designationId = json['designation_id'];
     storeId = json['store_id'];
-    rolId = json['app_rol_id'];
+    // FIXED: backend sends the actual role as 'rol_id', not 'app_rol_id'.
+    // 'app_rol_id' was coming back null, which made every login look like
+    // an unmapped role and get stuck on the login screen.
+    final appRolId = json['app_rol_id'];
+    final legacyRolId = json['rol_id'];
+    if (appRolId != null && appRolId != 0) {
+      rolId = appRolId;
+    } else {
+      rolId = legacyRolId;
+    }
     createdAt = json['created_at'];
     updatedAt = json['updated_at'];
   }
@@ -100,9 +112,28 @@ class User {
     data['department_id'] = this.departmentId;
     data['designation_id'] = this.designationId;
     data['store_id'] = this.storeId;
-    data['app_rol_id'] = this.rolId;
+    data['rol_id'] = this.rolId;
     data['created_at'] = this.createdAt;
     data['updated_at'] = this.updatedAt;
+    return data;
+  }
+}
+
+class Store {
+  String? allowAccess;
+  String? description;
+
+  Store({this.allowAccess, this.description});
+
+  Store.fromJson(Map<String, dynamic> json) {
+    allowAccess = json['allow_access'];
+    description = json['description'];
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = new Map<String, dynamic>();
+    data['allow_access'] = this.allowAccess;
+    data['description'] = this.description;
     return data;
   }
 }
@@ -114,13 +145,15 @@ class Settings {
   String? attendanceState;
   String? qtySalesvalidate;
   String? printer;
+  String? dateFormat;
   Settings(
       {this.discountState,
       this.soValQtyState,
       this.vatState,
       this.attendanceState,
       this.printer,
-      this.qtySalesvalidate});
+      this.qtySalesvalidate,
+      this.dateFormat});
   Settings.fromJson(Map<String, dynamic> json) {
     vatState = json['vat_no_vat'];
     soValQtyState = json['validate_qty_in_so'];
@@ -128,6 +161,7 @@ class Settings {
     attendanceState = json['attendance'];
     qtySalesvalidate = json['validate_qty_in_sales'];
     printer = json['printer'];
+    dateFormat = json['date_format'];
   }
 }
 

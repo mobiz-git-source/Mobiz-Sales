@@ -5,8 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:mobizapp/Pages/homepage.dart';
 import 'package:mobizapp/Pages/selectProducts.dart';
 import 'package:mobizapp/Pages/newvanstockrequests.dart';
+import 'package:mobizapp/Utilities/date_helper.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:http/http.dart'as http;
+import 'package:http/http.dart' as http;
 import '../Components/commonwidgets.dart';
 import '../Models/appstate.dart';
 import '../Models/requestmodelclass.dart';
@@ -26,7 +27,7 @@ class VanStockRequestsScreen extends StatefulWidget {
 class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
   bool _initDone = false;
   bool _nodata = false;
-  List <VanRequest> request= [];
+  List<VanRequest> request = [];
   List<Map<String, dynamic>> stocks = [];
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
@@ -43,9 +44,10 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
     _scrollController = ScrollController();
     _scrollController.addListener(_scrollListener);
   }
+
   void _scrollListener() {
     if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent &&
+            _scrollController.position.maxScrollExtent &&
         !_isLoading &&
         _hasMore) {
       _getRequests();
@@ -124,31 +126,31 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
         title: _isSearching
             ? TextField(
-          controller: _searchController,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Search requests...',
-            hintStyle: TextStyle(color: Colors.white70),
-            border: InputBorder.none,
-          ),
-          style: const TextStyle(color: Colors.white),
-          onChanged: (value) {
-            _searchDebounce?.cancel();
-            _searchDebounce = Timer(const Duration(milliseconds: 500), () {
-              _onSearchChanged();
-            });
-          },
-        )
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Search requests...',
+                  hintStyle: TextStyle(color: Colors.white70),
+                  border: InputBorder.none,
+                ),
+                style: const TextStyle(color: Colors.white),
+                onChanged: (value) {
+                  _searchDebounce?.cancel();
+                  _searchDebounce =
+                      Timer(const Duration(milliseconds: 500), () {
+                    _onSearchChanged();
+                  });
+                },
+              )
             : const Text(
-          'Van Stock Requests',
-          style: TextStyle(color: AppConfig.backgroundColor),
-        ),
+                'Van Stock Requests',
+                style: AppConfig.pageTitleStyle,
+              ),
         actions: [
           if (!_isSearching)
             GestureDetector(
               onTap: () async {
-                Navigator.pushReplacementNamed(
-                    context, VanStocks.routeName);
+                Navigator.pushReplacementNamed(context, VanStocks.routeName);
               },
               child: const Icon(
                 Icons.add,
@@ -175,76 +177,89 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
         padding: const EdgeInsets.only(bottom: 18.0, left: 18, right: 18),
         child: Column(
           children: [
-            if (_isSearching && request.isEmpty && _searchController.text.isNotEmpty)
+            if (_isSearching &&
+                request.isEmpty &&
+                _searchController.text.isNotEmpty)
               const Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Text('No results found'),
               ),
-
             (_initDone && !_nodata)
                 ? Expanded(
-              child: ListView.separated(
-                controller: _scrollController,
-                separatorBuilder: (BuildContext context, int index) =>
-                    CommonWidgets.verticalSpace(1),
-                itemCount: request.length + (_isLoading ? 1 : 0),
-                shrinkWrap: true,
-                itemBuilder: (context, index) {
-                  if (index < request.length) {
-                    return _requestsTab(index, request[index]);
-                  } else {
-                    if (_isLoading) {
-                      return Center(
-                        child: Text("Loading...",style: TextStyle(color: Colors.grey.shade400,fontStyle: FontStyle.italic),),
-                      );
-                    } else if (!_hasMore) {
-                      return Center(
-                        child: Text("That's all",style: TextStyle(color: Colors.grey.shade400,fontStyle: FontStyle.italic,fontWeight: FontWeight.w700),),
-                      );
-                    } else {
-                      return const SizedBox.shrink();
-                    }
-                  }
-                },
-              ),
-            )
+                    child: ListView.separated(
+                      controller: _scrollController,
+                      separatorBuilder: (BuildContext context, int index) =>
+                          CommonWidgets.verticalSpace(1),
+                      itemCount: request.length + (_isLoading ? 1 : 0),
+                      shrinkWrap: true,
+                      itemBuilder: (context, index) {
+                        if (index < request.length) {
+                          return _requestsTab(index, request[index]);
+                        } else {
+                          if (_isLoading) {
+                            return Center(
+                              child: Text(
+                                "Loading...",
+                                style: TextStyle(
+                                    color: Colors.grey.shade400,
+                                    fontStyle: FontStyle.italic),
+                              ),
+                            );
+                          } else if (!_hasMore) {
+                            return Center(
+                              child: Text(
+                                "That's all",
+                                style: TextStyle(
+                                    color: Colors.grey.shade400,
+                                    fontStyle: FontStyle.italic,
+                                    fontWeight: FontWeight.w700),
+                              ),
+                            );
+                          } else {
+                            return const SizedBox.shrink();
+                          }
+                        }
+                      },
+                    ),
+                  )
                 : (_nodata && _initDone)
-                ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CommonWidgets.verticalSpace(3),
-                  const Center(
-                    child: Text('No Data'),
-                  ),
-                ])
-                : Shimmer.fromColors(
-              baseColor: AppConfig.buttonDeactiveColor.withOpacity(0.1),
-              highlightColor: AppConfig.backButtonColor,
-              child: Center(
-                child: Column(
-                  children: [
-                    CommonWidgets.loadingContainers(
-                        height: SizeConfig.blockSizeVertical * 10,
-                        width: SizeConfig.blockSizeHorizontal * 90),
-                    CommonWidgets.loadingContainers(
-                        height: SizeConfig.blockSizeVertical * 10,
-                        width: SizeConfig.blockSizeHorizontal * 90),
-                    CommonWidgets.loadingContainers(
-                        height: SizeConfig.blockSizeVertical * 10,
-                        width: SizeConfig.blockSizeHorizontal * 90),
-                    CommonWidgets.loadingContainers(
-                        height: SizeConfig.blockSizeVertical * 10,
-                        width: SizeConfig.blockSizeHorizontal * 90),
-                    CommonWidgets.loadingContainers(
-                        height: SizeConfig.blockSizeVertical * 10,
-                        width: SizeConfig.blockSizeHorizontal * 90),
-                    CommonWidgets.loadingContainers(
-                        height: SizeConfig.blockSizeVertical * 10,
-                        width: SizeConfig.blockSizeHorizontal * 90),
-                  ],
-                ),
-              ),
-            ),
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                            CommonWidgets.verticalSpace(3),
+                            const Center(
+                              child: Text('No Data'),
+                            ),
+                          ])
+                    : Shimmer.fromColors(
+                        baseColor:
+                            AppConfig.buttonDeactiveColor.withOpacity(0.1),
+                        highlightColor: AppConfig.backButtonColor,
+                        child: Center(
+                          child: Column(
+                            children: [
+                              CommonWidgets.loadingContainers(
+                                  height: SizeConfig.blockSizeVertical * 10,
+                                  width: SizeConfig.blockSizeHorizontal * 90),
+                              CommonWidgets.loadingContainers(
+                                  height: SizeConfig.blockSizeVertical * 10,
+                                  width: SizeConfig.blockSizeHorizontal * 90),
+                              CommonWidgets.loadingContainers(
+                                  height: SizeConfig.blockSizeVertical * 10,
+                                  width: SizeConfig.blockSizeHorizontal * 90),
+                              CommonWidgets.loadingContainers(
+                                  height: SizeConfig.blockSizeVertical * 10,
+                                  width: SizeConfig.blockSizeHorizontal * 90),
+                              CommonWidgets.loadingContainers(
+                                  height: SizeConfig.blockSizeVertical * 10,
+                                  width: SizeConfig.blockSizeHorizontal * 90),
+                              CommonWidgets.loadingContainers(
+                                  height: SizeConfig.blockSizeVertical * 10,
+                                  width: SizeConfig.blockSizeHorizontal * 90),
+                            ],
+                          ),
+                        ),
+                      ),
           ],
         ),
       ),
@@ -295,35 +310,35 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
                           (data.status == 0)
                               ? 'Cancelled'
                               : (data.status == 1)
-                              ? 'Pending'
-                              : (data.status == 2)
-                              ? 'Approved'
-                              : (data.status == 3)
-                              ? 'Confirmed'
-                              : '',
+                                  ? 'Pending'
+                                  : (data.status == 2)
+                                      ? 'Approved'
+                                      : (data.status == 3)
+                                          ? 'Confirmed'
+                                          : '',
                           style: TextStyle(
                             fontSize: AppConfig.textCaption3Size,
                             color: (data.status == 0)
                                 ? Colors.red
                                 : (data.status == 1)
-                                ? AppConfig.colorWarning
-                                : (data.status == 2)
-                                ? Colors.orange
-                                : (data.status == 3)
-                                ? Colors.green
-                                : Colors.grey,
+                                    ? AppConfig.colorWarning
+                                    : (data.status == 2)
+                                        ? Colors.orange
+                                        : (data.status == 3)
+                                            ? Colors.green
+                                            : Colors.grey,
                             fontWeight: AppConfig.headLineWeight,
                           ),
                         ),
-
                       ],
                     ),
                   ),
                   Text(
-                    data.inDate!.substring(0, 10),
+                    DateHelper.displayDate(data.inDate),
                     style: TextStyle(
-                        fontSize: AppConfig.textCaption3Size * 0.9,
-                        fontWeight: AppConfig.headLineWeight),
+                      fontSize: AppConfig.textCaption3Size * 0.9,
+                      fontWeight: AppConfig.headLineWeight,
+                    ),
                   ),
                 ],
               ),
@@ -387,7 +402,6 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
                           ),
                         Center(
                           child: SizedBox(
-                            width: SizeConfig.blockSizeHorizontal * 25,
                             height: SizeConfig.blockSizeVertical * 5,
                             child: ElevatedButton(
                               style: ButtonStyle(
@@ -399,15 +413,15 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
                                 ),
                                 backgroundColor: WidgetStateProperty.all(
                                   _isButtonDisabled
-                                      ? Colors.grey // Disabled button color
-                                      : AppConfig.colorPrimary, // Original button color
+                                      ? Colors.grey
+                                      : AppConfig.colorPrimary,
                                 ),
                               ),
-                              onPressed:  _isButtonDisabled
+                              onPressed: _isButtonDisabled
                                   ? null
                                   : () {
-                                _conformrequest(data.id!);
-                              },
+                                      _conformrequest(data.id!);
+                                    },
                               child: _isButtonDisabled
                                   ? const SizedBox(
                                       height: 15,
@@ -419,10 +433,14 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
                                     )
                                   : Text(
                                       'Confirm',
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      overflow: TextOverflow.visible,
                                       style: TextStyle(
-                                          fontSize: AppConfig.textCaption3Size,
-                                          color: AppConfig.backgroundColor,
-                                          fontWeight: AppConfig.headLineWeight),
+                                        fontSize: AppConfig.textCaption3Size,
+                                        color: AppConfig.backgroundColor,
+                                        fontWeight: AppConfig.headLineWeight,
+                                      ),
                                     ),
                             ),
                           ),
@@ -513,9 +531,11 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
       final String apiUrl;
 
       if (_isSearching && _searchController.text.isNotEmpty) {
-        apiUrl = "${RestDatasource().BASE_URL}/api/vanrequest.index.search?store_id=${AppState().storeId}&van_id=${AppState().vanId}&user_id=${AppState().userId}&page=$_page&value=${_searchController.text}";
+        apiUrl =
+            "${RestDatasource().BASE_URL}/api/vanrequest.index.search?store_id=${AppState().storeId}&van_id=${AppState().vanId}&user_id=${AppState().userId}&page=$_page&value=${_searchController.text}";
       } else {
-        apiUrl = "${RestDatasource().BASE_URL}/api/vanrequest.index.api?store_id=${AppState().storeId}&van_id=${AppState().vanId}&page=$_page";
+        apiUrl =
+            "${RestDatasource().BASE_URL}/api/vanrequest.index.api?store_id=${AppState().storeId}&van_id=${AppState().vanId}&page=$_page";
       }
 
       final response = await http.get(Uri.parse(apiUrl));
@@ -566,7 +586,7 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
               context: context,
               title: "Success",
               msg: "Request Confirmed Successfully");
-          
+
           setState(() {
             request.clear();
             _page = 1;
@@ -580,7 +600,8 @@ class _VanStockRequestsScreenState extends State<VanStockRequestsScreen> {
           CommonWidgets.showDialogueBox(
               context: context,
               title: "Alert",
-              msg: resJson['messages']?.toString() ?? "Failed to confirm request");
+              msg: resJson['messages']?.toString() ??
+                  "Failed to confirm request");
         }
       }
     } catch (e) {
@@ -646,17 +667,16 @@ class Data {
     return Data(
       currentPage: json['current_page'] ?? 0,
       vanRequests: (json['data'] as List?)
-          ?.map((e) => VanRequest.fromJson(e))
-          .toList() ??
+              ?.map((e) => VanRequest.fromJson(e))
+              .toList() ??
           [],
       firstPageUrl: json['first_page_url'] ?? '',
       from: json['from'] ?? 0,
       lastPage: json['last_page'] ?? 0,
       lastPageUrl: json['last_page_url'] ?? '',
-      links: (json['links'] as List?)
-          ?.map((e) => PageLink.fromJson(e))
-          .toList() ??
-          [],
+      links:
+          (json['links'] as List?)?.map((e) => PageLink.fromJson(e)).toList() ??
+              [],
       nextPageUrl: json['next_page_url'],
       perPage: json['per_page'] ?? 0,
       to: json['to'] ?? 0,
@@ -698,23 +718,22 @@ class VanRequest {
   String? deletedAt;
   List<VanDetail>? detail;
 
-  VanRequest({
-    this.id,
-    this.vanId,
-    this.userId,
-    this.inDate,
-    this.inTime,
-    this.invoiceNo,
-    this.approvedDate,
-    this.approvedTime,
-    this.approvedUser,
-    this.storeId,
-    this.status,
-    this.createdAt,
-    this.updatedAt,
-    this.deletedAt,
-    this.detail
-  });
+  VanRequest(
+      {this.id,
+      this.vanId,
+      this.userId,
+      this.inDate,
+      this.inTime,
+      this.invoiceNo,
+      this.approvedDate,
+      this.approvedTime,
+      this.approvedUser,
+      this.storeId,
+      this.status,
+      this.createdAt,
+      this.updatedAt,
+      this.deletedAt,
+      this.detail});
 
   VanRequest.fromJson(Map<String, dynamic> json) {
     id = json['id'];
@@ -783,28 +802,27 @@ class VanDetail {
   String? productName;
   String? productCode;
 
-  VanDetail({
-    this.id,
-    this.vanRequestId,
-    this.product_type,
-    this.name,
-    this.itemId,
-    this.unit,
-    this.quantity,
-    this.editedQuantity,
-    this.approvedQuantity,
-    this.convertQty,
-    this.vanId,
-    this.userId,
-    this.storeId,
-    this.status,
-    this.createdAt,
-    this.updatedAt,
-    this.deletedAt,
-    this.productId,
-    this.productCode,
-    this.productName
-  });
+  VanDetail(
+      {this.id,
+      this.vanRequestId,
+      this.product_type,
+      this.name,
+      this.itemId,
+      this.unit,
+      this.quantity,
+      this.editedQuantity,
+      this.approvedQuantity,
+      this.convertQty,
+      this.vanId,
+      this.userId,
+      this.storeId,
+      this.status,
+      this.createdAt,
+      this.updatedAt,
+      this.deletedAt,
+      this.productId,
+      this.productCode,
+      this.productName});
 
   VanDetail.fromJson(Map<String, dynamic> json) {
     id = json['id'];

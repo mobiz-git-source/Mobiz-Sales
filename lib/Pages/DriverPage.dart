@@ -94,7 +94,7 @@ class _DriverPageState extends State<DriverPage> {
         backgroundColor: AppConfig.colorPrimary,
         title: const Text(
           'Driver',
-          style: TextStyle(color: AppConfig.backgroundColor),
+           style: AppConfig.pageTitleStyle,
         ),
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
       ),

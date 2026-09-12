@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import '../../Components/commonwidgets.dart';
 import '../../Models/sales_model.dart';
 import '../../Utilities/rest_ds.dart';
+import '../../Utilities/date_helper.dart';
 import '../../confg/appconfig.dart';
 import '../../confg/sizeconfig.dart';
 import 'QuotationHome.dart';
@@ -541,7 +542,7 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
           iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
           title: const Text(
             'Quotation',
-            style: TextStyle(color: AppConfig.backgroundColor),
+            style: AppConfig.pageTitleStyle,
           ),
           backgroundColor: AppConfig.colorPrimary,
           actions: [
@@ -785,11 +786,10 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
                       child: Padding(
                         padding:
                         const EdgeInsets.symmetric(horizontal: 2.0),
-                        child: Text(
+                      child: Text(
                           _selectedDate == null
                               ? 'Select Date'
-                              : DateFormat('dd/MM/yyyy')
-                              .format(_selectedDate!),
+                              : DateHelper.displayFromDateTime(_selectedDate!),
                         ),
                       ),
                     ),
@@ -1275,7 +1275,7 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold),
                                 ),
-                                Text('Date: ${lastsale['date']}'),
+                              Text('Date: ${DateHelper.displayDate(lastsale['date'])}'),
                                 Text('Unit: ${lastsale['unit']}'),
                                 Text('Price: ${lastsale['price']}'),
                               ],
@@ -1287,7 +1287,11 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
                           Text(
                             'Available Qty: ${selectedUnit!['stock']}',
                             style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                          ),SizedBox(height: 8),
+
+
+
+SizedBox(height: 10),
                         ],
                         if (units != null &&
                             units.any((unit) => unit != null)) ...[

@@ -30,7 +30,7 @@ class CustomerDues extends StatelessWidget {
       }
     }
     return Scaffold(
-      appBar: AppBar(title: Text('Overdue Amount',style: TextStyle(color: Colors.white),),iconTheme: IconThemeData(color: Colors.white),backgroundColor: AppConfig.colorPrimary,),
+      appBar: AppBar(title: Text('Overdue Amount', style: AppConfig.pageTitleStyle,),iconTheme: IconThemeData(color: Colors.white),backgroundColor: AppConfig.colorPrimary,),
       body: FutureBuilder<UserOverdue>(
         future: fetchUserOverdue(),
         builder: (context, snapshot) {

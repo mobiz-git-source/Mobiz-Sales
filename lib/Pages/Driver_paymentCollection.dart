@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:mobizapp/Pages/CustomeSOA.dart';
@@ -10,6 +11,7 @@ import '../Components/commonwidgets.dart';
 import '../Models/appstate.dart';
 import '../Models/paymentcollectionclass.dart';
 import '../Utilities/rest_ds.dart';
+import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
 
@@ -42,7 +44,8 @@ class _Driver_PaymentCollectionScreenState
   List<bool> expandedStates = [];
   TextEditingController _paidAmt = TextEditingController();
   String PaidAmt = '';
-  String formattedDate = DateFormat('dd-MM-yyyy').format(DateTime.now());
+  String formattedDate = DateHelper.displayFromDateTime(DateTime.now());
+  DateTime selectedChequeDate = DateTime.now();
   TextEditingController _bankController = TextEditingController();
   String bankData = '';
   TextEditingController _chequeController = TextEditingController();
@@ -55,8 +58,30 @@ class _Driver_PaymentCollectionScreenState
   List<int> invoiceid = [];
 
   String formatDate(String date) {
-    DateTime parsedDate = DateTime.parse(date);
-    return DateFormat('dd MMMM yyyy').format(parsedDate);
+    return DateHelper.displayDate(date);
+  }
+
+  String fmt(dynamic value) {
+    final n = double.tryParse(value.toString()) ?? 0;
+    return n.toStringAsFixed(AppState().noOfDecimals ?? 3);
+  }
+
+// NEW: rounds a value to the app's configured decimal places
+// and returns a clean numeric string (no long float tails).
+  String roundedString(dynamic value) {
+    final n = double.tryParse(value.toString()) ?? 0;
+    final decimals = AppState().noOfDecimals ?? 3;
+    return n.toStringAsFixed(decimals);
+  }
+
+// NEW: restricts typed input to N decimal places
+  List<TextInputFormatter> decimalInputFormatters() {
+    final decimals = AppState().noOfDecimals ?? 3;
+    return [
+      FilteringTextInputFormatter.allow(
+        RegExp(r'^\d*\.?\d{0,' + decimals.toString() + r'}'),
+      ),
+    ];
   }
 
   @override
@@ -121,7 +146,7 @@ class _Driver_PaymentCollectionScreenState
       cuoutstand = params!['outstandamt'];
     }
 
-    PaidAmt = _paidAmt.text;
+   
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppConfig.colorPrimary,
@@ -151,7 +176,7 @@ class _Driver_PaymentCollectionScreenState
                       CommonWidgets.horizontalSpace(1),
                       _inputBox(
                           status: false,
-                          value: "${cuoutstand == '[]' ? '' : cuoutstand}"),
+                          value: cuoutstand == '[]' ? '' : fmt(cuoutstand)),
                       // ${_data == '[]' ? '' : _data}
                       const Spacer(),
                       const Text(
@@ -160,42 +185,56 @@ class _Driver_PaymentCollectionScreenState
                       ),
                       CommonWidgets.horizontalSpace(1),
                       InkWell(
-                        onTap: () {
-                          showDialog(
-                              barrierDismissible: false,
-                              context: context,
-                              builder: (context) {
-                                return AlertDialog(
-                                  title: const Text('Paid Amount'),
-                                  content: TextField(
-                                    onChanged: (value) {
-                                      setState(() {
-                                        PaidAmt = value;
-                                        updateBalanceAndAllocatedAmounts();
-                                      });
-                                    },
-                                    keyboardType: TextInputType.number,
-                                    controller: _paidAmt,
-                                    decoration: const InputDecoration(
-                                        hintText: "Paid Amount"),
+                       onTap: () {
+
+ _paidAmt.text =
+    PaidAmt.isEmpty ? '' : roundedString(PaidAmt);
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text("Paid Amount"),
+        content: TextField(
+          controller: _paidAmt,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  inputFormatters: decimalInputFormatters(),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      PaidAmt = roundedString(value);
+                                      updateBalanceAndAllocatedAmounts();
+                                    });
+                                  },
+                                  decoration: const InputDecoration(
+                                    hintText: "Paid Amount",
                                   ),
-                                  actions: <Widget>[
-                                    MaterialButton(
-                                      color: AppConfig.colorPrimary,
-                                      textColor: Colors.white,
-                                      child: const Text('OK'),
-                                      onPressed: () {
-                                        Navigator.of(context).pop();
-                                        setState(() {
-                                          updateBalanceAndAllocatedAmounts();
-                                        });
-                                      },
-                                    ),
-                                  ],
-                                );
-                              }).then((value) => setState(() {}));
+                                ),
+                                actions: [
+                                  MaterialButton(
+                                    color: AppConfig.colorPrimary,
+                                    textColor: Colors.white,
+                                    child: const Text("OK"),
+                                   onPressed: () {
+  setState(() {
+    PaidAmt = roundedString(_paidAmt.text);
+    _paidAmt.text = PaidAmt;
+    updateBalanceAndAllocatedAmounts();
+  });
+
+  Navigator.pop(context);
+}
+                                  ),
+                                ],
+                              );
+                            },
+                          ).then((_) => setState(() {}));
                         },
-                        child: _inputBox(status: true, value: (PaidAmt ?? '')),
+                        child: _inputBox(
+                          status: true,
+                          value: PaidAmt.isEmpty ? '' : fmt(PaidAmt),
+                        ),
                       ),
                     ],
                   ),
@@ -208,8 +247,9 @@ class _Driver_PaymentCollectionScreenState
                       ),
                       CommonWidgets.horizontalSpace(1),
                       _inputBox(
-                          status: false,
-                          value: getAllocatedAmount().toString()),
+                        status: false,
+                        value: fmt(getAllocatedAmount()),
+                      ),
                       const Spacer(),
                       const Text(
                         'Balance Amount',
@@ -217,7 +257,9 @@ class _Driver_PaymentCollectionScreenState
                       ),
                       CommonWidgets.horizontalSpace(1),
                       _inputBox(
-                          status: false, value: getBalanceAmount().toString()),
+                        status: false,
+                        value: fmt(getBalanceAmount()),
+                      ),
                     ],
                   ),
                 ],
@@ -331,31 +373,65 @@ class _Driver_PaymentCollectionScreenState
                                             child: Column(
                                               children: [
                                                 Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .spaceBetween,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
                                                   children: [
-                                                    Text(
-                                                        "${formatDate(invoice.invoiceDate)} | ${invoice.invoiceNo} | ${invoice.invoiceType}"),
-                                                    InkWell(
-                                                      onTap: () {
-                                                        _showDialog(context,
-                                                            index, invoice);
-                                                      },
-                                                      child: _inputBox(
+                                                    Expanded(
+                                                      child: Text(
+                                                        "${formatDate(invoice.invoiceDate)} | ${invoice.invoiceNo} | ${invoice.invoiceType}",
+                                                        maxLines:
+                                                            2, // <-- 1 alla, 2 aakku
+                                                        overflow: TextOverflow
+                                                            .visible,
+                                                        softWrap: true,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    SizedBox(
+                                                      width: 70,
+                                                      child: InkWell(
+                                                        onTap: () {
+                                                          _showDialog(context,
+                                                              index, invoice);
+                                                        },
+                                                        child: _inputBox(
                                                           status: false,
                                                           value: enteredValues[
-                                                              index]),
+                                                                      index]
+                                                                  .isEmpty
+                                                              ? ''
+                                                              : fmt(
+                                                                  enteredValues[
+                                                                      index]),
+                                                        ),
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
                                                 Padding(
                                                   padding: const EdgeInsets
-                                                      .symmetric(vertical: 8.0),
-                                                  child: Row(
+                                                      .symmetric(vertical: 8),
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
                                                     children: [
                                                       Text(
-                                                        'Amount: ${invoice.amount} | Paid: ${invoice.paid} | Balance: ${invoice.amount - invoice.paid}',
+                                                        'Amount: ${fmt(invoice.amount)}',
+                                                        style: TextStyle(
+                                                            color: Colors
+                                                                .grey.shade600),
+                                                      ),
+                                                      const SizedBox(height: 3),
+                                                      Text(
+                                                        'Paid: ${fmt(invoice.paid)}',
+                                                        style: TextStyle(
+                                                            color: Colors
+                                                                .grey.shade600),
+                                                      ),
+                                                      const SizedBox(height: 3),
+                                                      Text(
+                                                        'Balance: ${fmt(invoice.balance)}',
                                                         style: TextStyle(
                                                             color: Colors
                                                                 .grey.shade600),
@@ -386,7 +462,7 @@ class _Driver_PaymentCollectionScreenState
                                                       child: Row(
                                                         children: [
                                                           Text(
-                                                              '${formatDate(collection.inDate)} | ${collection.voucherNo} | ${collection.amount} | ${collection.collectionType}')
+                                                              '${formatDate(collection.inDate ?? '')} | ${collection.voucherNo} | ${fmt(collection.totalAmount)} | ${collection.collectionType}')
                                                         ],
                                                       ),
                                                     );
@@ -535,9 +611,13 @@ class _Driver_PaymentCollectionScreenState
                                               lastDate: DateTime(2100));
 
                                       if (pickedDate != null) {
-                                        formattedDate = DateFormat('dd-MM-yyyy')
-                                            .format(pickedDate);
-                                      } else {}
+                                        setState(() {
+                                          selectedChequeDate = pickedDate;
+                                          formattedDate =
+                                              DateHelper.displayFromDateTime(
+                                                  pickedDate);
+                                        });
+                                      }
                                     },
                                     child: _inputBox(
                                         status: true, value: "$formattedDate"),
@@ -614,10 +694,10 @@ class _Driver_PaymentCollectionScreenState
   }
 
   void _showDialog(BuildContext context, int index, Invoice invoice) {
-    double invoiceBalance = invoice.amount - invoice.paid;
+    double invoiceBalance = invoice.balance;
 
     TextEditingController _amountController = TextEditingController(
-      text: invoiceBalance.toString(),
+      text: fmt(invoiceBalance),
     );
 
     showDialog(
@@ -626,7 +706,8 @@ class _Driver_PaymentCollectionScreenState
         return AlertDialog(
           title: const Text('Enter Amount'),
           content: TextField(
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: decimalInputFormatters(), // NEW
             controller: _amountController,
             onChanged: (value) {
               setState(() {
@@ -636,9 +717,12 @@ class _Driver_PaymentCollectionScreenState
                 } else {
                   // Add entered amount to balance if invoice type is not 'sales'
                   double currentBalance = double.parse(value) +
-                      double.parse(PaidAmt) -
+                      double.parse(PaidAmt.isEmpty
+                          ? '0'
+                          : PaidAmt) - // NEW: guard empty PaidAmt
                       getAllocatedAmount();
-                  enteredValues[index] = currentBalance.toString();
+                  enteredValues[index] = roundedString(
+                      currentBalance); // CHANGED: was currentBalance.toString()
                 }
               });
             },
@@ -652,7 +736,8 @@ class _Driver_PaymentCollectionScreenState
               onPressed: () {
                 Navigator.of(context).pop();
                 setState(() {
-                  enteredValues[index] = _amountController.text;
+                  enteredValues[index] = roundedString(_amountController
+                      .text); // CHANGED: was _amountController.text
                   updateBalanceAndAllocatedAmounts();
                 });
               },
@@ -668,23 +753,19 @@ class _Driver_PaymentCollectionScreenState
     required bool status,
   }) {
     return Container(
-      // padding: EdgeInsets.symmetric(horizontal: 30),
+      width: 70, // <-- add this
+      height: 32,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(5),
         border: Border.all(
           color: AppConfig.buttonDeactiveColor,
         ),
       ),
-      constraints: BoxConstraints(
-        minWidth: SizeConfig.blockSizeHorizontal * 13,
-        minHeight: SizeConfig.blockSizeVertical * 3,
-      ),
       child: Text(
-        textAlign: TextAlign.center,
         value,
-        style: TextStyle(
-          color: status ? AppConfig.textBlack : AppConfig.buttonDeactiveColor,
-        ),
+        textAlign: TextAlign.center,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }
@@ -732,7 +813,7 @@ class _Driver_PaymentCollectionScreenState
       'collection_type': dropdownvalue,
       'bank': _bankController.text,
       'cheque_no': _chequeController.text,
-      'cheque_date': formattedDate,
+      'cheque_date': DateHelper.apiDate(selectedChequeDate),
       'invoice_no': invoiceno,
       'invoice_date': invoicedate,
       'invoice_id': invoiceid

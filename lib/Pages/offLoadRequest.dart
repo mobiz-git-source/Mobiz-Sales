@@ -11,6 +11,7 @@ import '../Models/appstate.dart';
 import '../Models/requestmodelclass.dart';
 import '../Models/stockdata.dart';
 import '../Utilities/rest_ds.dart';
+import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import 'package:http/http.dart' as http;
 import '../confg/sizeconfig.dart';
@@ -69,7 +70,7 @@ class _OffLoadRequestScreenState extends State<OffLoadRequestScreen> {
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
         title: Text(
           'Off Load Requests',
-          style: TextStyle(color: AppConfig.backgroundColor),
+         style: AppConfig.pageTitleStyle,
         ),
         actions: [
           (_search)
@@ -270,11 +271,11 @@ class _OffLoadRequestScreenState extends State<OffLoadRequestScreen> {
                     ),
                   ),
                   Text(
-                    data.inDate!.substring(0, 10),
-                    style: TextStyle(
-                        fontSize: AppConfig.textCaption3Size * 0.9,
-                        fontWeight: AppConfig.headLineWeight),
-                  ),
+  DateHelper.displayDate(data.inDate),
+  style: TextStyle(
+      fontSize: AppConfig.textCaption3Size * 0.9,
+      fontWeight: AppConfig.headLineWeight),
+),
                 ],
               ),
             ],

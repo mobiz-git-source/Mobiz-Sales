@@ -3,6 +3,7 @@ class StoreDetail {
   final int comapny_id;
   final String code;
   final String name;
+  final String? name_ar;   // NEW: Arabic company name
   final String email;
   final String? address;
   final String? vatLabel;
@@ -23,6 +24,7 @@ class StoreDetail {
     required this.comapny_id,
     required this.code,
     required this.name,
+    this.name_ar,   // NEW
     required this.email,
     this.address,
     this.vatLabel,
@@ -36,23 +38,16 @@ class StoreDetail {
     this.createdAt,
     this.updatedAt,
     this.currency,
-    this.logos, // Include this field in constructor
+    this.logos,
   });
 
   factory StoreDetail.fromJson(Map<String, dynamic> json) {
-    // Parse logos as a list of strings
-    // List<String> logosList = [];
-    // if (json['data']['logos'] != null) {
-    //   for (var logo in json['data']['logos']) {
-    //     logosList.add(logo.toString());
-    //   }
-    // }
-
     return StoreDetail(
       id: json['data']['id'],
       comapny_id: json['data']['comapny_id'],
       code: json['data']['code'],
       name: json['data']['name'],
+      name_ar: json['data']['name_ar'],   // NEW
       email: json['data']['email'],
       address: json['data']['address'],
       vatLabel: json['data']['vat_label'],
@@ -66,7 +61,7 @@ class StoreDetail {
       createdAt: json['data']['created_at'],
       updatedAt: json['data']['updated_at'],
       currency: json['data']['currency'],
-      logos: json['data']['logo'], // Assign logos field from JSON
+      logos: json['data']['logo'],
     );
   }
 }

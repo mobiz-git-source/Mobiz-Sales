@@ -44,13 +44,11 @@ class _VanStocksState extends State<VanStocks> {
   List<Map<String, dynamic>> savedProducts = [];
   bool _loaded = false;
 
-
   int _ifVat = 1;
   // num tax = 0;
 
   String amount = '';
   String quantity = '';
-  @override
   @override
   void initState() {
     super.initState();
@@ -73,17 +71,16 @@ class _VanStocksState extends State<VanStocks> {
     }
   }
 
-
   Future<void> _loadSavedProducts() async {
     final prefs = await SharedPreferences.getInstance();
     final List<String>? savedProductsStringList =
-    prefs.getStringList('selected_productss');
+        prefs.getStringList('selected_productss');
 
     if (savedProductsStringList != null) {
       setState(() {
         savedProducts = savedProductsStringList
             .map((productString) =>
-        jsonDecode(productString) as Map<String, dynamic>)
+                jsonDecode(productString) as Map<String, dynamic>)
             .toList();
 
         // Calculate total amount
@@ -113,7 +110,7 @@ class _VanStocksState extends State<VanStocks> {
 
     final prefs = await SharedPreferences.getInstance();
     final savedProductsStringList =
-    savedProducts.map((product) => jsonEncode(product)).toList();
+        savedProducts.map((product) => jsonEncode(product)).toList();
     await prefs.setStringList('selected_productss', savedProductsStringList);
   }
 
@@ -158,13 +155,14 @@ class _VanStocksState extends State<VanStocks> {
       for (int i = 0; i < savedProducts.length; i++) {
         final product = savedProducts[i];
 
-        double quantity = double.tryParse(product['quantity']?.toString() ?? '0') ?? 0.0;
-        int selectedUnitId = int.tryParse(product['unit_id']?.toString() ?? '0') ?? 0;
+        double quantity =
+            double.tryParse(product['quantity']?.toString() ?? '0') ?? 0.0;
+        int selectedUnitId =
+            int.tryParse(product['unit_id']?.toString() ?? '0') ?? 0;
 
         quantities.add(quantity);
         selectedUnitIds.add(selectedUnitId);
       }
-
 
       var data = {
         'van_id': AppState().vanId,
@@ -282,8 +280,8 @@ class _VanStocksState extends State<VanStocks> {
             child: Icon(Icons.arrow_back_rounded)),
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
         title: const Text(
-          'Van Stocks Requests',
-          style: TextStyle(color: AppConfig.backgroundColor),
+          'Van Stocks',
+          style: AppConfig.pageTitleStyle,
         ),
         backgroundColor: AppConfig.colorPrimary,
         actions: [
@@ -342,16 +340,15 @@ class _VanStocksState extends State<VanStocks> {
                       _loaded = true;
                       final product = savedProducts[index];
                       final quantity = double.tryParse(
-                          product['quantity']?.toString() ?? '0') ??
+                              product['quantity']?.toString() ?? '0') ??
                           0.0;
                       final amount = double.tryParse(
-                          product['amount']?.toString() ?? '0') ??
+                              product['amount']?.toString() ?? '0') ??
                           0.0;
 
                       final total = quantity * amount;
                       return InkWell(
-                        onTap: () =>
-                            showProductDetailsDialog(context, product),
+                        onTap: () => showProductDetailsDialog(context, product),
                         child: Padding(
                           padding: EdgeInsets.symmetric(
                               horizontal: 8.0.w, vertical: 2.h),
@@ -367,8 +364,8 @@ class _VanStocksState extends State<VanStocks> {
                                   color: AppConfig.buttonDeactiveColor
                                       .withOpacity(0.5),
                                 ),
-                                borderRadius: const BorderRadius.all(
-                                    Radius.circular(10)),
+                                borderRadius:
+                                    const BorderRadius.all(Radius.circular(10)),
                               ),
                               child: Padding(
                                 padding: const EdgeInsets.all(8.0),
@@ -376,7 +373,7 @@ class _VanStocksState extends State<VanStocks> {
                                   children: [
                                     Row(
                                       crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                          CrossAxisAlignment.start,
                                       children: [
                                         // SizedBox(
                                         //   width: 50,
@@ -404,7 +401,7 @@ class _VanStocksState extends State<VanStocks> {
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Text(
                                                 '${product['code']} | ${product['name'].toString().toUpperCase()}',
@@ -412,18 +409,17 @@ class _VanStocksState extends State<VanStocks> {
                                                     fontSize: AppConfig
                                                         .textCaption3Size,
                                                     fontWeight:
-                                                    FontWeight.bold),
+                                                        FontWeight.bold),
                                               ),
                                             ],
                                           ),
                                         ),
                                         CircleAvatar(
-                                          backgroundColor: Colors.grey
-                                              .withOpacity(0.2),
+                                          backgroundColor:
+                                              Colors.grey.withOpacity(0.2),
                                           radius: 10,
                                           child: GestureDetector(
-                                            onTap: () =>
-                                                _removeProduct(index),
+                                            onTap: () => _removeProduct(index),
                                             child: const Icon(
                                               Icons.close,
                                               size: 15,
@@ -438,10 +434,9 @@ class _VanStocksState extends State<VanStocks> {
                                       children: [
                                         // Text(product['type_name']),
                                         // Text(' | '),
-                                        Text(product['unit_name']??'N/A'),
+                                        Text(product['unit_name'] ?? 'N/A'),
                                         Text(' | '),
-                                        Text(
-                                            'Qty: ${product['quantity']}'),
+                                        Text('Qty: ${product['quantity']}'),
                                         // Text(' | '),
                                         // Text('Rate: ${product['amount']}'),
                                         // Text(' | '),
@@ -463,6 +458,7 @@ class _VanStocksState extends State<VanStocks> {
             ),
     );
   }
+
   void showProductDetailsDialog(
       BuildContext context, Map<String, dynamic> product) async {
     final response = await http.get(Uri.parse(
@@ -478,8 +474,8 @@ class _VanStocksState extends State<VanStocks> {
       final amountController = TextEditingController();
 
       // Get the existing product details
-      final existingProduct = savedProducts.firstWhere(
-              (p) => p['serial_number'] == product['serial_number']);
+      final existingProduct = savedProducts
+          .firstWhere((p) => p['serial_number'] == product['serial_number']);
 
       // Initialize controllers and values from existing product
       String? amount = existingProduct['amount'];
@@ -497,7 +493,8 @@ class _VanStocksState extends State<VanStocks> {
       Map<String, dynamic>? selectedUnit;
       if (existingProduct['unit_id'] != null) {
         selectedUnit = units.firstWhere(
-              (unit) => unit['id'].toString() == existingProduct['unit_id'].toString(),
+          (unit) =>
+              unit['id'].toString() == existingProduct['unit_id'].toString(),
           orElse: () => null,
         );
       }
@@ -576,7 +573,8 @@ class _VanStocksState extends State<VanStocks> {
                             labelStyle: TextStyle(fontWeight: FontWeight.bold),
                             contentPadding: EdgeInsets.symmetric(
                                 vertical: 2.h, horizontal: 10.w),
-                            border: OutlineInputBorder(borderSide: BorderSide.none),
+                            border:
+                                OutlineInputBorder(borderSide: BorderSide.none),
                             filled: true,
                             fillColor: Colors.grey.shade300,
                           ),
@@ -594,7 +592,8 @@ class _VanStocksState extends State<VanStocks> {
                                   : '';
                             });
                           },
-                          value: selectedUnit, // This shows the currently selected unit
+                          value:
+                              selectedUnit, // This shows the currently selected unit
                           hint: Text('Select Unit'),
                         ),
                         SizedBox(height: 10.h),
@@ -607,11 +606,13 @@ class _VanStocksState extends State<VanStocks> {
                           },
                           decoration: InputDecoration(
                               labelText: 'Quantity',
-                              labelStyle: TextStyle(fontWeight: FontWeight.bold),
+                              labelStyle:
+                                  TextStyle(fontWeight: FontWeight.bold),
                               contentPadding: EdgeInsets.symmetric(
                                   vertical: 2.h, horizontal: 10.w),
                               hintText: 'Qty',
-                              border: OutlineInputBorder(borderSide: BorderSide.none),
+                              border: OutlineInputBorder(
+                                  borderSide: BorderSide.none),
                               filled: true,
                               fillColor: Colors.grey.shade300),
                         ),
@@ -647,40 +648,45 @@ class _VanStocksState extends State<VanStocks> {
                     ),
                     onPressed: isQuantityValid(quantity)
                         ? () async {
-                      if (
-                      quantity != null &&
-                          amountController.text.isNotEmpty) {
-                        final productIndex = savedProducts.indexWhere(
-                                (p) => p['serial_number'] == product['serial_number']);
+                            if (quantity != null &&
+                                amountController.text.isNotEmpty) {
+                              final productIndex = savedProducts.indexWhere(
+                                  (p) =>
+                                      p['serial_number'] ==
+                                      product['serial_number']);
 
-                        if (productIndex != -1) {
-                          setState(() {
-                            // savedProducts[productIndex]['type_id'] = selectedProductTypeId;
-                            savedProducts[productIndex]['quantity'] = quantity;
-                            savedProducts[productIndex]['amount'] = amountController.text;
-                            // savedProducts[productIndex]['type_name'] = productTypes.firstWhere(
-                            //         (type) => type['id'].toString() == selectedProductTypeId)['name'];
+                              if (productIndex != -1) {
+                                setState(() {
+                                  // savedProducts[productIndex]['type_id'] = selectedProductTypeId;
+                                  savedProducts[productIndex]['quantity'] =
+                                      quantity;
+                                  savedProducts[productIndex]['amount'] =
+                                      amountController.text;
+                                  // savedProducts[productIndex]['type_name'] = productTypes.firstWhere(
+                                  //         (type) => type['id'].toString() == selectedProductTypeId)['name'];
 
-                            // Update the unit information
-                            if (selectedUnit != null) {
-                              savedProducts[productIndex]['unit_id'] = selectedUnit!['id'].toString();
-                              savedProducts[productIndex]['unit_name'] = selectedUnit!['unit_name'];
+                                  // Update the unit information
+                                  if (selectedUnit != null) {
+                                    savedProducts[productIndex]['unit_id'] =
+                                        selectedUnit!['id'].toString();
+                                    savedProducts[productIndex]['unit_name'] =
+                                        selectedUnit!['unit_name'];
+                                  }
+                                });
+
+                                final prefs =
+                                    await SharedPreferences.getInstance();
+                                final savedProductsStringList = savedProducts
+                                    .map((product) => jsonEncode(product))
+                                    .toList();
+                                await prefs.setStringList('selected_productss',
+                                    savedProductsStringList);
+
+                                Navigator.of(context).pop();
+                                _updateCalculations(); // Refresh the UI
+                              }
                             }
-                          });
-
-                          final prefs = await SharedPreferences.getInstance();
-                          final savedProductsStringList = savedProducts
-                              .map((product) => jsonEncode(product))
-                              .toList();
-                          await prefs.setStringList(
-                              'selected_productss',
-                              savedProductsStringList);
-
-                          Navigator.of(context).pop();
-                          _updateCalculations(); // Refresh the UI
-                        }
-                      }
-                    }
+                          }
                         : null,
                   ),
                 ],

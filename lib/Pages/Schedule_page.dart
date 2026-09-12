@@ -73,7 +73,7 @@ class _SchedulePageState extends State<SchedulePage> {
         backgroundColor: AppConfig.colorPrimary,
         title: Text(
           'Schedule',
-          style: TextStyle(color: AppConfig.backgroundColor),
+         style: AppConfig.pageTitleStyle,
         ),
         actions: [
           GestureDetector(

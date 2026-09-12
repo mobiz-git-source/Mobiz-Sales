@@ -19,6 +19,7 @@ import '../Components/commonwidgets.dart';
 import '../Models/ExpenseDrop_model.dart';
 import '../Models/LoginModelClass.dart';
 import '../Utilities/rest_ds.dart';
+import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
 import 'homepage_Driver.dart';
@@ -52,8 +53,8 @@ class _ExpenseAddState extends State<ExpenseAdd> {
     futureExpenseReason = fetchExpenses();
     _amountController.addListener(_calculateTotalAmount);
     _vatAmountController.addListener(_calculateTotalAmount);
-    _dateController.text =
-        DateFormat('dd MMMM yyyy EEEE').format(_selectedDate!);
+  _dateController.text =
+        DateHelper.displayFromDateTime(_selectedDate!);
   }
 
   @override
@@ -80,10 +81,10 @@ class _ExpenseAddState extends State<ExpenseAdd> {
           ),
         ),
         backgroundColor: AppConfig.colorPrimary,
-        title: Text(
-          'Expense',
-          style: TextStyle(color: AppConfig.backgroundColor),
-        ),
+      title: const Text(
+  'Expense',
+  style: AppConfig.pageTitleStyle,
+),
       ),
       body: FutureBuilder(
         future: futureExpenseReason,
@@ -130,11 +131,10 @@ class _ExpenseAddState extends State<ExpenseAdd> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Center(
-                              child: Text(
+                                child: Text(
                                 _selectedDate == null
                                     ? 'Select Date'
-                                    : DateFormat('dd MMMM yyyy, EEEE').format(
-                                        _selectedDate!), // Assuming _dateController has the date text
+                                    : DateHelper.displayFromDateTime(_selectedDate!),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: Colors.white,
@@ -285,25 +285,58 @@ class _ExpenseAddState extends State<ExpenseAdd> {
                         ],
                       ),
                     ),
-                    Center(
-                      child: ElevatedButton(
-                        style: ButtonStyle(
-                          backgroundColor:
-                              WidgetStateProperty.all(AppConfig.colorPrimary),
-                          shape:
-                              WidgetStateProperty.all(BeveledRectangleBorder()),
-                          minimumSize: WidgetStateProperty.all(Size(70, 30)),
-                        ),
-                        onPressed: _attachDocuments,
-                        child: SizedBox(
-                          width: 120,
-                          child: Center(
-                            child: Text(
-                              "Attach Documents",
-                              style: TextStyle(color: Colors.white),
+                                      Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 15.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          ElevatedButton(
+                            style: ButtonStyle(
+                              backgroundColor: WidgetStateProperty.all(
+                                  AppConfig.colorPrimary),
+                              shape: WidgetStateProperty.all(
+                                  BeveledRectangleBorder()),
+                              minimumSize:
+                                  WidgetStateProperty.all(Size(70, 30)),
+                            ),
+                            onPressed: _attachDocuments,
+                            child: SizedBox(
+                              width: 120,
+                              child: Center(
+                                child: Text(
+                                  "Attach Documents",
+                                  style: TextStyle(color: Colors.white),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                          ElevatedButton(
+                            style: ButtonStyle(
+                              backgroundColor: WidgetStateProperty.all(
+                                  AppConfig.colorPrimary),
+                              shape: WidgetStateProperty.all(
+                                  BeveledRectangleBorder()),
+                              minimumSize:
+                                  WidgetStateProperty.all(Size(70, 30)),
+                            ),
+                            onPressed: () {
+                              if (_formKey.currentState!.validate()) {
+                                postData();
+                              }
+                            },
+                            child: SizedBox(
+                              width: 120,
+                              child: Center(
+                                child: Text(
+                                  "Send for Approval",
+                                  style: TextStyle(color: Colors.white),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     SizedBox(height: 20),
@@ -322,32 +355,7 @@ class _ExpenseAddState extends State<ExpenseAdd> {
                               );
                             }).toList(),
                           ),
-                    SizedBox(height: 40),
-                    Center(
-                      child: ElevatedButton(
-                        style: ButtonStyle(
-                          backgroundColor:
-                              WidgetStateProperty.all(AppConfig.colorPrimary),
-                          shape:
-                              WidgetStateProperty.all(BeveledRectangleBorder()),
-                          minimumSize: WidgetStateProperty.all(Size(70, 30)),
-                        ),
-                        onPressed: () {
-                          if (_formKey.currentState!.validate()) {
-                            postData();
-                          }
-                        },
-                        child: SizedBox(
-                          width: 120,
-                          child: Center(
-                            child: Text(
-                              "Send for Approval",
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                    SizedBox(height: 30),
                   ],
                 ),
               ),
@@ -467,7 +475,7 @@ class _ExpenseAddState extends State<ExpenseAdd> {
     request.fields['expense_id'] = selectedexpense!.id.toString();
     request.fields['description'] = remark.text;
     request.fields['amount'] = _amountController.text;
-    request.fields['in_date'] = DateFormat('dd-MM-yyyy').format(_selectedDate!);
+    request.fields['in_date'] = DateHelper.apiDate(_selectedDate!);
     request.fields['user_id'] = AppState().userId.toString();
     request.fields['vat_amount'] = _vatAmountController.text;
     request.fields['total_amount'] = _totalAmountController.text;

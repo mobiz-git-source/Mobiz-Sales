@@ -257,20 +257,70 @@ class _LoginScreenState extends State<LoginScreen> {
         null,
         jsonEncode(bodyJson),
       );
+      print("FULL RESPONSE:");
+      print(jsonEncode(resJson));
 
+      print("Status: ${resJson['status']}");
+      print("Status Code: ${resJson['status_code']}");
+      print("Allow Access: ${resJson['allow_access']}");
+      print("Store: ${resJson['store']}");
       printFullText(jsonEncode(resJson));
+      print("Allow Access : ${resJson['allow_access']}");
+      print("Description : ${resJson['description']}");
 
       if (resJson == null || resJson.isEmpty) {
         if (mounted) {
           CommonWidgets.showDialogueBox(
-              context: context, title: "Error", msg: "Server connection failed.");
+              context: context,
+              title: "Error",
+              msg: "Server connection failed.");
+        }
+        return;
+      }
+
+      // handle 403 - access restricted response from backend
+      if (resJson['status_code'] == 403) {
+        if (mounted) {
+          CommonWidgets.showDialogueBox(
+            context: context,
+            title: "Access Restricted",
+            msg: resJson['description'] ??
+                resJson['message'] ??
+                "Your account access has been restricted. Please contact support.",
+          );
+        }
+        return;
+      }
+
+      if (resJson['allow_access']?.toString().toLowerCase() == "no") {
+        if (mounted) {
+          CommonWidgets.showDialogueBox(
+            context: context,
+            title: "Access Restricted",
+            msg: resJson['description'] ?? "Login access has been restricted.",
+          );
         }
         return;
       }
 
       LoginModel loginResp = LoginModel.fromJson(resJson);
+      print("Role ID: ${loginResp.user?.rolId}");
       if (loginResp.status == "success") {
-        if (loginResp.user != null && loginResp.authorisation != null && loginResp.settings != null) {
+        // restrict access if store access is disabled
+        if (loginResp.store != null && loginResp.store!.allowAccess == 'No') {
+          if (mounted) {
+            CommonWidgets.showDialogueBox(
+                context: context,
+                title: "Access Restricted",
+                msg: loginResp.store!.description ??
+                    "Access to this store has been restricted.");
+          }
+          return;
+        }
+
+        if (loginResp.user != null &&
+            loginResp.authorisation != null &&
+            loginResp.settings != null) {
           appState.token = loginResp.authorisation!.token;
           appState.storeId = loginResp.user!.storeId;
           appState.rolId = loginResp.user!.rolId;
@@ -280,10 +330,40 @@ class _LoginScreenState extends State<LoginScreen> {
           appState.vatState = loginResp.settings?.vatState ?? '';
           appState.discountState = loginResp.settings?.discountState ?? '';
           appState.validate_qtySO = loginResp.settings?.soValQtyState ?? '';
-          appState.validate_qtySales = loginResp.settings?.qtySalesvalidate ?? '';
+          appState.validate_qtySales =
+              loginResp.settings?.qtySalesvalidate ?? '';
           appState.attendanceState = loginResp.settings?.attendanceState ?? '';
           appState.printer = loginResp.settings?.printer ?? '';
+          appState.dateFormat = loginResp.settings?.dateFormat ?? 'd-M-Y';
+          print("Date Format from API: ${AppState().dateFormat}");
+          print(
+              "Settings object dateFormat = ${loginResp.settings?.dateFormat}");
+          print("AppState dateFormat = ${appState.dateFormat}");
           appState.noOfDecimals = loginResp.currency?.noOfDecimals;
+          // Round off cap - parse from system_setup array in raw response
+try {
+  final systemSetup = resJson['system_setup'] as List?;
+  if (systemSetup != null) {
+    for (var item in systemSetup) {
+      if (item['key'] == 'positive_roundoff') {
+        appState.roundOffPositive =
+            double.tryParse(item['number_value']?.toString() ?? '0') ?? 0;
+      } else if (item['key'] == 'negative_roundoff') {
+        appState.roundOffNegative =
+            double.tryParse(item['number_value']?.toString() ?? '0') ?? 0;
+      } else if (item['key'] == 'roundoff_alllowed_in_invoice') {   // ✅ new
+        appState.roundOffAllowedInInvoice =                          // ✅ new
+            item['flag_value']?.toString().toLowerCase() != 'no'; 
+            print("Round off allowed: ${appState.roundOffAllowedInInvoice}");   // ✅ new - default true unless explicitly "no"
+      }
+    }
+  }
+} catch (e) {
+  print("Round off parse failed (non-blocking): $e");
+  appState.roundOffPositive = 0;
+  appState.roundOffNegative = 0;
+  appState.roundOffAllowedInInvoice = true;   // ✅ new - safe default on error
+}
           appState.code = loginResp.currency?.code;
           appState.minor = loginResp.currency?.minor;
           appState.loginState = 'LOGGED_IN';
@@ -292,24 +372,37 @@ class _LoginScreenState extends State<LoginScreen> {
           if (appStateRetrieved == true) {
             sharedPref.removeAll();
           }
-          
+
           sharedPref.save("app_state", appState);
-          
-          if (mounted) {
-            if (loginResp.user!.rolId == 2 || loginResp.user!.rolId == 5) {
-              Navigator.of(context).pushReplacementNamed(HomeScreen.routeName);
-            } else if (loginResp.user!.rolId == 4) {
-              Navigator.of(context).pushReplacementNamed(HomepageDriver.routeName);
-            } else if (loginResp.user!.rolId == 3) {
-              Navigator.of(context).pushReplacementNamed(TransferOptionsPage.routeName);
-            } else if (loginResp.user!.rolId == 7) {
-              Navigator.of(context).pushReplacementNamed(DashboardScreen.routeName);
-            }
-          }
+
+      if (mounted) {
+  if (loginResp.user!.rolId == 2 ||
+      loginResp.user!.rolId == 5 ||
+      loginResp.user!.rolId == 29) {
+    Navigator.of(context).pushReplacementNamed(HomeScreen.routeName);
+  } else if (loginResp.user!.rolId == 4) {
+    Navigator.of(context)
+        .pushReplacementNamed(HomepageDriver.routeName);
+  } else if (loginResp.user!.rolId == 3) {
+    Navigator.of(context)
+        .pushReplacementNamed(TransferOptionsPage.routeName);
+  } else if (loginResp.user!.rolId == 7) {
+    Navigator.of(context)
+        .pushReplacementNamed(DashboardScreen.routeName);
+  } else {
+    CommonWidgets.showDialogueBox(
+      context: context,
+      title: "Access Restricted",
+      msg: "Your account access has been restricted. Please contact support.",
+    );
+  }
+}
         } else {
           if (mounted) {
             CommonWidgets.showDialogueBox(
-                context: context, title: "Error", msg: "Invalid server response data.");
+                context: context,
+                title: "Error",
+                msg: "Invalid server response data.");
           }
         }
       } else {

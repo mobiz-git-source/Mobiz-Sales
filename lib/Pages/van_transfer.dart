@@ -182,7 +182,7 @@ class _VanTransferState extends State<VanTransfer> {
             children: [
               Text(
                 'Van Transfer Request',
-                style: TextStyle(color: AppConfig.backgroundColor),
+                style: AppConfig.pageTitleStyle,
               ),
               Row(
                 children: [
@@ -747,13 +747,13 @@ class _VanTransferState extends State<VanTransfer> {
               Center(
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _isButtonDisabled
-                        ? Colors.grey: AppConfig.colorPrimary
-                  ),
+                      backgroundColor: _isButtonDisabled
+                          ? Colors.grey
+                          : AppConfig.colorPrimary),
                   onPressed: (savedProducts.isNotEmpty && !_isButtonDisabled)
                       ? () async {
-                    postDataToApi();
-                  }
+                          postDataToApi();
+                        }
                       : null,
                   child: Text(
                     'TRANSFER',
@@ -937,6 +937,8 @@ class _VanTransferState extends State<VanTransfer> {
                             'Available Qty: ${selectedUnit!['stock']}',
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
+                          SizedBox(height: 8),
+                          SizedBox(height: 10),
                         ],
                         if (units != null &&
                             units.any((unit) => unit != null)) ...[

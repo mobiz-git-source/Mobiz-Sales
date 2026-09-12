@@ -55,7 +55,7 @@ class _ScheduleDriverState extends State<ScheduleDriver> {
         backgroundColor: AppConfig.colorPrimary,
         title: Text(
           'Schedule',
-          style: TextStyle(color: AppConfig.backgroundColor),
+         style: AppConfig.pageTitleStyle,
         ),
         actions: [
           GestureDetector(

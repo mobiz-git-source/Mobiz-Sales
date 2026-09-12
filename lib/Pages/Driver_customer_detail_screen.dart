@@ -90,7 +90,7 @@ class _Driver_customer_detail_screenState
         backgroundColor: AppConfig.colorPrimary,
         title: const Text(
           'Customer',
-          style: TextStyle(color: AppConfig.backgroundColor),
+          style: AppConfig.pageTitleStyle,
         ),
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
       ),

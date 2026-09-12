@@ -26,6 +26,9 @@ class _ErrorHandlingScreenState extends State<ErrorHandlingScreen> {
   @override
   void initState() {
     super.initState();
+  // AppState().rolId = 7;
+    print("Role : ${AppState().rolId}");
+    print("Login : ${AppState().loginState}");
     _loadRole = _getRoleId();
   }
 
@@ -38,22 +41,27 @@ class _ErrorHandlingScreenState extends State<ErrorHandlingScreen> {
 
   void _navigateBasedOnRole() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (AppState().rolId == 2 || AppState().rolId == 5) {
+      if (AppState().rolId == 2 ||
+          AppState().rolId == 5 ||
+          AppState().rolId == 29) {
         if (mounted) {
           Navigator.of(context).pushReplacementNamed(HomeScreen.routeName);
         }
       } else if (AppState().rolId == 3) {
         if (mounted) {
-          Navigator.of(context).pushReplacementNamed(TransferOptionsPage.routeName);
+          Navigator.of(context)
+              .pushReplacementNamed(TransferOptionsPage.routeName);
         }
       } else if (AppState().rolId == 4) {
         if (mounted) {
           Navigator.of(context).pushReplacementNamed(HomepageDriver.routeName);
         }
-      }else if(AppState().rolId == 7){
-        if(mounted){
+      } else if (AppState().rolId == 7) {
+        if (mounted) {
           Navigator.of(context).pushReplacementNamed(DashboardScreen.routeName);
         }
+      } else {
+        print("Unhandled Role: ${AppState().rolId}");
       }
     });
   }
@@ -80,39 +88,59 @@ class _ErrorHandlingScreenState extends State<ErrorHandlingScreen> {
   Widget _buildLoadingScreen() {
     return Shimmer.fromColors(
       baseColor: Colors.grey.shade300,
-      highlightColor: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(35.0),
+      highlightColor: Colors.grey.shade100,
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
         child: Column(
           children: [
-            SizedBox(
-              height: 70,
-            ),
+            // ─────────────────────────────────────
+            // TOP HEADER SKELETON
+            // ─────────────────────────────────────
             Container(
-              width: 100,
-              height: 110,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(10),
+              width: double.infinity,
+              height: 90,
+              color: Colors.white,
+            ),
+
+            const SizedBox(height: 22),
+
+            // ─────────────────────────────────────
+            // SMALL SUMMARY CARD SKELETON
+            // ─────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              child: Container(
+                height: 70,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                ),
               ),
             ),
-            Expanded(
+
+            const SizedBox(height: 24),
+
+            // ─────────────────────────────────────
+            // 4 COLUMN MENU SKELETON
+            // ─────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
               child: GridView.builder(
-                scrollDirection: Axis.vertical,
                 shrinkWrap: true,
-                physics: BouncingScrollPhysics(),
+                physics: const NeverScrollableScrollPhysics(),
                 itemCount: 12,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  mainAxisExtent: 120,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 30,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 14,
+                  mainAxisSpacing: 14,
+                  childAspectRatio: 0.90,
                 ),
-                itemBuilder: (context, index) {
+                itemBuilder: (_, __) {
                   return Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      color: Colors.grey.shade200,
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
                     ),
                   );
                 },

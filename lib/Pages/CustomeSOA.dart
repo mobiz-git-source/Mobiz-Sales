@@ -2,8 +2,7 @@ import 'dart:io';
 import 'package:image/image.dart' as img;
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/cupertino.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -23,6 +22,7 @@ import '../Components/commonwidgets.dart';
 import '../Models/Soa_model.dart';
 import '../Models/Store_model.dart';
 import '../Utilities/rest_ds.dart';
+import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
 
@@ -42,7 +42,6 @@ String? code;
 String? payment;
 
 class _SOAState extends State<SOA> {
-
   List<BluetoothDevice> _devices = [];
   BluetoothDevice? _selectedDevice;
   bool _connected = false;
@@ -91,293 +90,234 @@ class _SOAState extends State<SOA> {
       return dateA.compareTo(dateB);
     });
   }
+
   Future<void> _generateAndPrintPdf(
       List data, double opening, double closing) async {
     final response = await http.get(Uri.parse(
         '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
-    if (response.statusCode == 200) {
-      // Parse JSON response into StoreDetail object
-      StoreDetail storeDetail =
-      StoreDetail.fromJson(json.decode(response.body));
-
-      final pdf = pw.Document();
-
-      final String api =
-          '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
-      final logoResponse = await http.get(Uri.parse(api));
-      if (logoResponse.statusCode != 200) {
-        throw Exception('Failed to load logo image');
-      }
-      final Uint8List logoBytes = logoResponse.bodyBytes;
-
-      String addressText = storeDetail.address != null
-          ? "Address: ${storeDetail.address}, "
-          : "";
-      String countryText =
-      storeDetail.country != null ? "${storeDetail.country}" : "";
-
-      pdf.addPage(
-        pw.MultiPage(
-          header: (pw.Context context) {
-            if (context.pageNumber == 1) {
-              return pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Center(
-                    child: pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                      children: [
-                        pw.Column(
-                            crossAxisAlignment: pw.CrossAxisAlignment.start,
-                            children: [
-                              pw.Text(
-                                storeDetail.name,
-                                style: pw.TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: pw.FontWeight.bold,
-                                ),
-                              ),
-                              if (storeDetail.address != null)
-                                pw.Text(storeDetail.address!),
-                              if (storeDetail.trn != null)
-                                pw.Text('TRN: ${storeDetail.trn}'),
-                            ]
-                        ),
-                        pw.Column(
-                            children: [
-                              pw.Image(
-                                pw.MemoryImage(logoBytes),
-                                height: 100,
-                                width: 150,
-                                fit: pw.BoxFit.fitWidth,
-                              ),
-                            ]
-                        ),
-                      ],
-                    ),
-                  ),
-                  pw.SizedBox(height: 20),
-                  pw.Center(
-                    child: pw.Text(
-                      'Statement of Accounts',
-                      style: pw.TextStyle(
-                        fontSize: 20,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  pw.SizedBox(height: 10),
-                  pw.Divider(),
-                  pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.SizedBox(
-                            width: 300,
-                            child: pw.Text(
-                              overflow: pw.TextOverflow.span,
-                              "${name}",
-                              style: pw.TextStyle(
-                                fontSize: 15,
-                              ),
-                            ),
-                          ),
-                          pw.SizedBox(
-                            width: 300,
-                            child: pw.Text(
-                              overflow: pw.TextOverflow.span,
-                              "$address",
-                              style: pw.TextStyle(
-                                fontSize: 15,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.end,
-                        children: [
-                          pw.Text(
-                            'From Date: ${_selectedDatefrom != null ? DateFormat('dd MMMM yyyy').format(_selectedDatefrom!) : 'Select Date'}',
-                            style: pw.TextStyle(
-                              fontSize: 15,
-                            ),
-                          ),
-                          pw.Text(
-                            'To Date: ${_selectedDateto != null ? DateFormat('dd MMMM yyyy').format(_selectedDateto!) : 'Select Date'}',
-                            style: pw.TextStyle(
-                              fontSize: 15,
-                            ),
-                          ),
-                          if (storeDetail.currency != null)
-                            pw.Text(
-                              'Currency: ${storeDetail.currency}',
-                              style: pw.TextStyle(fontSize: 15),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  pw.SizedBox(height: 20),
-                ],
-              );
-            } else {
-              return pw.Container(); // Empty container for other pages
-            }
-          },
-          build: (pw.Context context) => [
-            pw.Table(
-              children: [
-                pw.TableRow(
-                  decoration: pw.BoxDecoration(color: PdfColors.grey),
-                  children: [
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text('Date',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text('Reference',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text('Debit',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text('Credit',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text('Balance',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                    ),
-                  ],
-                ),
-                pw.TableRow(
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.grey200,
-                  ),
-                  children: [
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text(''),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text(''),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text(''),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text('Opening Balance'),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text(opening.toStringAsFixed(AppState().noOfDecimals ?? 2)),
-                    ),
-                  ],
-                ),
-                ...data.asMap().entries.map((entry) {
-                  int index = entry.key;
-                  var row = entry.value;
-
-                  // Use the balance from API (5th column - index 4)
-                  // Make sure to handle null cases
-                  double balance = row[4] != null
-                      ? double.parse(row[4].toString())
-                      : 0.0;
-
-                  return pw.TableRow(
-                    decoration: pw.BoxDecoration(
-                      color:
-                      index % 2 == 0 ? PdfColors.white : PdfColors.grey200,
-                    ),
-                    children: [
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(4),
-                        child: pw.Text(row[0].toString()),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(4),
-                        child: pw.Text(row[1].toString()),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(4),
-                        child: pw.Text(row[2] != null
-                            ? double.parse(row[2].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2)
-                            : "0.00",textAlign: pw.TextAlign.right),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(4),
-                        child: pw.Text(row[3] != null
-                            ? double.parse(row[3].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2)
-                            : "0.00",textAlign: pw.TextAlign.right),
-                      ),
-                      pw.Padding(
-                        padding:  pw.EdgeInsets.all(4),
-                        child: pw.Text(balance.toStringAsFixed(AppState().noOfDecimals ?? 2),textAlign: pw.TextAlign.right),
-                      ),
-                    ],
-                  );
-                }).toList(),
-                pw.TableRow(
-                  decoration: pw.BoxDecoration(color: PdfColors.white),
-                  children: [
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text(''),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text(''),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Text(''),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(vertical: 20),
-                      child: pw.Text('Closing Balance',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(vertical: 20),
-                      child: pw.Text(closing.toStringAsFixed(AppState().noOfDecimals ?? 2),
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-
-      final output = await getTemporaryDirectory();
-      final file = File('${output.path}/Custom SOA.pdf');
-      await file.writeAsBytes(await pdf.save());
-      await OpenFile.open(file.path);
-    } else {
+    if (response.statusCode != 200) {
       throw Exception('Failed to load store details');
     }
+
+    StoreDetail storeDetail = StoreDetail.fromJson(json.decode(response.body));
+    final pdf = pw.Document();
+
+    final String api =
+        '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
+    final logoResponse = await http.get(Uri.parse(api));
+    if (logoResponse.statusCode != 200) {
+      throw Exception('Failed to load logo image');
+    }
+    final Uint8List logoBytes = logoResponse.bodyBytes;
+    final int decimals = AppState().noOfDecimals ?? 2;
+
+    final textStyle = const pw.TextStyle(fontSize: 10);
+    final boldStyle =
+        pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold);
+
+    pw.Widget buildCell(String text,
+        {pw.Alignment alignment = pw.Alignment.centerLeft,
+        bool isBold = false}) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.all(3),
+        child: pw.Container(
+          alignment: alignment,
+          child: pw.Text(
+            text,
+            style: isBold ? boldStyle : textStyle,
+            textAlign: alignment == pw.Alignment.centerRight
+                ? pw.TextAlign.right
+                : pw.TextAlign.left,
+          ),
+        ),
+      );
+    }
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(30),
+        header: (pw.Context context) {
+          if (context.pageNumber != 1) return pw.Container();
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        storeDetail.name,
+                        style: pw.TextStyle(
+                          fontSize: 14,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      if (storeDetail.address != null)
+                        pw.Text(storeDetail.address!,
+                            style: const pw.TextStyle(fontSize: 10)),
+                      if (storeDetail.trn != null)
+                        pw.Text('TRN: ${storeDetail.trn}',
+                            style: const pw.TextStyle(fontSize: 10)),
+                    ],
+                  ),
+                  pw.Image(
+                    pw.MemoryImage(logoBytes),
+                    height: 50,
+                    width: 100,
+                    fit: pw.BoxFit.contain,
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 10),
+              pw.Divider(thickness: 0.5),
+              pw.SizedBox(height: 5),
+              pw.Center(
+                child: pw.Text(
+                  'Statement of Accounts',
+                  style: pw.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ),
+              pw.SizedBox(height: 10),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Customer: $name', style: boldStyle),
+                      if (address != null)
+                        pw.SizedBox(
+                          width: 250,
+                          child: pw.Text('Address: $address', style: textStyle),
+                        ),
+                    ],
+                  ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'From Date: ${_selectedDatefrom != null ? DateHelper.displayFromDateTime(_selectedDatefrom!) : '-'}',
+                        style: textStyle,
+                      ),
+                      pw.Text(
+                        'To Date: ${_selectedDateto != null ? DateHelper.displayFromDateTime(_selectedDateto!) : '-'}',
+                        style: textStyle,
+                      ),
+                      if (storeDetail.currency != null)
+                        pw.Text('Currency: ${storeDetail.currency}',
+                            style: textStyle),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 10),
+              pw.Divider(thickness: 0.5),
+              pw.SizedBox(height: 10),
+            ],
+          );
+        },
+        build: (pw.Context context) => [
+          pw.Table(
+            border: pw.TableBorder.all(width: 0.5, color: PdfColors.black),
+            columnWidths: const {
+              0: pw.FixedColumnWidth(80), // Date
+              1: pw.FixedColumnWidth(150), // Reference
+              2: pw.FixedColumnWidth(90), // Debit
+              3: pw.FixedColumnWidth(90), // Credit
+              4: pw.FixedColumnWidth(100), // Balance
+            },
+            children: [
+              // Header Row
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                children: [
+                  buildCell('Date',
+                      alignment: pw.Alignment.center, isBold: true),
+                  buildCell('Reference', isBold: true),
+                  buildCell('Debit',
+                      alignment: pw.Alignment.centerRight, isBold: true),
+                  buildCell('Credit',
+                      alignment: pw.Alignment.centerRight, isBold: true),
+                  buildCell('Balance',
+                      alignment: pw.Alignment.centerRight, isBold: true),
+                ],
+              ),
+              // Opening Balance Row
+              pw.TableRow(
+                children: [
+                  buildCell(''),
+                  buildCell(''),
+                  buildCell(''),
+                  buildCell('Opening Balance',
+                      alignment: pw.Alignment.centerRight, isBold: true),
+                  buildCell(opening.toStringAsFixed(decimals),
+                      alignment: pw.Alignment.centerRight, isBold: true),
+                ],
+              ),
+              // Transaction Data Rows
+              ...data.map((row) {
+                final String dateStr =
+                    DateHelper.displayDate(row[0]?.toString());
+                final String refStr = row[1]?.toString() ?? '';
+                final double Debit = row[2] != null
+                    ? double.parse(row[2].toString()).abs()
+                    : 0.0;
+                final double Credit = row[3] != null
+                    ? double.parse(row[3].toString()).abs()
+                    : 0.0;
+                final double balance =
+                    row[4] != null ? double.parse(row[4].toString()) : 0.0;
+
+                return pw.TableRow(
+                  children: [
+                    buildCell(dateStr),
+                    buildCell(refStr),
+                    buildCell(Debit.toStringAsFixed(decimals),
+                        alignment: pw.Alignment.centerRight),
+                    buildCell(Credit.toStringAsFixed(decimals),
+                        alignment: pw.Alignment.centerRight),
+                    buildCell(balance.toStringAsFixed(decimals),
+                        alignment: pw.Alignment.centerRight),
+                  ],
+                );
+              }).toList(),
+              // Closing Balance Row
+              pw.TableRow(
+                children: [
+                  buildCell(''),
+                  buildCell(''),
+                  buildCell(''),
+                  buildCell('Closing Balance',
+                      alignment: pw.Alignment.centerRight, isBold: true),
+                  buildCell(closing.toStringAsFixed(decimals),
+                      alignment: pw.Alignment.centerRight, isBold: true),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    final output = await getTemporaryDirectory();
+    final file = File('${output.path}/Custom SOA.pdf');
+    await file.writeAsBytes(await pdf.save());
+    await OpenFile.open(file.path);
   }
 
   void _printSOA(
-      StoreDetail store,
-      List<List<dynamic>> data,
-      double opening,
-      double closing,
-      ) async {
+    StoreDetail store,
+    List<List<dynamic>> data,
+    double opening,
+    double closing,
+  ) async {
     if (!_connected) {
       await _connect();
     }
@@ -414,23 +354,24 @@ class _SOAState extends State<SOA> {
     printer.printCustom("Customer: $code | $name", 1, 0);
     printer.printCustom("Address: $address", 1, 0);
     printer.printCustom(
-        "From: ${DateFormat('dd MMM yyyy').format(_selectedDatefrom!)}", 1, 0);
+        "From: ${DateHelper.displayFromDateTime(_selectedDatefrom!)}", 1, 0);
+
     printer.printCustom(
-        "To     : ${DateFormat('dd MMM yyyy').format(_selectedDateto!)}", 1, 0);
+        "To     : ${DateHelper.displayFromDateTime(_selectedDateto!)}", 1, 0);
 
     printer.printCustom("-" * 68, 1, 1);
     const dateHeader = 'Date';
     const refHeader = 'Ref';
-    const creditHeader = 'Credit';
     const debitHeader = 'Debit';
+    const creditHeader = 'Credit';
     const balHeader = 'Balance';
 
     printer.printCustom(
         '${dateHeader.padRight(12)}'
-            '${refHeader.padRight(8)}'
-            '${creditHeader.padLeft(9)}'
-            '${debitHeader.padLeft(9)}'
-            '${balHeader.padLeft(10)}',
+        '${refHeader.padRight(8)}'
+        '${debitHeader.padLeft(9)}'
+        '${creditHeader.padLeft(9)}'
+        '${balHeader.padLeft(10)}',
         1,
         0);
     printer.printCustom("-" * 68, 1, 0);
@@ -443,10 +384,12 @@ class _SOAState extends State<SOA> {
 
     // 7. ALL ROWS - Use balance from API (index 4)
     for (var row in data) {
-      String date = row[0].toString();
+      String date = DateHelper.displayDate(row[0].toString());
       String ref = row[1].toString();
-      double amount = row[2] != null ? double.parse(row[2].toString()) : 0.0;
-      double payment = row[3] != null ? double.parse(row[3].toString()) : 0.0;
+      double Debit =
+          row[2] != null ? double.parse(row[2].toString()).abs() : 0.0;
+      double Credit =
+          row[3] != null ? double.parse(row[3].toString()).abs() : 0.0;
       double balance = row[4] != null ? double.parse(row[4].toString()) : 0.0;
 
       final dateStr = date.length > 12 ? date.substring(0, 12) : date;
@@ -454,10 +397,10 @@ class _SOAState extends State<SOA> {
 
       printer.printCustom(
         '${dateStr.padRight(12)}'
-            '${refStr.padRight(8)}'
-            '${amount.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(9)}'
-            '${payment.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(9)}'
-            '${balance.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(10)}',
+        '${refStr.padRight(8)}'
+        '${Debit.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(9)}'
+        '${Credit.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(9)}'
+        '${balance.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(10)}',
         1,
         0,
       );
@@ -467,7 +410,9 @@ class _SOAState extends State<SOA> {
 
     // 8. CLOSING BALANCE
     printer.printCustom(
-        "Closing Balance: ${closing.toStringAsFixed(AppState().noOfDecimals ?? 2)}", 2, 1);
+        "Closing Balance: ${closing.toStringAsFixed(AppState().noOfDecimals ?? 2)}",
+        2,
+        1);
 
     printer.printNewLine();
 
@@ -475,14 +420,13 @@ class _SOAState extends State<SOA> {
     printer.paperCut();
   }
 
-
   _generateAndPrintSOA(List data, double opening, double closing) async {
     final response = await http.get(Uri.parse(
         '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
 
     if (response.statusCode == 200) {
       StoreDetail storeDetail =
-      StoreDetail.fromJson(json.decode(response.body));
+          StoreDetail.fromJson(json.decode(response.body));
 
       _printSOA(
         storeDetail,
@@ -492,8 +436,6 @@ class _SOAState extends State<SOA> {
       );
     }
   }
-
-
 
   bool isOutstandingSelected = true;
   List<Transaction> transactions = [];
@@ -512,14 +454,13 @@ class _SOAState extends State<SOA> {
   void initState() {
     super.initState();
     _initPrinter();
-    _selectedDatefrom = DateTime.now();
-    _selectedDateto = DateTime.now();
-    _refreshData();
-    // _fetchtransactions();
-    // futureSOA = fetchSOAData(); // Initial data load
-    _selectedDatefrom = DateTime(DateTime.now().year, DateTime.now().month, 1);
-    _selectedDateto =
-        DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
+   _selectedDatefrom =
+    DateTime(DateTime.now().year, DateTime.now().month, 1);
+
+_selectedDateto =
+    DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
+
+_refreshData();
   }
 
   void didChangeDependencies() {
@@ -550,27 +491,29 @@ class _SOAState extends State<SOA> {
     final toDate = _selectedDateto ?? DateTime.now();
     final fromDateString = DateFormat('yyyy-MM-dd').format(fromDate);
     final toDateString = DateFormat('yyyy-MM-dd').format(toDate);
+
     final String outstand =
         '${RestDatasource().BASE_URL}/api/get_soa_use_outstanding?customer_id=$id&from_date=$fromDateString&to_date=$toDateString';
+
     final String alltransaction =
         '${RestDatasource().BASE_URL}/api/get_soa_use_alltransaction?customer_id=$id&from_date=$fromDateString&to_date=$toDateString';
+
     final String url = isOutstandingSelected ? outstand : alltransaction;
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
-      print(response.request);
-      print(id);
-      return SOAResponse.fromJson(jsonDecode(response.body));
+      final json = jsonDecode(response.body);
+
+      final soa = SOAResponse.fromJson(json);
+
+      return soa;
     } else {
       throw Exception('Failed to load SOA data');
     }
   }
 
-
-
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(
         leading: GestureDetector(
@@ -585,7 +528,7 @@ class _SOAState extends State<SOA> {
         backgroundColor: AppConfig.colorPrimary,
         title: const Text(
           'Statement Of Accounts',
-          style: TextStyle(color: AppConfig.backgroundColor),
+          style: AppConfig.pageTitleStyle,
         ),
       ),
       body: RefreshIndicator(
@@ -602,7 +545,7 @@ class _SOAState extends State<SOA> {
                 if (item is List && item.length > 4) {
                   balanceDue += double.tryParse(item[4].toString()) ?? 0;
                 }
-                print(double.tryParse(item[4].toString()));              }
+              }
               sortDataByDate(data);
 
               return SingleChildScrollView(
@@ -618,178 +561,220 @@ class _SOAState extends State<SOA> {
                             const TextStyle(color: Colors.grey, fontSize: 15),
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      Padding(
+                      padding: const EdgeInsets.fromLTRB(8.0, 4.0, 16.0, 4.0),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          Column(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  GestureDetector(
-                                    onTap: () {
-                                      if (!isOutstandingSelected) {
-                                        toggleSelection();
-                                        setState(() {
-                                          _refreshData();
-                                        });
-                                      }
-                                    },
-                                    child: Container(
-                                      constraints: const BoxConstraints(
-                                        maxWidth: 120.0,
-                                        minHeight: 25.0,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: isOutstandingSelected
-                                            ? AppConfig.colorPrimary
-                                            : Colors.transparent,
-                                        border: Border.all(
-                                          style: BorderStyle.solid,
-                                        ),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          "Outstanding",
-                                          style: TextStyle(
-                                            color: isOutstandingSelected
-                                                ? Colors.white
-                                                : Colors.grey,
-                                          ),
-                                        ),
-                                      ),
+                              GestureDetector(
+                                onTap: () {
+                                  if (!isOutstandingSelected) {
+                                    toggleSelection();
+                                    setState(() {
+                                      _refreshData();
+                                    });
+                                  }
+                                },
+                                child: Container(
+                                  constraints: const BoxConstraints(
+                                    minHeight: 30.0,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isOutstandingSelected
+                                        ? AppConfig.colorPrimary
+                                        : const Color.fromARGB(
+                                            0, 204, 122, 122),
+                                    border: Border.all(
+                                      style: BorderStyle.solid,
                                     ),
                                   ),
-                                  GestureDetector(
-                                    onTap: () {
-                                      if (isOutstandingSelected) {
-                                        toggleSelection();
-                                        setState(() {
-                                          _refreshData();
-                                        });
-                                      }
-                                    },
-                                    child: Container(
-                                      constraints: const BoxConstraints(
-                                        maxWidth: 120.0,
-                                        minHeight: 25.0,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: !isOutstandingSelected
-                                            ? AppConfig.colorPrimary
-                                            : Colors.transparent,
-                                        border: Border.all(
-                                          style: BorderStyle.solid,
-                                        ),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          "All Transactions",
-                                          style: TextStyle(
-                                            color: !isOutstandingSelected
-                                                ? Colors.white
-                                                : Colors.grey,
-                                          ),
-                                        ),
-                                      ),
+                                  child: Text(
+                                    "Outstanding",
+                                    style: TextStyle(
+                                      color: isOutstandingSelected
+                                          ? Colors.white
+                                          : Colors.grey,
                                     ),
                                   ),
-                                ],
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  if (isOutstandingSelected) {
+                                    toggleSelection();
+                                    setState(() {
+                                      _refreshData();
+                                    });
+                                  }
+                                },
+                                child: Container(
+                                  constraints: const BoxConstraints(
+                                    minHeight: 30.0,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: !isOutstandingSelected
+                                        ? AppConfig.colorPrimary
+                                        : Colors.transparent,
+                                    border: Border.all(
+                                      style: BorderStyle.solid,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    "All Transactions",
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: !isOutstandingSelected
+                                          ? Colors.white
+                                          : Colors.grey,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ],
                           ),
-                          Row(
+                                                    Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               GestureDetector(
                                 onTap: () async {
-                                  print("object");
                                   await _generateAndPrintSOA(
                                       data, opening, closing);
                                 },
-                                child: Icon(
-                                  Icons.print,
-                                  color: Colors.blue,
-                                  size: 30,
+                                child: Container(
+                                  width: 36,
+                                  height: 36,
+                                  alignment: Alignment.center,
+                                  child: const Icon(
+                                    Icons.print,
+                                    color: Colors.blue,
+                                    size: 26,
+                                  ),
                                 ),
                               ),
-                              SizedBox(width: 20,),
+                              const SizedBox(
+                                width: 12,
+                              ),
                               GestureDetector(
                                 onTap: () async {
                                   await _generateAndPrintPdf(
                                       data, opening, closing);
                                 },
-                                child: Icon(Icons.document_scanner,
-                                    color: Colors.red, size: 30),
+                                child: Container(
+                                  width: 36,
+                                  height: 36,
+                                  alignment: Alignment.center,
+                                  child: const Icon(
+                                    Icons.document_scanner,
+                                    color: Colors.red,
+                                    size: 26,
+                                  ),
+                                ),
                               ),
-                              SizedBox(
-                                width: 10,
-                              )
                             ],
                           ),
                         ],
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8.0,
+                        vertical: 4.0,
+                      ),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          Text(
+                          const Text(
                             "From Date",
-                            style: TextStyle(fontSize: 15),
+                            style: TextStyle(fontSize: 14),
                           ),
-                          SizedBox(
-                            width: 5,
-                          ),
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(2),
-                              border: Border.all(),
-                            ),
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 5),
-                              child: Text(
-                                _selectedDatefrom == null
-                                    ? 'Select Date'
-                                    : DateFormat('dd/MM/yyyy')
-                                        .format(_selectedDatefrom!),
+                          GestureDetector(
+                            onTap: () {
+                              _selectDatefrom(context);
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(2),
+                                border: Border.all(),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 4,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _selectedDatefrom == null
+                                          ? 'Select Date'
+                                          : DateHelper.displayFromDateTime(
+                                              _selectedDatefrom!),
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.calendar_month,
+                                      size: 18,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                          GestureDetector(
-                              onTap: () {
-                                _selectDatefrom(context);
-                              },
-                              child: Icon(Icons.calendar_month)),
-                          Text(
+                          const Text(
                             "To Date",
-                            style: TextStyle(fontSize: 15),
+                            style: TextStyle(fontSize: 14),
                           ),
-                          SizedBox(
-                            width: 5,
-                          ),
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(2),
-                              border: Border.all(),
-                            ),
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 5),
-                              child: Text(
-                                _selectedDateto == null
-                                    ? 'Select Date'
-                                    : DateFormat('dd/MM/yyyy')
-                                        .format(_selectedDateto!),
+                          GestureDetector(
+                            onTap: () {
+                              _selectDateto(context);
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(2),
+                                border: Border.all(),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 4,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _selectedDateto == null
+                                          ? 'Select Date'
+                                          : DateHelper.displayFromDateTime(
+                                              _selectedDateto!),
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.calendar_month,
+                                      size: 18,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                          GestureDetector(
-                              onTap: () {
-                                _selectDateto(context);
-                              },
-                              child: Icon(Icons.calendar_month)),
                         ],
                       ),
                     ),
@@ -805,50 +790,95 @@ class _SOAState extends State<SOA> {
                                 defaultVerticalAlignment:
                                     TableCellVerticalAlignment.middle,
                                 columnWidths: const {
-                                  0: FlexColumnWidth(),
-                                  1: FlexColumnWidth(),
-                                  2: FlexColumnWidth(),
-                                  3: FlexColumnWidth(),
-                                  4: FlexColumnWidth(),
+                                  0: FlexColumnWidth(1.6), // Date
+                                  1: FlexColumnWidth(
+                                      1.3), // Reference (widened for full label)
+                                  2: FlexColumnWidth(1.1), // Debit
+                                  3: FlexColumnWidth(1.1), // Credit
+                                  4: FlexColumnWidth(1.2), // Balance
                                 },
                                 children: const [
                                   TableRow(
                                     children: [
                                       Padding(
-                                        padding: EdgeInsets.symmetric(
-                                            horizontal: 12.0, vertical: 8),
+                                        padding:
+                                            EdgeInsets.fromLTRB(12, 8, 4, 8),
                                         child: Text(
                                           "Date",
                                           style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 13),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
                                         ),
                                       ),
-                                      Text(
-                                        "Reference",
-                                        maxLines: 1,
-                                        style: TextStyle(
-                                            overflow: TextOverflow.fade,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13),
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                            left: 2,
+                                            right: 4,
+                                            top: 8,
+                                            bottom: 8),
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            "Reference",
+                                            maxLines: 1,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                      Text(
-                                        "Debit",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13),
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                            left: 2,
+                                            right: 18,
+                                            top: 8,
+                                            bottom: 8),
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerRight,
+                                          child: Text(
+                                            "Debit",
+                                            textAlign: TextAlign.right,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                      Text(
-                                        "Credit",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13),
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                            left: 16,
+                                            right: 6,
+                                            top: 8,
+                                            bottom: 8),
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerRight,
+                                          child: Text(
+                                            "Credit",
+                                            textAlign: TextAlign.right,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                      Text(
-                                        "Balance",
-                                        style: TextStyle(
+                                      Padding(
+                                        padding: EdgeInsets.only(
+                                            right: 10, top: 8, bottom: 8),
+                                        child: Text(
+                                          "Balance",
+                                          textAlign: TextAlign.right,
+                                          style: TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 13),
+                                            fontSize: 13,
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -863,7 +893,7 @@ class _SOAState extends State<SOA> {
                                   2, // increase by 2 to account for opening and closing balance rows
                               itemBuilder: (context, index) {
                                 if (index == 0) {
-                                  // Display opening balance
+                                  // Opening balance row
                                   return Padding(
                                     padding: const EdgeInsets.all(8.0),
                                     child: Row(
@@ -875,57 +905,20 @@ class _SOAState extends State<SOA> {
                                           children: [
                                             Text(
                                               "Opening Balance : ${opening.toStringAsFixed(AppState().noOfDecimals ?? 2)}",
-                                              // style: TextStyle(
-                                              //   fontSize: 15,
-                                              // ),
                                             ),
-                                            SizedBox(
-                                              width: 3,
-                                            )
+                                            const SizedBox(width: 3),
                                           ],
                                         ),
                                       ],
                                     ),
                                   );
                                 } else if (index == data.length + 1) {
-                                  // Display closing balance
-                                  double balance = opening;
-                                  for (int i = 0; i < data.length; i++) {
-                                    double amount = data[i][2] != null
-                                        ? double.parse(data[i][2].toString())
-                                        : 0.0;
-                                    double payment = data[i][3] != null
-                                        ? double.parse(data[i][3].toString())
-                                        : 0.0;
-                                    balance += amount;
-                                    balance -= payment;
-                                  }
+                                  // Closing balance row - nothing to render here, Balance Due already shows it below
+                                  return const SizedBox.shrink();
                                 } else {
                                   final row = data[index - 1];
-                                  double balance = opening;
-                                  for (int i = 0; i < index - 1; i++) {
-                                    double amount = data[i][2] != null
-                                        ? double.parse(data[i][2].toString())
-                                        : 0.0;
-                                    double payment = data[i][3] != null
-                                        ? double.parse(data[i][3].toString())
-                                        : 0.0;
-                                    balance += amount;
-                                    balance -= payment;
-                                  }
-                                  // Get current row's amount and payment
-                                  double amount = row[2] != null
-                                      ? double.parse(row[2].toString())
-                                      : 0.0;
-                                  double payment = row[3] != null
-                                      ? double.parse(row[3].toString())
-                                      : 0.0;
-                                  balance += amount;
-                                  balance -= payment;
-
                                   return Container(
                                     width: double.infinity,
-                                    height: 25,
                                     color: index % 2 == 0
                                         ? Colors.grey.shade200
                                         : Colors.white,
@@ -933,48 +926,113 @@ class _SOAState extends State<SOA> {
                                       defaultVerticalAlignment:
                                           TableCellVerticalAlignment.middle,
                                       columnWidths: const {
-                                        0: FlexColumnWidth(1.3),
-                                        1: FlexColumnWidth(),
-                                        2: FlexColumnWidth(),
-                                        3: FlexColumnWidth(),
-                                        4: FlexColumnWidth(),
+                                        0: FlexColumnWidth(1.6), // Date
+                                        1: FlexColumnWidth(1.3), // Reference
+                                        2: FlexColumnWidth(1.1), // Amount
+                                        3: FlexColumnWidth(1.1), // Payment
+                                        4: FlexColumnWidth(1.2), // Balance
                                       },
                                       children: [
                                         TableRow(
                                           children: [
                                             Padding(
-                                              padding: EdgeInsets.all(6.0),
-                                              child: Text(
-                                                row[0].toString(),
-                                                style: TextStyle(fontSize: 13),
+                                              padding:
+                                                  const EdgeInsets.fromLTRB(
+                                                      12, 6, 4, 6),
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment: Alignment.centerLeft,
+                                                child: Text(
+                                                  DateHelper.displayDate(
+                                                      row[0].toString()),
+                                                  maxLines: 1,
+                                                  style: const TextStyle(
+                                                      fontSize: 13),
+                                                ),
                                               ),
                                             ),
                                             Padding(
-                                              padding: EdgeInsets.all(6.0),
-                                              child: Text(
-                                                row[1].toString(),
-                                                style: TextStyle(fontSize: 13),
+                                              padding: const EdgeInsets.only(
+                                                  left: 2,
+                                                  right: 4,
+                                                  top: 6,
+                                                  bottom: 6),
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment: Alignment.centerLeft,
+                                                child: Text(
+                                                  row[1].toString(),
+                                                  maxLines: 1,
+                                                  style: const TextStyle(
+                                                      fontSize: 13),
+                                                ),
                                               ),
                                             ),
                                             Padding(
-                                              padding: EdgeInsets.all(6.0),
-                                              child: Text(
-                                                row[2].toStringAsFixed(AppState().noOfDecimals ?? 2),
-                                                style: TextStyle(fontSize: 13),
+                                              padding: const EdgeInsets.only(
+                                                  left: 2,
+                                                  right: 18,
+                                                  top: 6,
+                                                  bottom: 6),
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                child: Text(
+                                                  (double.tryParse(row[2]
+                                                              .toString()) ??
+                                                          0.0)
+                                                      .toStringAsFixed(AppState()
+                                                              .noOfDecimals ??
+                                                          2),
+                                                  textAlign: TextAlign.right,
+                                                  style: const TextStyle(
+                                                      fontSize: 13),
+                                                ),
                                               ),
                                             ),
                                             Padding(
-                                              padding: EdgeInsets.all(6.0),
-                                              child: Text(
-                                                row[3].toStringAsFixed(AppState().noOfDecimals ?? 2),
-                                                style: TextStyle(fontSize: 13),
+                                              padding: const EdgeInsets.only(
+                                                  left: 16,
+                                                  right: 6,
+                                                  top: 6,
+                                                  bottom: 6),
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                child: Text(
+                                                  (double.tryParse(row[3]
+                                                              .toString()) ??
+                                                          0.0)
+                                                      .abs()
+                                                      .toStringAsFixed(AppState()
+                                                              .noOfDecimals ??
+                                                          2),
+                                                  textAlign: TextAlign.right,
+                                                  style: const TextStyle(
+                                                      fontSize: 13),
+                                                ),
                                               ),
                                             ),
                                             Padding(
-                                              padding: EdgeInsets.all(6.0),
-                                              child: Text(
-                                                row[4].toStringAsFixed(AppState().noOfDecimals ?? 2),
-                                                style: TextStyle(fontSize: 13),
+                                              padding: const EdgeInsets.only(
+                                                  right: 10, top: 6, bottom: 6),
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                child: Text(
+                                                  (double.tryParse(row[4]
+                                                              .toString()) ??
+                                                          0.0)
+                                                      .toStringAsFixed(AppState()
+                                                              .noOfDecimals ??
+                                                          2),
+                                                  textAlign: TextAlign.right,
+                                                  style: const TextStyle(
+                                                      fontSize: 13),
+                                                ),
                                               ),
                                             ),
                                           ],
@@ -1016,50 +1074,91 @@ class _SOAState extends State<SOA> {
                                 defaultVerticalAlignment:
                                     TableCellVerticalAlignment.middle,
                                 columnWidths: const {
-                                  0: FlexColumnWidth(),
-                                  1: FlexColumnWidth(),
-                                  2: FlexColumnWidth(),
-                                  3: FlexColumnWidth(),
-                                  4: FlexColumnWidth(),
+                                  0: FlexColumnWidth(1.6), // Date
+                                  1: FlexColumnWidth(1.3), // Reference
+                                  2: FlexColumnWidth(1.1), // Debit
+                                  3: FlexColumnWidth(1.1), // Credit
+                                  4: FlexColumnWidth(1.2), // Balance
                                 },
-                                children: [
-                                  const TableRow(
+                                children: const [
+                                  TableRow(
                                     children: [
                                       Padding(
-                                        padding: EdgeInsets.symmetric(
-                                            horizontal: 12.0, vertical: 8),
+                                        padding:
+                                            EdgeInsets.fromLTRB(12, 8, 4, 8),
                                         child: Text(
                                           "Date",
                                           style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 13),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
                                         ),
                                       ),
-                                      Text(
-                                        "Reference",
-                                        maxLines: 1,
-                                        style: TextStyle(
-                                            overflow: TextOverflow.fade,
+                                      Padding(
+                                        padding: EdgeInsets.only(
+                                            left: 2,
+                                            right: 4,
+                                            top: 8,
+                                            bottom: 8),
+                                        child: Text(
+                                          "Reference",
+                                          maxLines: 1,
+                                          overflow: TextOverflow.fade,
+                                          style: TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 13),
+                                            fontSize: 13,
+                                          ),
+                                        ),
                                       ),
-                                      Text(
-                                        "Debit",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13),
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                            left: 2,
+                                            right: 18,
+                                            top: 8,
+                                            bottom: 8),
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerRight,
+                                          child: Text(
+                                            "Debit",
+                                            textAlign: TextAlign.right,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                      Text(
-                                        "Credit",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13),
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                            left: 16,
+                                            right: 6,
+                                            top: 8,
+                                            bottom: 8),
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerRight,
+                                          child: Text(
+                                            "Credit",
+                                            textAlign: TextAlign.right,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                      Text(
-                                        "Balance",
-                                        style: TextStyle(
+                                      Padding(
+                                        padding: EdgeInsets.only(
+                                            right: 10, top: 8, bottom: 8),
+                                        child: Text(
+                                          "Balance",
+                                          textAlign: TextAlign.right,
+                                          style: TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 13),
+                                            fontSize: 13,
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -1074,7 +1173,7 @@ class _SOAState extends State<SOA> {
                                   2, // increase by 2 to account for opening and closing balance rows
                               itemBuilder: (context, index) {
                                 if (index == 0) {
-                                  // Display opening balance
+                                  // Opening balance row
                                   return Padding(
                                     padding: const EdgeInsets.all(8.0),
                                     child: Row(
@@ -1086,58 +1185,20 @@ class _SOAState extends State<SOA> {
                                           children: [
                                             Text(
                                               "Opening Balance : ${opening.toStringAsFixed(AppState().noOfDecimals ?? 2)}",
-                                              // style: TextStyle(
-                                              //   fontSize: 15,
-                                              // ),
                                             ),
-                                            SizedBox(
-                                              width: 3,
-                                            )
+                                            const SizedBox(width: 3),
                                           ],
                                         ),
                                       ],
                                     ),
                                   );
                                 } else if (index == data.length + 1) {
-                                  // Display closing balance
-                                  double balance = opening;
-                                  for (int i = 0; i < data.length; i++) {
-                                    double amount = data[i][2] != null
-                                        ? double.parse(data[i][2].toString())
-                                        : 0.0;
-                                    double payment = data[i][3] != null
-                                        ? double.parse(data[i][3].toString())
-                                        : 0.0;
-                                    // double babalance = data[i][5] != null
-                                    //     ? double.parse(data[i][5].toString()):0.0;
-                                    balance += amount;
-                                    balance -= payment;
-                                  }
+                                  // Closing balance row - nothing to render here, Balance Due already shows it below
+                                  return const SizedBox.shrink();
                                 } else {
                                   final row = data[index - 1];
-                                  double balance = opening;
-                                  for (int i = 0; i < index - 1; i++) {
-                                    double amount = data[i][2] != null
-                                        ? double.parse(data[i][2].toString())
-                                        : 0.0;
-                                    double payment = data[i][3] != null
-                                        ? double.parse(data[i][3].toString())
-                                        : 0.0;
-                                    balance += amount;
-                                    balance -= payment;
-                                  }
-                                  double amount = row[2] != null
-                                      ? double.parse(row[2].toString())
-                                      : 0.0;
-                                  double payment = row[3] != null
-                                      ? double.parse(row[3].toString())
-                                      : 0.0;
-                                  balance += amount;
-                                  balance -= payment;
-
                                   return Container(
                                     width: double.infinity,
-                                    height: 35,
                                     color: index % 2 == 0
                                         ? Colors.grey.shade200
                                         : Colors.white,
@@ -1145,48 +1206,113 @@ class _SOAState extends State<SOA> {
                                       defaultVerticalAlignment:
                                           TableCellVerticalAlignment.middle,
                                       columnWidths: const {
-                                        0: FlexColumnWidth(1.3),
-                                        1: FlexColumnWidth(),
-                                        2: FlexColumnWidth(),
-                                        3: FlexColumnWidth(),
-                                        4: FlexColumnWidth(),
+                                        0: FlexColumnWidth(1.6), // Date
+                                        1: FlexColumnWidth(1.3), // Reference
+                                        2: FlexColumnWidth(1.1), // Amount
+                                        3: FlexColumnWidth(1.1), // Payment
+                                        4: FlexColumnWidth(1.2), // Balance
                                       },
                                       children: [
                                         TableRow(
                                           children: [
                                             Padding(
-                                              padding: EdgeInsets.all(6.0),
-                                              child: Text(
-                                                row[0].toString(),
-                                                style: TextStyle(fontSize: 13),
+                                              padding:
+                                                  const EdgeInsets.fromLTRB(
+                                                      12, 6, 4, 6),
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment: Alignment.centerLeft,
+                                                child: Text(
+                                                  DateHelper.displayDate(
+                                                      row[0].toString()),
+                                                  maxLines: 1,
+                                                  style: const TextStyle(
+                                                      fontSize: 13),
+                                                ),
                                               ),
                                             ),
                                             Padding(
-                                              padding: EdgeInsets.all(6.0),
-                                              child: Text(
-                                                row[1].toString(),
-                                                style: TextStyle(fontSize: 13),
+                                              padding: const EdgeInsets.only(
+                                                  left: 2,
+                                                  right: 4,
+                                                  top: 6,
+                                                  bottom: 6),
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment: Alignment.centerLeft,
+                                                child: Text(
+                                                  row[1].toString(),
+                                                  maxLines: 1,
+                                                  style: const TextStyle(
+                                                      fontSize: 13),
+                                                ),
                                               ),
                                             ),
                                             Padding(
-                                              padding: EdgeInsets.all(6.0),
-                                              child: Text(
-                                                row[2].toString(),
-                                                style: TextStyle(fontSize: 13),
+                                              padding: const EdgeInsets.only(
+                                                  left: 2,
+                                                  right: 18,
+                                                  top: 6,
+                                                  bottom: 6),
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                child: Text(
+                                                  (double.tryParse(row[2]
+                                                              .toString()) ??
+                                                          0.0)
+                                                      .toStringAsFixed(AppState()
+                                                              .noOfDecimals ??
+                                                          2),
+                                                  textAlign: TextAlign.right,
+                                                  style: const TextStyle(
+                                                      fontSize: 13),
+                                                ),
                                               ),
                                             ),
                                             Padding(
-                                              padding: EdgeInsets.all(6.0),
-                                              child: Text(
-                                                row[3].toString(),
-                                                style: TextStyle(fontSize: 13),
+                                              padding: const EdgeInsets.only(
+                                                  left: 16,
+                                                  right: 6,
+                                                  top: 6,
+                                                  bottom: 6),
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                child: Text(
+                                                  (double.tryParse(row[3]
+                                                              .toString()) ??
+                                                          0.0)
+                                                      .abs()
+                                                      .toStringAsFixed(AppState()
+                                                              .noOfDecimals ??
+                                                          2),
+                                                  textAlign: TextAlign.right,
+                                                  style: const TextStyle(
+                                                      fontSize: 13),
+                                                ),
                                               ),
                                             ),
                                             Padding(
-                                              padding: EdgeInsets.all(6.0),
-                                              child: Text(
-                                                row[4].toString(),
-                                                style: TextStyle(fontSize: 13),
+                                              padding: const EdgeInsets.only(
+                                                  right: 10, top: 6, bottom: 6),
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                child: Text(
+                                                  (double.tryParse(row[4]
+                                                              .toString()) ??
+                                                          0.0)
+                                                      .toStringAsFixed(AppState()
+                                                              .noOfDecimals ??
+                                                          2),
+                                                  textAlign: TextAlign.right,
+                                                  style: const TextStyle(
+                                                      fontSize: 13),
+                                                ),
                                               ),
                                             ),
                                           ],
@@ -1197,7 +1323,7 @@ class _SOAState extends State<SOA> {
                                 }
                               },
                             ),
-                            Divider(
+                            const Divider(
                               color: Colors.black38,
                               thickness: 2,
                             ),
@@ -1208,8 +1334,8 @@ class _SOAState extends State<SOA> {
                                 children: [
                                   Text(
                                     "Balance Due: ${balanceDue.toStringAsFixed(AppState().noOfDecimals ?? 2)}",
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
                                   ),
                                 ],
                               ),

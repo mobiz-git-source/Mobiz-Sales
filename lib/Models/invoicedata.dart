@@ -197,6 +197,7 @@ class Store {
   int? id;
   String? code;
   String? name;
+  String? name_ar;
   int? comapnyId;
   String? logo;
   String? address;
@@ -257,6 +258,7 @@ class Store {
     id = json['id'];
     code = json['code'];
     name = json['name'];
+     name_ar = json['name_ar']; 
     comapnyId = json['comapny_id'];
     logo = json['logo'];
     address = json['address'];
@@ -291,6 +293,7 @@ class Store {
     data['id'] = this.id;
     data['code'] = this.code;
     data['name'] = this.name;
+     data['name_ar'] = this.name_ar;
     data['comapny_id'] = this.comapnyId;
     data['logo'] = this.logo;
     data['address'] = this.address;

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../Utilities/rest_ds.dart';
 import '../../confg/appconfig.dart';
 import '../../Models/appstate.dart';
+import '../../Utilities/date_helper.dart';
 import 'ProductSearchPage.dart';
 
 class ProductionOrderForm extends StatefulWidget {
@@ -16,6 +17,7 @@ class ProductionOrderForm extends StatefulWidget {
 
 class _ProductionOrderFormState extends State<ProductionOrderForm> {
   final TextEditingController dateController = TextEditingController();
+  DateTime selectedProductionDate = DateTime.now();
   final TextEditingController productController = TextEditingController();
   final TextEditingController unitController = TextEditingController();
   final TextEditingController qtyController = TextEditingController(text: "1");
@@ -34,9 +36,10 @@ class _ProductionOrderFormState extends State<ProductionOrderForm> {
     fetchLocations();
   }
 
-  void _setCurrentFormattedDate() {
+void _setCurrentFormattedDate() {
     final now = DateTime.now();
-    dateController.text = DateFormat('dd/MMM/yyyy').format(now);
+    selectedProductionDate = now;
+    dateController.text = DateHelper.displayFromDateTime(now);
   }
 
   Future<void> fetchLocations() async {
@@ -87,8 +90,11 @@ class _ProductionOrderFormState extends State<ProductionOrderForm> {
       lastDate: DateTime(2100),
     );
 
-    if (picked != null) {
-      dateController.text = DateFormat('dd/MMM/yyyy').format(picked);
+ if (picked != null) {
+      setState(() {
+        selectedProductionDate = picked;
+        dateController.text = DateHelper.displayFromDateTime(picked);
+      });
     }
   }
 
@@ -111,14 +117,14 @@ class _ProductionOrderFormState extends State<ProductionOrderForm> {
     final url = Uri.parse("${RestDatasource().BASE_URL}/api/production-orders");
     final nowTime = DateFormat('HH:mm:ss').format(DateTime.now());
 
-    final body = {
+  final body = {
       "store_id" : AppState().storeId,
       "product_id": selectedProductId,
       "unit": selectedUnitId,
       "user_id": AppState().userId,
       "quandity": qty,
       "quantity": qty,
-      "in_date": dateController.text,
+      "in_date": DateHelper.apiDate(selectedProductionDate),
       "in_time": nowTime,
       "production_store": locationId
     };
@@ -259,7 +265,7 @@ print(response.body);
       appBar: AppBar(
         backgroundColor: AppConfig.colorPrimary,
         title: const Text("New Production Order",
-            style: TextStyle(color: Colors.white)),
+            style: AppConfig.pageTitleStyle,),
         iconTheme: const IconThemeData(color: Colors.white),
         // actions: [
         //   IconButton(

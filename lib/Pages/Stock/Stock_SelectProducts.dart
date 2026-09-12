@@ -404,7 +404,17 @@ class _Stock_SelectProductsState extends State<Stock_SelectProducts> {
                           Text(
                             'Available Qty: ${selectedUnit!['stock']}',
                             style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                          ),SizedBox(height: 8),
+
+Text(
+  "Minimum Rate : ${selectedUnit?['min_price'] ?? '0'}",
+  style: const TextStyle(
+    color: Colors.red,
+    fontWeight: FontWeight.bold,
+  ),
+),
+
+SizedBox(height: 10),
                         ],
                         if (units != null &&
                             units.any((unit) => unit != null)) ...[

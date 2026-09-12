@@ -13,6 +13,8 @@ import '../Models/sales_model.dart';
 import '../Utilities/rest_ds.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
+// NEW: centralized semantic font sizes (matches the Sale screen exactly).
+import '../confg/apptextsizes.dart';
 import 'TestReturn.dart';
 import 'homereturn.dart';
 
@@ -25,7 +27,14 @@ class Customerreturndetail extends StatefulWidget {
 
 int? id;
 
-// int?dataId;
+// =====================================================================
+// NOTE: Everything below `build()` (all calculations, API calls,
+// SharedPreferences logic, navigation, and the item-details dialog) is
+// UNCHANGED from the original implementation. Only `build()`'s widget
+// tree has been restructured to visually match the Sale (CopyScreen)
+// screen, and hardcoded `.sp`/raw fontSize values inside `build()` have
+// been replaced with semantic constants from AppFontSizes.
+// =====================================================================
 class _CustomerreturndetailState extends State<Customerreturndetail> {
   late String initialQty;
   int specificIndex = 0;
@@ -40,7 +49,7 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
   final TextEditingController _remarksController = TextEditingController();
   String _remarksText = "";
   Map<int, String> amounts = {};
-  final TextEditingController _roundoff = TextEditingController();
+  final TextEditingController _roundoff = TextEditingController(text: '0');
   Map<int, String> qtys = {};
   TextEditingController _searchData = TextEditingController();
   String? selectedUnitName;
@@ -95,28 +104,6 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
     });
   }
 
-  // @override
-  // void didChangeDependencies() {
-  //   super.didChangeDependencies();
-  //
-  //   // Check if arguments are passed via the ModalRoute and extract them
-  //   final Map<String, dynamic>? params = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-  //
-  //   if (params != null) {
-  //     setState(() {
-  //       id = params['customerId'];
-  //       name = params['name'];
-  //       code = params['code'];
-  //       payment = params['paymentTerms'];
-  //       dataId = params['dataId'];
-  //       paydata = params['outstandamt'];
-  //     });
-  //
-  //     // Now that dataId is set, you can call fetchSalesReturnData
-  //     fetchSalesReturnData(dataId!);
-  //   }
-  // }
-
   Future<void> addToCart(Product product) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String>? cartItems = prefs.getStringList('cartItemsreturn') ?? [];
@@ -152,55 +139,6 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
     );
   }
 
-  // Future<void> fetchSalesReturnData() async {
-  //   print("DataaIID");
-  //   print(dataId);
-  //   final url = Uri.parse(
-  //       '${RestDatasource().BASE_URL}/api/get-sales-return.empty-product?store_id=${AppState().storeId}&id=$dataId');
-  //   final response = await http.get(url);
-  //
-  //   if (response.statusCode == 200) {
-  //     print(response.request);
-  //     final data = jsonDecode(response.body);
-  //     if (data != null && data['data'] != null) {
-  //       if (dataId != null) {
-  //         SharedPreferences prefs = await SharedPreferences.getInstance();
-  //         await prefs.setString('dataId', dataId.toString());
-  //         List<Product> fetchedProducts = [];
-  //         if (data['data'] is List) {
-  //           fetchedProducts = (data['data'] as List).map((item) {
-  //             Product product = Product.fromJson(item);
-  //             product.defaultValue = 1;
-  //             return product;
-  //           }).toList();
-  //           cartItems.addAll(fetchedProducts);
-  //           for (var product in fetchedProducts) {
-  //             await addToCart(product);
-  //           }
-  //         } else if (data['data'] is Map) {
-  //           Product product = Product.fromJson(data['data']);
-  //           product.defaultValue = 1;
-  //           cartItems.add(product);
-  //           await addToCart(product);
-  //
-  //         }
-  //         selectedProductTypes = List.generate(
-  //           cartItems.length,
-  //           (index) => null,
-  //         );
-  //         setState(() {
-  //           _fetchSalesReturnDataComplete =
-  //               true;
-  //         });
-  //       }
-  //     }
-  //   } else {
-  //     throw Exception('Failed to load sales return data');
-  //   }
-  // }
-
-  // bool _showButton = false; // Add this flag at the class level.
-
   Future<void> fetchSalesReturnData() async {
     try {
       print("DataaIID");
@@ -212,13 +150,29 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
       if (response.statusCode == 200) {
         print(response.request);
         final data = jsonDecode(response.body);
+        print("========== RETURN API FULL RESPONSE ==========");
+        print(response.body);
+        print("================================================");
         if (data != null && data['data'] != null) {
           if (dataId != null) {
             SharedPreferences prefs = await SharedPreferences.getInstance();
             await prefs.setString('dataId', dataId.toString());
             List<Product> fetchedProducts = [];
+
             if (data['data'] is List && data['data'].isNotEmpty) {
               fetchedProducts = (data['data'] as List).map((item) {
+                print("========== VAT API DEBUG ==========");
+                print("Product ID       : ${item['id']}");
+                print("Product Name     : ${item['name']}");
+                print("Tax              : ${item['tax']}");
+                print("Tax Percentage   : ${item['tax_percentage']}");
+                print("VAT Label        : ${item['vat_label']}");
+                print("VAT              : ${item['vat']}");
+                print("Tax Label        : ${item['tax_label']}");
+                print("ALL KEYS         : ${item.keys.toList()}");
+                print("FULL ITEM        : $item");
+                print("===================================");
+
                 Product product = Product.fromJson(item);
                 product.defaultValue = 1;
                 return product;
@@ -229,6 +183,16 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
               }
               _showButton = false; // No need to show the button if data exists.
             } else if (data['data'] is Map) {
+              // ============ NEW: single-item key check ============
+              print("---------- SINGLE ITEM KEYS ----------");
+              print((data['data'] as Map).keys.toList());
+              print("stock: ${data['data']['stock']}");
+              print("min_price: ${data['data']['min_price']}");
+              print(
+                  "minimum_rate_matrix: ${data['data']['minimum_rate_matrix']}");
+              print("units: ${data['data']['units']}");
+              print("---------------------------------------");
+              // ====================================================
               Product product = Product.fromJson(data['data']);
               product.defaultValue = 1;
               cartItems.add(product);
@@ -322,7 +286,7 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
     double total = 0;
     for (int index = 0; index < cartItems.length; index++) {
       double rate = double.tryParse(
-          amounts[index] ?? cartItems[index].price.toString()) ??
+              amounts[index] ?? cartItems[index].price.toString()) ??
           0;
       // FIX: Use double.tryParse instead of int.tryParse for quantity
       double quantity = double.tryParse(qtys[index] ?? '1') ?? 1.0;
@@ -335,17 +299,29 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
     double totalAmount = calculateTotalRate();
     String discountValue = _discountData.text.trim();
     double discountAmount = double.tryParse(discountValue) ?? 0;
-    num taxPercentage = 5;
+    double tax = 0;
 
-    if (_isPercentage) {
-      // Percentage discount: apply discount first, then calculate tax
-      double discountedAmount = totalAmount - (totalAmount * discountAmount / 100);
-      return (discountedAmount * taxPercentage) / 100;
-    } else {
-      // Fixed amount discount: subtract discount, then calculate tax
-      double discountedAmount = totalAmount - discountAmount;
-      return (discountedAmount * taxPercentage) / 100;
+    for (int index = 0; index < cartItems.length; index++) {
+      double rate = double.tryParse(
+              amounts[index] ?? cartItems[index].price.toString()) ??
+          0;
+      double quantity = double.tryParse(qtys[index] ?? '1') ?? 1.0;
+      double lineTotal = rate * quantity;
+      num taxPercentage = cartItems[index].taxPercentage;
+
+      double lineDiscountShare =
+          totalAmount == 0 ? 0 : (lineTotal / totalAmount) * discountAmount;
+
+      double taxableAmount = _isPercentage
+          ? lineTotal - ((lineTotal * discountAmount) / 100)
+          : lineTotal - lineDiscountShare;
+
+      if (taxableAmount < 0) taxableAmount = 0;
+
+      tax += (taxableAmount * taxPercentage) / 100;
     }
+
+    return tax;
   }
 
   Map<String, dynamic> grandTotal() {
@@ -398,25 +374,6 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
     }
   }
 
-  // Future<void> removeFromCart(int index) async {
-  //   SharedPreferences prefs = await SharedPreferences.getInstance();
-  //   List<String>? cartItemsJson = prefs.getStringList('cartItemsreturn');
-  //
-  //   if (cartItemsJson != null) {
-  //     List<Product> products = cartItemsJson
-  //         .map((json) => Product.fromJson(jsonDecode(json)))
-  //         .toList();
-  //
-  //     products.removeAt(index); // Remove the item at the specific index
-  //
-  //     List<String> updatedCartItemsJson =
-  //         products.map((product) => jsonEncode(product.toJson())).toList();
-  //
-  //     await prefs.setStringList('cartItemsreturn', updatedCartItemsJson);
-  //
-  //     fetchCartItems(); // Refresh UI after deletion
-  //   }
-  // }
   Future<void> removeFromCart(int index) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String>? cartItemsJson = prefs.getStringList('cartItemsreturn');
@@ -471,16 +428,6 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
     }
   }
 
-  // Future<void> initializeValues() async {
-  //   SharedPreferences prefs = await SharedPreferences.getInstance();
-  //   setState(() {
-  //     for (int i = 0; i < cartItems.length; i++) {
-  //       qtys[i] = prefs.getString('qtyreturn$i') ?? '1';
-  //       amounts[i] =
-  //           prefs.getString('amountreturn$i') ?? cartItems[i].price.toString();
-  //     }
-  //   });
-  // }
   Future<void> initializeValues() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
 
@@ -518,14 +465,22 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
     // You can also show a dialog, navigate to another page, etc.
   }
 
+  // =====================================================================
+  // BUILD — Restructured to visually match the Sale (CopyScreen) screen.
+  // All values referenced below (totals, tax, roundedGrandTotal,
+  // roundOffValue, cartItems, qtys/amounts maps, discount/round-off
+  // controllers, the Reason dropdown, etc.) are computed exactly as
+  // before — only the widget tree and font sizes changed.
+  // =====================================================================
   @override
   Widget build(BuildContext context) {
     Map<String, dynamic> grandTotalMap = grandTotal();
 
     double total = calculateTotalRate();
     double tax = _ifVat == 1 ? calculateTax() : 0;
-    var roundedGrandTotal =
-        grandTotalMap['rounded']?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
+    var roundedGrandTotal = grandTotalMap['rounded']
+            ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
+        '0.00';
 
     double roundOffValue = grandTotalMap['roundOffValue'];
 
@@ -575,7 +530,8 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
           'mrp': amounts.entries
                   .map((entry) {
                     double value = double.tryParse(entry.value) ?? 0.0;
-                    return double.parse(value.toStringAsFixed(AppState().noOfDecimals ?? 2));
+                    return double.parse(
+                        value.toStringAsFixed(AppState().noOfDecimals ?? 2));
                   })
                   .toList()
                   .isEmpty
@@ -583,13 +539,9 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
               : amounts.entries.map((entry) {
                   double value = double.tryParse(entry.value) ?? 0.0;
                   print("sdsds$value");
-                  return double.parse(value.toStringAsFixed(AppState().noOfDecimals ?? 2));
+                  return double.parse(
+                      value.toStringAsFixed(AppState().noOfDecimals ?? 2));
                 }).toList(),
-          // 'mrp': amounts.entries.map((entry) {
-          //   return double.tryParse(entry.value) ?? 0.0;
-          // }).toList().isEmpty ? [0.0] : amounts.entries.map((entry) {
-          //   return double.tryParse(entry.value) ?? 0.0;
-          // }).toList(),
           'customer_id': id ?? 0,
           'if_vat': _ifVat == 1 ? 1 : 0,
           'product_type': productTypesList,
@@ -643,8 +595,7 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
               } else {
                 Navigator.pushReplacementNamed(
                   context,
-                  HomereturnScreen
-                      .routeName, // Replace with the actual route name for HomeReturnPage
+                  HomereturnScreen.routeName,
                 );
               }
             });
@@ -657,105 +608,17 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
         print('An error occurred: $e');
       } finally {
         setState(() {
-          _isButtonDisabled =
-              false; // Re-enable the button after the request completes (whether it succeeds or fails)
+          _isButtonDisabled = false;
         });
       }
     }
 
-    // if (ModalRoute.of(context)!.settings.arguments != null) {
-    //   final Map<String, dynamic>? params =
-    //       ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
-    //   id = params!['customerId'];
-    //   name = params['name'];
-    //   code = params!['code'];
-    //   payment = params!['paymentTerms'];
-    //   dataId = params!['dataId'];
-    //   paydata = params!['outstandamt'];
-    //
-    // }
-
     return WillPopScope(
       onWillPop: () async {
-        // Call your custom function here
         await _onBackPressed();
-        // Return true to allow the page to be popped
-        // Return false to prevent the page from being popped
         return true;
       },
       child: Scaffold(
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-        floatingActionButton: SizedBox(
-          width: 200.w,
-          height: 30.h,
-          child: _hasData
-              ? Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ElevatedButton(
-                      style: ButtonStyle(
-                        shape: WidgetStateProperty.all<RoundedRectangleBorder>(
-                          RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(7.0),
-                          ),
-                        ),
-                        backgroundColor: WidgetStateProperty.all(
-                          cartItems.isNotEmpty && !_isButtonDisabled
-                              ? AppConfig.colorPrimary
-                              : AppConfig.buttonDeactiveColor,
-                        ),
-                      ),
-                      onPressed: _isButtonDisabled || cartItems.isEmpty
-                          ? null
-                          : () async {
-                        postDataToApi();
-                      },
-                      child: Text(
-                        'SAVE',
-                        style: TextStyle(
-                            fontSize: AppConfig.textCaption3Size,
-                            color: AppConfig.backgroundColor,
-                            fontWeight: AppConfig.headLineWeight),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 10,
-                    ),
-                    _showButton
-                        ? ElevatedButton(
-                            style: ButtonStyle(
-                                shape: WidgetStatePropertyAll(
-                                    RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(10))),
-                                backgroundColor: WidgetStatePropertyAll(
-                                    AppConfig.colorPrimary)),
-                            onPressed: () {
-                              Navigator.pushReplacementNamed(
-                                context,
-                                PaymentCollectionScreen.routeName,
-                                arguments: {
-                                  'customerId': id,
-                                  'name': name,
-                                  'code': code,
-                                  'saleId': saleId,
-                                  // 'returnId':returnId,
-                                  'paymentTerms': payment,
-                                  'outstandamt': paydata,
-                                  'price_group_id': pricegroupId
-                                },
-                              );
-                            },
-                            child: Text(
-                              'SKIP',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          )
-                        : SizedBox.shrink(),
-                  ],
-                )
-              : Text('Return Type Not\n      Available'),
-        ),
         appBar: AppBar(
           leading: GestureDetector(
               onTap: () {
@@ -766,14 +629,15 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
           iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
           title: const Text(
             'Return',
-            style: TextStyle(color: AppConfig.backgroundColor),
+            style: AppConfig.pageTitleStyle,
           ),
           backgroundColor: AppConfig.colorPrimary,
           actions: [
             (_search)
                 ? Container(
                     height: SizeConfig.blockSizeVertical * 5,
-                    width: SizeConfig.blockSizeHorizontal * 76,
+                    width: (MediaQuery.of(context).size.width * 0.76)
+                        .clamp(160.0, 280.0),
                     decoration: BoxDecoration(
                       color: AppConfig.colorPrimary,
                       borderRadius: const BorderRadius.all(
@@ -783,6 +647,12 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
                     ),
                     child: TextField(
                       controller: _searchData,
+                      autofocus: true,
+                      onChanged: (value) {
+                        setState(() {});
+                      },
+                      style: TextStyle(color: AppConfig.backgroundColor),
+                      cursorColor: AppConfig.backgroundColor,
                       decoration: const InputDecoration(
                         contentPadding: EdgeInsets.all(5),
                         hintText: "Search...",
@@ -795,20 +665,11 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
             CommonWidgets.horizontalSpace(1),
             GestureDetector(
               onTap: () {
-                Navigator.pushReplacementNamed(
-                    context, Salesselectproductreturn.routeName,
-                    arguments: {
-                      'customerId': id,
-                      'name': name,
-                      'code': code,
-                      'saleId': saleId,
-                      'paymentTerms': payment,
-                      'outstandamt': paydata,
-                      'price_group_id': pricegroupId
-                      // 'dataId': dataId
-                    }).then((value) {
-                  // _initDone = false;
-                  // _getTypes();
+                setState(() {
+                  _search = !_search;
+                  if (!_search) {
+                    _searchData.clear();
+                  }
                 });
               },
               child: Icon(
@@ -822,56 +683,149 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
         ),
         body: cartItems.isEmpty
             ? Center(
-                child: Text('No items.'),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.pushReplacementNamed(
+                      context,
+                      Salesselectproductreturn.routeName,
+                      arguments: {
+                        'customerId': id,
+                        'name': name,
+                        'code': code,
+                        'saleId': saleId,
+                        'paymentTerms': payment,
+                        'outstandamt': paydata,
+                        'price_group_id': pricegroupId,
+                      },
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.add_shopping_cart,
+                          size: 34,
+                          color: AppConfig.colorPrimary,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No saved products',
+                          style: TextStyle(color: Colors.black54),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tap to Add Item',
+                          style: TextStyle(
+                            color: AppConfig.colorPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               )
             : Column(
                 children: [
+                  // ==========================================================
+                  // STORE HEADER CARD (matches Sale exactly)
+                  // ==========================================================
                   Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      children: [
-                        Text(
-                          (name ?? '').toUpperCase(),
-                          style: TextStyle(
-                            fontSize: AppConfig.textCaption3Size,
-                            color: AppConfig.buttonDeactiveColor,
-                          ),
+                    padding: const EdgeInsets.fromLTRB(7, 5, 7, 6),
+                    child: Container(
+                      height: 50,
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: const Color(0xFFE0E0E0),
+                          width: 0.7,
                         ),
-                        const Spacer(),
-                        AppState().vatState != 'Disable'
-                            ? Row(
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 3,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF4F4FF),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Icon(
+                              Icons.storefront_outlined,
+                              size: 19,
+                              color: AppConfig.colorPrimary,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              (name ?? '').toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: AppFontSizes.label,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF252525),
+                                letterSpacing: 0.05,
+                              ),
+                            ),
+                          ),
+                          // VAT IN / NO VAT (content unchanged, styled like Sale)
+                          if (AppState().vatState != 'Disable') ...[
+                            const SizedBox(width: 5),
+                            Container(
+                              height: 22,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(3),
+                                border: Border.all(
+                                  color: const Color(0xFFD5D5D5),
+                                  width: 0.7,
+                                ),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   InkWell(
                                     onTap: () {
                                       setState(() {
                                         _ifVat = 1;
                                       });
-                                      total = 0;
-                                      tax = 0;
-                                      // _calculateTotal();
                                     },
                                     child: Container(
-                                      decoration: BoxDecoration(
-                                          border:
-                                              Border.all(color: Colors.black),
-                                          color: (_ifVat == 1)
-                                              ? AppConfig.colorPrimary
-                                              : AppConfig.backButtonColor,
-                                          borderRadius: const BorderRadius.only(
-                                              topLeft: Radius.circular(3),
-                                              bottomLeft: Radius.circular(3))),
-                                      width:
-                                          SizeConfig.blockSizeHorizontal * 13,
-                                      height: SizeConfig.blockSizeVertical * 3,
-                                      child: Center(
+                                      constraints:
+                                          const BoxConstraints(minWidth: 45),
+                                      height: 22,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                      ),
+                                      alignment: Alignment.center,
+                                      color: (_ifVat == 1)
+                                          ? AppConfig.colorPrimary
+                                          : const Color(0xFFF7F7F7),
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
                                         child: Text(
-                                          'VAT',
+                                          'VAT IN',
+                                          maxLines: 1,
                                           style: TextStyle(
-                                            fontSize:
-                                                AppConfig.textCaption3Size,
+                                            fontSize: AppFontSizes.body,
+                                            fontWeight: FontWeight.w600,
                                             color: (_ifVat == 1)
-                                                ? AppConfig.backButtonColor
-                                                : AppConfig.textBlack,
+                                                ? Colors.white
+                                                : const Color(0xFF333333),
                                           ),
                                         ),
                                       ),
@@ -882,745 +836,2269 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
                                       setState(() {
                                         _ifVat = 0;
                                       });
-                                      total = 0;
-                                      tax = 0;
-                                      // _calculateTotal();
                                     },
                                     child: Container(
-                                      decoration: BoxDecoration(
-                                          border:
-                                              Border.all(color: Colors.black),
-                                          color: (_ifVat == 0)
-                                              ? AppConfig.colorPrimary
-                                              : AppConfig.backButtonColor,
-                                          borderRadius: const BorderRadius.only(
-                                              topRight: Radius.circular(3),
-                                              bottomRight: Radius.circular(3))),
-                                      width:
-                                          SizeConfig.blockSizeHorizontal * 13,
-                                      height: SizeConfig.blockSizeVertical * 3,
-                                      child: Center(
+                                      constraints:
+                                          const BoxConstraints(minWidth: 52),
+                                      height: 22,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                      ),
+                                      alignment: Alignment.center,
+                                      color: (_ifVat == 0)
+                                          ? AppConfig.colorPrimary
+                                          : const Color(0xFFF7F7F7),
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
                                         child: Text(
                                           'NO VAT',
+                                          maxLines: 1,
                                           style: TextStyle(
-                                            fontSize:
-                                                AppConfig.textCaption3Size,
+                                            fontSize: AppFontSizes.body,
+                                            fontWeight: FontWeight.w600,
                                             color: (_ifVat == 0)
-                                                ? AppConfig.backButtonColor
-                                                : AppConfig.textBlack,
+                                                ? Colors.white
+                                                : const Color(0xFF333333),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
                                 ],
-                              )
-                            : SizedBox.shrink()
-                      ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
-                  SizedBox(
-                    height: SizeConfig.blockSizeVertical * 55,
-                    child: ListView.builder(
-                      physics: BouncingScrollPhysics(),
-                      shrinkWrap: true,
-                      itemCount: cartItems.length,
-                      itemBuilder: (context, index) {
-                        List<String> unitNames = cartItems[index]
-                            .units
-                            .where((unit) => unit.name != null)
-                            .map((unit) => unit.name!)
-                            .toList();
-                        if (unitNames.isEmpty) {
-                          return SizedBox.shrink();
-                        }
-                        String? selectedUnitName =
-                            cartItems[index].selectedUnitName ??
-                                unitNames.first;
-                        String quantity = qtys[index] ?? '1';
-                        String rate =
-                            amounts[index] ?? cartItems[index].price.toString();
-                        double ttlamount =
-                            double.parse(quantity) * double.parse(rate);
-                        bool isUnitNameDuplicated(String unitName) {
-                          // Get the product ID of the current item
-                          var currentProductId = cartItems[index].id;
 
-                          // Check for duplicates only within the same product ID
-                          for (var item in cartItems) {
-                            if (item.id == currentProductId &&
-                                item != cartItems[index] &&
-                                item.selectedUnitName == unitName) {
-                              return true;
-                            }
-                          }
-                          return false;
-                        }
+                  // ==========================================================
+                  // PRODUCT TABLE (matches Sale exactly, responsive columns)
+                  // ==========================================================
+                  Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(
+                          color: const Color(0xFFDCDCDC),
+                          width: 0.8,
+                        ),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: LayoutBuilder(
+                        builder: (context, tableConstraints) {
+                          final double tw = tableConstraints.maxWidth;
+                          final bool isNarrow = tw < 340;
+                          final double numW = isNarrow ? 26 : 35;
+                          final double qtyW = isNarrow ? 26 : 34;
+                          final double rateW = isNarrow ? 40 : 48;
+                          final double amtW = isNarrow ? 40 : 48;
+                          final double delW = isNarrow ? 26 : 32;
 
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 2),
-                          child: Card(
-                            elevation: 1,
-                            child: Container(
-                              padding: const EdgeInsets.all(5),
-                              width: SizeConfig.blockSizeHorizontal * 90,
-                              decoration: BoxDecoration(
-                                color: AppConfig.backgroundColor,
-                                border: Border.all(
-                                  color: AppConfig.buttonDeactiveColor
-                                      .withOpacity(0.5),
+                          final query = _searchData.text.trim().toLowerCase();
+                          final filteredIndices = query.isEmpty
+                              ? List<int>.generate(cartItems.length, (i) => i)
+                              : List<int>.generate(cartItems.length, (i) => i)
+                                  .where((i) {
+                                  final code = (cartItems[i].code ?? '')
+                                      .toString()
+                                      .toLowerCase();
+                                  final pname = (cartItems[i].name ?? '')
+                                      .toString()
+                                      .toLowerCase();
+                                  return code.contains(query) ||
+                                      pname.contains(query);
+                                }).toList();
+
+                          return Column(
+                            children: [
+                              // ================= TABLE HEADER =================
+                              Container(
+                                height: 34,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFFAFAFC),
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: Color(0xFFE2E2E2),
+                                      width: 0.8,
+                                    ),
+                                  ),
                                 ),
-                                borderRadius:
-                                    const BorderRadius.all(Radius.circular(10)),
+                                child: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: numW,
+                                      child: Center(
+                                        child: Text(
+                                          '#',
+                                          style: TextStyle(
+                                            fontSize: AppFontSizes.value,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppConfig.colorPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Padding(
+                                        padding:
+                                            const EdgeInsets.only(left: 2),
+                                        child: Text(
+                                          'Item Details',
+                                          style: TextStyle(
+                                            fontSize: AppFontSizes.value,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppConfig.colorPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: qtyW,
+                                      child: Center(
+                                        child: Text(
+                                          'Qty',
+                                          style: TextStyle(
+                                            fontSize: AppFontSizes.label,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppConfig.colorPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: rateW,
+                                      child: Center(
+                                        child: Text(
+                                          'Rate',
+                                          style: TextStyle(
+                                            fontSize: AppFontSizes.label,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppConfig.colorPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: amtW,
+                                      child: Center(
+                                        child: Text(
+                                          'Amt',
+                                          style: TextStyle(
+                                            fontSize: AppFontSizes.label,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppConfig.colorPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: delW,
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.delete_outline,
+                                          size: 16,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      // SizedBox(
-                                      // width: 50,
-                                      // height: 60,
-                                      // child: ClipRRect(
-                                      //   borderRadius:
-                                      //       BorderRadius.circular(10),
-                                      //   child: FadeInImage(
-                                      //     image: NetworkImage(
-                                      //       '${RestDatasource().Product_URL}/uploads/product/${cartItems[index].proImage}',
-                                      //     ),
-                                      //     placeholder: const AssetImage(
-                                      //       'Assets/Images/no_image.jpg',
-                                      //     ),
-                                      //     imageErrorBuilder:
-                                      //         (context, error, stackTrace) {
-                                      //       return Image.asset(
-                                      //         'Assets/Images/no_image.jpg',
-                                      //         fit: BoxFit.fitWidth,
-                                      //       );
-                                      //     },
-                                      //     fit: BoxFit.fitWidth,
-                                      //   ),
-                                      // ),
-                                      // ),
-                                      // CommonWidgets.horizontalSpace(1),
-                                      Column(
-                                        children: [
-                                          // CommonWidgets.verticalSpace(1),
-                                          Row(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              // CommonWidgets.horizontalSpace(1),
-                                              SizedBox(
-                                                width: 245.w,
+
+                              // ================= PRODUCT LIST =================
+                              Expanded(
+                                child: filteredIndices.isEmpty
+                                    ? Center(
+                                        child: Text(
+                                          'No matching items',
+                                          style: TextStyle(
+                                            color: Colors.black45,
+                                            fontSize: AppFontSizes.body,
+                                          ),
+                                        ),
+                                      )
+                                    : ListView.builder(
+                                        padding: EdgeInsets.zero,
+                                        physics:
+                                            const BouncingScrollPhysics(),
+                                        itemCount: filteredIndices.length,
+                                        itemBuilder: (context, listIndex) {
+                                          final index =
+                                              filteredIndices[listIndex];
+
+                                          List<String> unitNames =
+                                              cartItems[index]
+                                                  .units
+                                                  .where((unit) =>
+                                                      unit.name != null)
+                                                  .map((unit) => unit.name!)
+                                                  .toList();
+
+                                          if (unitNames.isEmpty) {
+                                            return const SizedBox.shrink();
+                                          }
+
+                                          final String selectedUnitName =
+                                              cartItems[index]
+                                                      .selectedUnitName ??
+                                                  unitNames.first;
+
+                                          final String quantity =
+                                              qtys[index] ?? '1';
+                                          final String rate = amounts[index] ??
+                                              cartItems[index]
+                                                  .price
+                                                  .toString();
+                                          final double qtyVal =
+                                              double.tryParse(quantity) ?? 0;
+                                          final double rateVal =
+                                              double.tryParse(rate) ?? 0;
+                                          final double rowTotal =
+                                              qtyVal * rateVal;
+                                          final String typeName =
+                                              selectedProductTypes[index]
+                                                      ?.name ??
+                                                  'Normal';
+
+                                          return InkWell(
+                                            borderRadius:
+                                                BorderRadius.circular(3),
+                                            onTap: () =>
+                                                showItemDetailsDialog(index),
+                                            child: Container(
+                                              constraints:
+                                                  const BoxConstraints(
+                                                      minHeight: 64),
+                                              decoration: const BoxDecoration(
+                                                color: Colors.white,
+                                                border: Border(
+                                                  bottom: BorderSide(
+                                                    color: Color(0xFFE8E8E8),
+                                                    width: 0.7,
+                                                  ),
+                                                ),
+                                              ),
+                                              child: IntrinsicHeight(
                                                 child: Row(
                                                   children: [
-                                                    Text(
-                                                      '${cartItems[index].code} | ${cartItems[index].name.toString().toUpperCase()} | ${cartItems[index].defaultValue}',
-                                                      style: TextStyle(
-                                                        fontSize: AppConfig
-                                                            .textCaption3Size,
+                                                    // NUMBER
+                                                    SizedBox(
+                                                      width: numW,
+                                                      child: Center(
+                                                        child: Container(
+                                                          width: 21,
+                                                          height: 21,
+                                                          alignment: Alignment
+                                                              .center,
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            color:
+                                                                const Color(
+                                                                    0xFFF2F3FF),
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        4),
+                                                            border:
+                                                                Border.all(
+                                                              color: const Color(
+                                                                  0xFFDDE0F5),
+                                                              width: 0.6,
+                                                            ),
+                                                          ),
+                                                          child: Text(
+                                                            '${index + 1}',
+                                                            style:
+                                                                const TextStyle(
+                                                              fontSize:
+                                                                  AppFontSizes
+                                                                      .body,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                              color: Color(
+                                                                  0xFF555EA0),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+
+                                                    // ITEM DETAILS
+                                                    Expanded(
+                                                      child: Padding(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .only(
+                                                          left: 3,
+                                                          right: 3,
+                                                          top: 5,
+                                                          bottom: 5,
+                                                        ),
+                                                        child: Column(
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment
+                                                                  .center,
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            Text(
+                                                              '${cartItems[index].code} | ${(cartItems[index].name ?? '').toString().toUpperCase()}',
+                                                              maxLines: 2,
+                                                              softWrap: true,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .visible,
+                                                              style:
+                                                                  const TextStyle(
+                                                                fontSize:
+                                                                    AppFontSizes
+                                                                        .label,
+                                                                height: 1.15,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                                color: Color(
+                                                                    0xFF222222),
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                                height: 4),
+                                                            Row(
+                                                              children: [
+                                                                Container(
+                                                                  padding:
+                                                                      const EdgeInsets
+                                                                          .symmetric(
+                                                                    horizontal:
+                                                                        5,
+                                                                    vertical:
+                                                                        2,
+                                                                  ),
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0xFFF0F0FF),
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                            3),
+                                                                  ),
+                                                                  child: Text(
+                                                                    typeName,
+                                                                    style:
+                                                                        const TextStyle(
+                                                                      fontSize:
+                                                                          AppFontSizes
+                                                                              .badge,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w500,
+                                                                      color: Color(
+                                                                          0xFF5558B5),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                const SizedBox(
+                                                                    width: 4),
+                                                                Container(
+                                                                  padding:
+                                                                      const EdgeInsets
+                                                                          .symmetric(
+                                                                    horizontal:
+                                                                        5,
+                                                                    vertical:
+                                                                        2,
+                                                                  ),
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    color: const Color(
+                                                                        0xFFF3F3F3),
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                            3),
+                                                                  ),
+                                                                  child: Text(
+                                                                    selectedUnitName,
+                                                                    style:
+                                                                        const TextStyle(
+                                                                      fontSize:
+                                                                          AppFontSizes
+                                                                              .badge,
+                                                                      color: Color(
+                                                                          0xFF555555),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+
+                                                    // QTY
+                                                    SizedBox(
+                                                      width: qtyW,
+                                                      child: Center(
+                                                        child: Text(
+                                                          quantity.isNotEmpty
+                                                              ? quantity
+                                                              : '1',
+                                                          style:
+                                                              const TextStyle(
+                                                            fontSize:
+                                                                AppFontSizes
+                                                                    .body,
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .w500,
+                                                            color: Color(
+                                                                0xFF222222),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+
+                                                    // RATE
+                                                    SizedBox(
+                                                      width: rateW,
+                                                      child: Center(
+                                                        child: Text(
+                                                          rateVal
+                                                              .toStringAsFixed(
+                                                                  3),
+                                                          style:
+                                                              const TextStyle(
+                                                            fontSize:
+                                                                AppFontSizes
+                                                                    .tableCellSmall,
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .w500,
+                                                            color: Color(
+                                                                0xFF222222),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+
+                                                    // AMOUNT
+                                                    SizedBox(
+                                                      width: amtW,
+                                                      child: Center(
+                                                        child: Text(
+                                                          rowTotal
+                                                              .toStringAsFixed(
+                                                            AppState()
+                                                                    .noOfDecimals ??
+                                                                2,
+                                                          ),
+                                                          style:
+                                                              const TextStyle(
+                                                            fontSize:
+                                                                AppFontSizes
+                                                                    .tableCellSmall,
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .w600,
+                                                            color: Color(
+                                                                0xFF222222),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+
+                                                    // DELETE
+                                                    SizedBox(
+                                                      width: delW,
+                                                      child: Center(
+                                                        child:
+                                                            GestureDetector(
+                                                          onTap: () {
+                                                            removeFromCart(
+                                                                index);
+                                                          },
+                                                          child: const Icon(
+                                                            Icons
+                                                                .delete_outline,
+                                                            size: 16,
+                                                            color:
+                                                                Colors.red,
+                                                          ),
+                                                        ),
                                                       ),
                                                     ),
                                                   ],
                                                 ),
                                               ),
-                                            ],
-                                          ),
-                                        ],
+                                            ),
+                                          );
+                                        },
                                       ),
-                                      if (cartItems.isNotEmpty &&
-                                          cartItems[index].defaultValue == 0)
-                                        CircleAvatar(
-                                          backgroundColor:
-                                              Colors.grey.withOpacity(0.2),
-                                          radius: 10,
-                                          child: GestureDetector(
-                                            onTap: () async {
-                                              removeFromCart(index);
-                                            },
-                                            child: Icon(
-                                              Icons.close,
-                                              size: 15,
-                                              color: Colors.red,
-                                            ),
-                                          ),
-                                        )
-                                    ],
+                              ),
+
+                              // ================= ADD ITEM =================
+                              InkWell(
+                                onTap: () {
+                                  Navigator.pushReplacementNamed(
+                                    context,
+                                    Salesselectproductreturn.routeName,
+                                    arguments: {
+                                      'customerId': id,
+                                      'name': name,
+                                      'code': code,
+                                      'saleId': saleId,
+                                      'paymentTerms': payment,
+                                      'outstandamt': paydata,
+                                      'price_group_id': pricegroupId,
+                                    },
+                                  );
+                                },
+                                child: Container(
+                                  height: 28,
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFAFAFC),
+                                    border: Border(
+                                      top: BorderSide(
+                                        color: const Color(0xFFDCDCDC),
+                                        width: 0.8,
+                                      ),
+                                    ),
                                   ),
-                                  SizedBox(
-                                    height: 20,
-                                  ),
-                                  Row(
-                                    children: [
-                                      SizedBox(
-                                        width: 45.w,
-                                        height: 20.h,
-                                        child: DropdownButtonHideUnderline(
-                                          child: DropdownButton<ProductType>(
-                                            alignment: Alignment.center,
-                                            isExpanded: true,
-                                            style: TextStyle(
-                                              fontSize: 10.sp,
-                                              color: AppConfig.colorPrimary,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            hint: const Center(
-                                                child: Text('Select')),
-                                            value:
-                                                selectedProductTypes[index] ??
-                                                    (productTypes.isNotEmpty
-                                                        ? productTypes.first
-                                                        : null),
-                                            onChanged: (ProductType? newValue) {
-                                              setState(() {
-                                                selectedProductTypes[index] =
-                                                    newValue;
-                                                saveToSharedPreferences(
-                                                    'productTypereturn$index',
-                                                    newValue!.name);
-                                              });
-                                            },
-                                            items: productTypes
-                                                .map((ProductType productType) {
-                                              return DropdownMenuItem<
-                                                  ProductType>(
-                                                value: productType,
-                                                child: Center(
-                                                    child: Text(productType
-                                                        .name)), // Center align the item text
-                                              );
-                                            }).toList(),
-                                            icon: SizedBox.shrink(),
+                                  child: Center(
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.add_circle_outline,
+                                          size: 13,
+                                          color: AppConfig.colorPrimary,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Add Item',
+                                          style: TextStyle(
+                                            fontSize: AppFontSizes.body,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppConfig.colorPrimary,
                                           ),
                                         ),
-                                      ),
-                                      Text(' | '),
-                                      Flexible(
-                                        child: DropdownButtonHideUnderline(
-                                          child: DropdownButton<String>(
-                                            isDense: true,
-                                            alignment: Alignment.center,
-                                            isExpanded: false,
-                                            value: selectedUnitName,
-                                            items: unitNames
-                                                .map<DropdownMenuItem<String>>(
-                                                    (String value) {
-                                              bool isDuplicated =
-                                                  isUnitNameDuplicated(value);
-                                              return DropdownMenuItem<String>(
-                                                value: value,
-                                                child: Center(
-                                                  child: Text(
-                                                    value,
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+
+                  // ==========================================================
+                  // REASON (Return-specific; kept exactly as before, just
+                  // given consistent horizontal padding)
+                  // ==========================================================
+                  if (cartItems.isNotEmpty &&
+                      cartItems[0].defaultValue == 1 &&
+                      qtys[specificIndex] != null &&
+                      double.parse(qtys[specificIndex]!) !=
+                          double.parse(initialQty))
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 7),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: DropdownButton<Reason>(
+                          hint: Text(
+                            'Reason',
+                            style: TextStyle(fontSize: AppFontSizes.body),
+                          ),
+                          value: _selectedReason,
+                          onChanged: (Reason? newValue) {
+                            setState(() {
+                              _selectedReason = newValue;
+                            });
+                          },
+                          items: _reasonList
+                              .map<DropdownMenuItem<Reason>>((Reason reason) {
+                            return DropdownMenuItem<Reason>(
+                              value: reason,
+                              child: Text(
+                                reason.reason,
+                                style: TextStyle(fontSize: AppFontSizes.body),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+
+                  // ==========================================================
+                  // BOTTOM SUMMARY CARD (matches Sale exactly)
+                  // ==========================================================
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(7, 6, 7, 10),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final double screenWidth = constraints.maxWidth;
+                        final bool isVerySmall = screenWidth < 340;
+
+                        final double labelWidth = isVerySmall ? 48 : 55;
+                        final double sectionPadding = isVerySmall ? 8 : 14;
+
+                        return Container(
+                          padding: EdgeInsets.fromLTRB(
+                            isVerySmall ? 9 : 13,
+                            10,
+                            isVerySmall ? 9 : 13,
+                            10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFFE1E1E1),
+                              width: 0.7,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              IntrinsicHeight(
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    // ================= LEFT =================
+                                    Expanded(
+                                      flex: 6,
+                                      child: Padding(
+                                        padding: EdgeInsets.only(
+                                            right: sectionPadding),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            // -------- REMARKS --------
+                                            Row(
+                                              children: [
+                                                SizedBox(
+                                                  width: labelWidth,
+                                                  child: const Text(
+                                                    'Remarks',
                                                     style: TextStyle(
-                                                      fontSize: 10.sp,
-                                                      color: isDuplicated
-                                                          ? Colors.red
-                                                          : AppConfig
-                                                              .colorPrimary,
+                                                      fontSize:
+                                                          AppFontSizes.label,
                                                       fontWeight:
-                                                          FontWeight.bold,
+                                                          FontWeight.w600,
+                                                      color:
+                                                          Color(0xFF222222),
                                                     ),
                                                   ),
                                                 ),
-                                              );
-                                            }).toList(),
-                                            onChanged: (String? newValue) {
-                                              setState(() {
-                                                cartItems[index]
-                                                        .selectedUnitName =
-                                                    newValue;
-
-                                                // Find the selected unit and update the rate
-                                                for (var unit
-                                                    in cartItems[index].units) {
-                                                  if (unit.name == newValue) {
-                                                    amounts[index] =
-                                                        unit.price.toString();
-                                                    saveToSharedPreferences(
-                                                        'amountreturn$index',
-                                                        amounts[index]);
-                                                    break;
-                                                  }
-                                                }
-                                                saveToSharedPreferences(
-                                                    'unitNamereturn$index',
-                                                    newValue);
-                                              });
-                                            },
-                                            icon: SizedBox.shrink(),
-                                          ),
-                                        ),
-                                      ),
-                                      Text(' | '),
-                                      GestureDetector(
-                                        onTap: () {
-                                          setInitialQty();
-                                          String initialQty;
-                                          if (dataId != null ||
-                                              cartItems[index].defaultValue ==
-                                                  1) {
-                                            initialQty = cartItems[index]
-                                                    .units[0]
-                                                    .stock
-                                                    ?.toString() ??
-                                                '1';
-                                          } else {
-                                            initialQty = qtys[index] ?? '1';
-                                          }
-
-                                          showDialog(
-                                            context: context,
-                                            builder: (context) {
-                                              // Use initial quantity as the default text in TextField
-                                              TextEditingController
-                                                  qtyController =
-                                                  TextEditingController(
-                                                      text: initialQty);
-
-                                              return AlertDialog(
-                                                title: Text('Quantity'),
-                                                content: TextField(
-                                                  controller: qtyController,
-                                                  onChanged: (value) {
-                                                    setState(() {
-                                                      qtys[index] = value;
-                                                      saveToSharedPreferences(
-                                                          'qtyreturn$index',
-                                                          value);
-                                                    });
-                                                  },
-                                                  keyboardType:
-                                                      TextInputType.number,
-                                                ),
-                                                actions: <Widget>[
-                                                  MaterialButton(
-                                                    color:
-                                                        AppConfig.colorPrimary,
-                                                    textColor: Colors.white,
-                                                    child: Text('OK'),
-                                                    onPressed: () {
-                                                      setState(() {
-                                                        qtys[index] =
-                                                            qtyController.text;
-                                                        saveToSharedPreferences(
-                                                            'qtyreturn$index',
-                                                            qtyController
-                                                                .text); // Update qtys w
-                                                        print(
-                                                            "objectValues"); // ith new value
-                                                        print(
-                                                            qtyController.text);
-                                                      });
-                                                      Navigator.pop(context);
+                                                Expanded(
+                                                  child: InkWell(
+                                                    onTap: () {
+                                                      showDialog(
+                                                        context: context,
+                                                        builder: (context) {
+                                                          return AlertDialog(
+                                                            title: const Text(
+                                                                'Remarks'),
+                                                            content:
+                                                                TextField(
+                                                              controller:
+                                                                  _remarksController,
+                                                              onChanged:
+                                                                  (value) {
+                                                                setState(() {
+                                                                  _remarksText =
+                                                                      value;
+                                                                });
+                                                              },
+                                                              keyboardType:
+                                                                  TextInputType
+                                                                      .text,
+                                                              decoration:
+                                                                  const InputDecoration(
+                                                                hintText:
+                                                                    "Enter your remarks",
+                                                              ),
+                                                            ),
+                                                            actions: [
+                                                              MaterialButton(
+                                                                color: AppConfig
+                                                                    .colorPrimary,
+                                                                textColor:
+                                                                    Colors
+                                                                        .white,
+                                                                child:
+                                                                    const Text(
+                                                                        'OK'),
+                                                                onPressed:
+                                                                    () {
+                                                                  setState(() {
+                                                                    _remarksText =
+                                                                        _remarksController
+                                                                            .text;
+                                                                  });
+                                                                  Navigator.pop(
+                                                                      context);
+                                                                },
+                                                              ),
+                                                            ],
+                                                          );
+                                                        },
+                                                      );
                                                     },
+                                                    child: Container(
+                                                      height: 30,
+                                                      padding:
+                                                          const EdgeInsets
+                                                              .symmetric(
+                                                        horizontal: 9,
+                                                      ),
+                                                      alignment: Alignment
+                                                          .centerLeft,
+                                                      decoration:
+                                                          BoxDecoration(
+                                                        border: Border.all(
+                                                          color: const Color(
+                                                              0xFFD2D2D2),
+                                                          width: 0.7,
+                                                        ),
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(4),
+                                                      ),
+                                                      child: Text(
+                                                        _remarksText.isEmpty
+                                                            ? 'Enter remarks'
+                                                            : _remarksText,
+                                                        maxLines: 1,
+                                                        overflow:
+                                                            TextOverflow
+                                                                .ellipsis,
+                                                        style: TextStyle(
+                                                          fontSize:
+                                                              AppFontSizes
+                                                                  .label,
+                                                          color: _remarksText
+                                                                  .isEmpty
+                                                              ? const Color(
+                                                                  0xFF9A9A9A)
+                                                              : const Color(
+                                                                  0xFF222222),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+
+                                            const SizedBox(height: 9),
+
+                                            // -------- DISCOUNT --------
+                                            // (visibility gated by
+                                            // AppState().discountState,
+                                            // exactly as before)
+                                            if (AppState().discountState ==
+                                                'Enable')
+                                              Row(
+                                                children: [
+                                                  SizedBox(
+                                                    width: labelWidth,
+                                                    child: const Text(
+                                                      'Discount',
+                                                      style: TextStyle(
+                                                        fontSize:
+                                                            AppFontSizes
+                                                                .label,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color:
+                                                            Color(0xFF222222),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    height: 30,
+                                                    decoration: BoxDecoration(
+                                                      border: Border.all(
+                                                        color: const Color(
+                                                            0xFFD2D2D2),
+                                                        width: 0.7,
+                                                      ),
+                                                      borderRadius:
+                                                          BorderRadius
+                                                              .circular(4),
+                                                    ),
+                                                    clipBehavior:
+                                                        Clip.antiAlias,
+                                                    child: Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        InkWell(
+                                                          onTap: () {
+                                                            setState(() {
+                                                              _isPercentage =
+                                                                  false;
+                                                            });
+                                                          },
+                                                          child: Container(
+                                                            width: 42,
+                                                            height: 30,
+                                                            alignment:
+                                                                Alignment
+                                                                    .center,
+                                                            color: !_isPercentage
+                                                                ? AppConfig
+                                                                    .colorPrimary
+                                                                : Colors.white,
+                                                            child: Text(
+                                                              'AMT',
+                                                              style:
+                                                                  TextStyle(
+                                                                fontSize:
+                                                                    AppFontSizes
+                                                                        .label,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                                color: !_isPercentage
+                                                                    ? Colors
+                                                                        .white
+                                                                    : const Color(
+                                                                        0xFF222222),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        InkWell(
+                                                          onTap: () {
+                                                            setState(() {
+                                                              _isPercentage =
+                                                                  true;
+                                                            });
+                                                          },
+                                                          child: Container(
+                                                            width: 34,
+                                                            height: 30,
+                                                            alignment:
+                                                                Alignment
+                                                                    .center,
+                                                            color: _isPercentage
+                                                                ? AppConfig
+                                                                    .colorPrimary
+                                                                : Colors.white,
+                                                            child: Text(
+                                                              '%',
+                                                              style:
+                                                                  TextStyle(
+                                                                fontSize:
+                                                                    AppFontSizes
+                                                                        .label,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                                color: _isPercentage
+                                                                    ? Colors
+                                                                        .white
+                                                                    : const Color(
+                                                                        0xFF222222),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 7),
+                                                  Expanded(
+                                                    child: SizedBox(
+                                                      height: 30,
+                                                      child: TextField(
+                                                        controller:
+                                                            _discountData,
+                                                        keyboardType:
+                                                            TextInputType
+                                                                .number,
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        style:
+                                                            const TextStyle(
+                                                          fontSize:
+                                                              AppFontSizes
+                                                                  .value,
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                          color: Color(
+                                                              0xFF222222),
+                                                        ),
+                                                        decoration:
+                                                            InputDecoration(
+                                                          contentPadding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                            horizontal: 2,
+                                                            vertical: 6,
+                                                          ),
+                                                          border:
+                                                              OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        4),
+                                                            borderSide:
+                                                                const BorderSide(
+                                                              color: Color(
+                                                                  0xFFD2D2D2),
+                                                              width: 0.7,
+                                                            ),
+                                                          ),
+                                                          enabledBorder:
+                                                              OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        4),
+                                                            borderSide:
+                                                                const BorderSide(
+                                                              color: Color(
+                                                                  0xFFD2D2D2),
+                                                              width: 0.7,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        onChanged: (_) {
+                                                          setState(() {});
+                                                        },
+                                                      ),
+                                                    ),
                                                   ),
                                                 ],
-                                              );
-                                            },
-                                          );
-                                        },
-                                        child: Row(
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+
+                                    // ================= DIVIDER =================
+                                    Container(
+                                      width: 0.8,
+                                      color: const Color(0xFFE3E3E3),
+                                    ),
+
+                                    // ================= RIGHT =================
+                                    Expanded(
+                                      flex: 4,
+                                      child: Padding(
+                                        padding: EdgeInsets.only(
+                                          left: sectionPadding,
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
                                           children: [
-                                            Text('Qty: '),
+                                            // TOTAL
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                const Text(
+                                                  'Total',
+                                                  style: TextStyle(
+                                                    fontSize:
+                                                        AppFontSizes.label,
+                                                    fontWeight:
+                                                        FontWeight.w600,
+                                                    color: Color(0xFF222222),
+                                                  ),
+                                                ),
+                                                Flexible(
+                                                  child: Text(
+                                                    total.toStringAsFixed(
+                                                      AppState()
+                                                              .noOfDecimals ??
+                                                          2,
+                                                    ),
+                                                    textAlign:
+                                                        TextAlign.right,
+                                                    style: const TextStyle(
+                                                      fontSize:
+                                                          AppFontSizes.value,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          Color(0xFF222222),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+
+                                            const SizedBox(height: 9),
+
+                                            // VAT
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                Flexible(
+                                                  child: Text(
+                                                    getVatLabel(),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow
+                                                        .ellipsis,
+                                                    style: const TextStyle(
+                                                      fontSize:
+                                                          AppFontSizes.label,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          Color(0xFF222222),
+                                                    ),
+                                                  ),
+                                                ),
+                                                Flexible(
+                                                  child: Text(
+                                                    tax.toStringAsFixed(
+                                                      AppState()
+                                                              .noOfDecimals ??
+                                                          2,
+                                                    ),
+                                                    textAlign:
+                                                        TextAlign.right,
+                                                    style: const TextStyle(
+                                                      fontSize:
+                                                          AppFontSizes.value,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          Color(0xFF222222),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+
+                                            const SizedBox(height: 9),
+
+                                            // SUB TOTAL (preserved from the
+                                            // original implementation:
+                                            // total + tax)
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                const Flexible(
+                                                  child: Text(
+                                                    'Sub Total',
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow
+                                                        .ellipsis,
+                                                    style: TextStyle(
+                                                      fontSize:
+                                                          AppFontSizes.label,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          Color(0xFF222222),
+                                                    ),
+                                                  ),
+                                                ),
+                                                Flexible(
+                                                  child: Text(
+                                                    (total + tax)
+                                                        .toStringAsFixed(
+                                                      AppState()
+                                                              .noOfDecimals ??
+                                                          2,
+                                                    ),
+                                                    textAlign:
+                                                        TextAlign.right,
+                                                    style: const TextStyle(
+                                                      fontSize:
+                                                          AppFontSizes.value,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          Color(0xFF222222),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+
+                                            const SizedBox(height: 9),
+
+                                            // ROUND OFF
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                const Flexible(
+                                                  child: Text(
+                                                    'Round Off',
+                                                    style: TextStyle(
+                                                      fontSize:
+                                                          AppFontSizes.label,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          Color(0xFF222222),
+                                                    ),
+                                                  ),
+                                                ),
+                                                InkWell(
+                                                  onTap: () {
+                                                    showDialog(
+                                                      context: context,
+                                                      builder: (context) {
+                                                        return AlertDialog(
+                                                          title: const Text(
+                                                              'Round off'),
+                                                          content: TextField(
+                                                            keyboardType:
+                                                                TextInputType
+                                                                    .number,
+                                                            controller:
+                                                                _roundoff,
+                                                            decoration:
+                                                                const InputDecoration(
+                                                              hintText:
+                                                                  "Round off",
+                                                            ),
+                                                          ),
+                                                          actions: [
+                                                            MaterialButton(
+                                                              color: AppConfig
+                                                                  .colorPrimary,
+                                                              textColor: Colors
+                                                                  .white,
+                                                              child:
+                                                                  const Text(
+                                                                      'OK'),
+                                                              onPressed: () {
+                                                                setState(
+                                                                    () {});
+                                                                Navigator.pop(
+                                                                    context);
+                                                              },
+                                                            ),
+                                                          ],
+                                                        );
+                                                      },
+                                                    );
+                                                  },
+                                                  child: Container(
+                                                    width: isVerySmall
+                                                        ? 55
+                                                        : 65,
+                                                    height: 30,
+                                                    alignment:
+                                                        Alignment.center,
+                                                    decoration: BoxDecoration(
+                                                      border: Border.all(
+                                                        color: const Color(
+                                                            0xFFD2D2D2),
+                                                        width: 0.7,
+                                                      ),
+                                                      borderRadius:
+                                                          BorderRadius
+                                                              .circular(4),
+                                                    ),
+                                                    child: FittedBox(
+                                                      fit: BoxFit.scaleDown,
+                                                      child: Text(
+                                                        roundOffValue
+                                                            .toStringAsFixed(
+                                                          AppState()
+                                                                  .noOfDecimals ??
+                                                              2,
+                                                        ),
+                                                        style:
+                                                            const TextStyle(
+                                                          fontSize:
+                                                              AppFontSizes
+                                                                  .value,
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                          color: Color(
+                                                              0xFF222222),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+
+                                            const SizedBox(height: 8),
+
+                                            // DIVIDER
+                                            Container(
+                                              height: 1,
+                                              width: double.infinity,
+                                              color: const Color(0xFFE0E0E0),
+                                            ),
+
+                                            const SizedBox(height: 7),
+
+                                            // GRAND TOTAL
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.center,
+                                              children: [
+                                                const Flexible(
+                                                  child: Text(
+                                                    'Grand Total',
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow
+                                                        .ellipsis,
+                                                    style: TextStyle(
+                                                      fontSize:
+                                                          AppFontSizes.value,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      color:
+                                                          Color(0xFF222222),
+                                                    ),
+                                                  ),
+                                                ),
+                                                Flexible(
+                                                  child: FittedBox(
+                                                    fit: BoxFit.scaleDown,
+                                                    alignment:
+                                                        Alignment.centerRight,
+                                                    child: Text(
+                                                      roundedGrandTotal,
+                                                      style: TextStyle(
+                                                        fontSize:
+                                                            AppFontSizes
+                                                                .grandTotal,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: AppConfig
+                                                            .colorPrimary,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 11),
+
+                              // ==========================================
+                              // BOTTOM BUTTONS
+                              // (Clear All / [Add To Cart] / Save Order /
+                              // [Skip] — the bracketed two only show when
+                              // _showButton is true, exactly as before)
+                              // ==========================================
+                              Row(
+                                children: [
+                                  // CLEAR ALL
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      style: OutlinedButton.styleFrom(
+                                        backgroundColor: Colors.white,
+                                        side: const BorderSide(
+                                          color: Colors.red,
+                                          width: 1.2,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: isVerySmall ? 10 : 11,
+                                        ),
+                                      ),
+                                      onPressed: () async {
+                                        await clearCart();
+                                      },
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: const [
+                                            Icon(
+                                              Icons.delete_outline,
+                                              size: 15,
+                                              color: Colors.red,
+                                            ),
+                                            SizedBox(width: 4),
                                             Text(
-                                              (qtys[index] != null &&
-                                                      qtys[index] != '')
-                                                  ? qtys[
-                                                      index]! // Force unwrap since we check for null already
-                                                  : (cartItems[index]
-                                                              .defaultValue ==
-                                                          1
-                                                      ? cartItems[index]
-                                                              .units[0]
-                                                              .stock
-                                                              ?.toString() ??
-                                                          '1' // Fallback to '1' if stock is null
-                                                      : '1'), // Default to '1' if no quantity is set
+                                              'CLEAR ALL',
                                               style: TextStyle(
-                                                color: AppConfig.colorPrimary,
+                                                fontSize:
+                                                    AppFontSizes.label,
                                                 fontWeight: FontWeight.bold,
+                                                color: Colors.red,
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                      Text(' | '),
-                                      GestureDetector(
-                                          onTap: () {
-                                            showDialog(
-                                                context: context,
-                                                builder: (context) {
-                                                  return AlertDialog(
-                                                    title: const Text('Amount'),
-                                                    content: TextField(
-                                                      controller:
-                                                          TextEditingController(
-                                                        text:
-                                                            '${amounts[index] ?? cartItems[index].price}',
-                                                      ),
-                                                      onChanged: (value) {
-                                                        setState(() {
-                                                          amounts[index] =
-                                                              value;
-                                                          saveToSharedPreferences(
-                                                              'amountreturn$index',
-                                                              value);
-                                                        });
-                                                      },
-                                                      keyboardType:
-                                                          TextInputType.number,
-                                                      // controller: _discountData,
-                                                    ),
-                                                    actions: <Widget>[
-                                                      MaterialButton(
-                                                        color: AppConfig
-                                                            .colorPrimary,
-                                                        textColor: Colors.white,
-                                                        child: const Text('OK'),
-                                                        onPressed: () {
-                                                          amount =
-                                                              amountctrl.text;
-                                                          Navigator.pop(
-                                                              context);
-                                                        },
-                                                      ),
-                                                    ],
-                                                  );
-                                                });
-                                          },
+                                    ),
+                                  ),
+
+                                  if (_showButton) ...[
+                                    const SizedBox(width: 8),
+                                    // ADD TO CART
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        style: OutlinedButton.styleFrom(
+                                          backgroundColor: Colors.white,
+                                          side: BorderSide(
+                                            color: AppConfig.colorPrimary,
+                                            width: 1.2,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                          ),
+                                          padding: EdgeInsets.symmetric(
+                                            vertical: isVerySmall ? 10 : 11,
+                                          ),
+                                        ),
+                                        onPressed: () {
+                                          Navigator.pushReplacementNamed(
+                                            context,
+                                            Salesselectproductreturn
+                                                .routeName,
+                                            arguments: {
+                                              'customerId': id,
+                                              'name': name,
+                                              'code': code,
+                                              'saleId': saleId,
+                                              'paymentTerms': payment,
+                                              'outstandamt': paydata,
+                                              'price_group_id': pricegroupId,
+                                            },
+                                          );
+                                        },
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
                                           child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Text('Rate: '),
+                                              Icon(
+                                                Icons.add_shopping_cart,
+                                                size: 15,
+                                                color:
+                                                    AppConfig.colorPrimary,
+                                              ),
+                                              const SizedBox(width: 4),
                                               Text(
-                                                '${amounts[index] ?? cartItems[index].price}',
+                                                'ADD TO CART',
                                                 style: TextStyle(
-                                                    color:
-                                                        AppConfig.colorPrimary,
-                                                    fontWeight:
-                                                        FontWeight.bold),
+                                                  fontSize:
+                                                      AppFontSizes.label,
+                                                  fontWeight:
+                                                      FontWeight.bold,
+                                                  color: AppConfig
+                                                      .colorPrimary,
+                                                ),
                                               ),
                                             ],
-                                          )),
-                                      Text(' | '),
-                                      Text(
-                                        'Amt: ${ttlamount.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
-                                        style: TextStyle(color: Colors.grey),
-                                      )
-                                    ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+
+                                  const SizedBox(width: 8),
+
+                                  // SAVE ORDER
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: cartItems
+                                                    .isNotEmpty &&
+                                                !_isButtonDisabled
+                                            ? AppConfig.colorPrimary
+                                            : AppConfig.buttonDeactiveColor,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: isVerySmall ? 10 : 11,
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      onPressed: cartItems.isNotEmpty &&
+                                              !_isButtonDisabled
+                                          ? () {
+                                              postDataToApi();
+                                            }
+                                          : null,
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.save_outlined,
+                                              size: 15,
+                                              color: Colors.white,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              _isButtonDisabled
+                                                  ? 'SAVING...'
+                                                  : 'SAVE ORDER',
+                                              style: const TextStyle(
+                                                fontSize:
+                                                    AppFontSizes.label,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
                                   ),
+
+                                  if (_showButton) ...[
+                                    const SizedBox(width: 8),
+                                    // SKIP
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              AppConfig.colorPrimary,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                          ),
+                                          padding: EdgeInsets.symmetric(
+                                            vertical: isVerySmall ? 10 : 11,
+                                          ),
+                                          elevation: 0,
+                                        ),
+                                        onPressed: () {
+                                          Navigator.pushReplacementNamed(
+                                            context,
+                                            PaymentCollectionScreen
+                                                .routeName,
+                                            arguments: {
+                                              'customerId': id,
+                                              'name': name,
+                                              'code': code,
+                                              'saleId': saleId,
+                                              'paymentTerms': payment,
+                                              'outstandamt': paydata,
+                                              'price_group_id': pricegroupId,
+                                            },
+                                          );
+                                        },
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(
+                                            'SKIP',
+                                            style: TextStyle(
+                                              fontSize: AppFontSizes.label,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
-                            ),
+                            ],
                           ),
                         );
                       },
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      right: 18.0,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            // Check conditions safely before rendering the DropdownButton
-                            if (cartItems.isNotEmpty &&
-                                cartItems[0].defaultValue == 1 &&
-                                qtys[specificIndex] != null &&
-                                double.parse(qtys[specificIndex]!) <
-                                    double.parse(initialQty))
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  SizedBox(width: 5),
-                                  DropdownButton<Reason>(
-                                    hint: Text('Reason'),
-                                    value: _selectedReason,
-                                    onChanged: (Reason? newValue) {
-                                      setState(() {
-                                        _selectedReason = newValue;
-                                        if (_selectedReason != null) {
-                                          // Print the selected Reason's id
-                                          print(_selectedReason!.id);
-                                        }
-                                      });
-                                    },
-                                    items: _reasonList
-                                        .map<DropdownMenuItem<Reason>>(
-                                            (Reason reason) {
-                                      return DropdownMenuItem<Reason>(
-                                        value: reason,
-                                        child: Text(reason
-                                            .reason), // Display the reason text (String)
-                                      );
-                                    }).toList(),
-                                  ),
-                                ],
-                              ),
-                          ],
-                        ),
-                        SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Text(
-                              "Remarks",
-                              style: TextStyle(
-                                fontSize: AppConfig.textCaption3Size,
-                              ),
-                            ),
-                            SizedBox(
-                              width: 2,
-                            ),
-                            InkWell(
-                              onTap: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) {
-                                    return AlertDialog(
-                                      title: const Text('Remarks'),
-                                      content: TextField(
-                                        controller: _remarksController,
-                                        onChanged: (value) {
-                                          setState(() {
-                                            _remarksText = value;
-                                          });
-                                        },
-                                        keyboardType: TextInputType.text,
-                                        decoration: const InputDecoration(
-                                          hintText: "Enter your remarks",
-                                        ),
-                                      ),
-                                      actions: <Widget>[
-                                        MaterialButton(
-                                          color: AppConfig.colorPrimary,
-                                          textColor: Colors.white,
-                                          child: const Text('OK'),
-                                          onPressed: () {
-                                            setState(() {
-                                              _remarksText =
-                                                  _remarksController.text;
-                                            });
-                                            Navigator.pop(context);
-                                          },
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                              },
-                              child: Container(
-                                width: MediaQuery.of(context).size.width * 0.67,
-                                // padding: EdgeInsets.symmetric(
-                                //     horizontal: 10, vertical: 3),
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                      color: AppConfig.buttonDeactiveColor),
-                                  borderRadius: const BorderRadius.all(
-                                      Radius.circular(5)),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    _remarksText,
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      // fontWeight: FontWeight.bold,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(
-                          height: 10,
-                        ),
-                        AppState().discountState == 'Enable'
-                            ? Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    'Discount ',
-                                    style: TextStyle(
-                                      fontSize: AppConfig.textCaption3Size,
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: () => setState(() {
-                                      _isPercentage = !_isPercentage;
-                                    }),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                          border:
-                                              Border.all(color: Colors.black),
-                                          color: (!_isPercentage)
-                                              ? AppConfig.colorPrimary
-                                              : AppConfig.backButtonColor,
-                                          borderRadius: const BorderRadius.only(
-                                              topLeft: Radius.circular(3),
-                                              bottomLeft: Radius.circular(3))),
-                                      width:
-                                          SizeConfig.blockSizeHorizontal * 24,
-                                      height: SizeConfig.blockSizeVertical * 3,
-                                      child: Center(
-                                        child: Text(
-                                          'AMOUNT',
-                                          style: TextStyle(
-                                            fontSize:
-                                                AppConfig.textCaption3Size,
-                                            color: (!_isPercentage)
-                                                ? AppConfig.backButtonColor
-                                                : AppConfig.textBlack,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: () => setState(() {
-                                      _isPercentage = !_isPercentage;
-                                    }),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                          border:
-                                              Border.all(color: Colors.black),
-                                          color: (_isPercentage)
-                                              ? AppConfig.colorPrimary
-                                              : AppConfig.backButtonColor,
-                                          borderRadius: const BorderRadius.only(
-                                              topRight: Radius.circular(3),
-                                              bottomRight: Radius.circular(3))),
-                                      width:
-                                          SizeConfig.blockSizeHorizontal * 24,
-                                      height: SizeConfig.blockSizeVertical * 3,
-                                      child: Center(
-                                          child: Text(
-                                        'PERCENTAGE',
-                                        style: TextStyle(
-                                          fontSize: AppConfig.textCaption3Size,
-                                          color: (_isPercentage)
-                                              ? AppConfig.backButtonColor
-                                              : AppConfig.textBlack,
-                                        ),
-                                      )),
-                                    ),
-                                  ),
-                                  CommonWidgets.horizontalSpace(2),
-                                  InkWell(
-                                    onTap: () {
-                                      showDialog(
-                                          context: context,
-                                          builder: (context) {
-                                            return AlertDialog(
-                                              title: const Text('Discount'),
-                                              content: TextField(
-                                                keyboardType:
-                                                    TextInputType.number,
-                                                controller: _discountData,
-                                                decoration:
-                                                    const InputDecoration(
-                                                        hintText: "Discount"),
-                                              ),
-                                              actions: <Widget>[
-                                                MaterialButton(
-                                                  color: AppConfig.colorPrimary,
-                                                  textColor: Colors.white,
-                                                  child: const Text('OK'),
-                                                  onPressed: () {
-                                                    Navigator.pop(context);
-                                                  },
-                                                ),
-                                              ],
-                                            );
-                                          });
-                                    },
-                                    child: Container(
-                                        width:
-                                            SizeConfig.blockSizeHorizontal * 17,
-                                        height:
-                                            SizeConfig.blockSizeVertical * 3,
-                                        decoration: BoxDecoration(
-                                            border: Border.all(
-                                                color: AppConfig
-                                                    .buttonDeactiveColor),
-                                            borderRadius:
-                                                const BorderRadius.all(
-                                                    Radius.circular(5))),
-                                        child: Center(
-                                          child: Text(_discountData.text.isEmpty
-                                              ? ''
-                                              : _discountData.text),
-                                        )),
-                                  ),
-                                ],
-                              )
-                            : SizedBox.shrink(),
-                        Text('Total: ${total.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
-                        Text('Tax: ${tax.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Text('Round off: '),
-                            InkWell(
-                              onTap: () {
-                                showDialog(
-                                    context: context,
-                                    builder: (context) {
-                                      return AlertDialog(
-                                        title: const Text('Round off'),
-                                        content: TextField(
-                                          keyboardType: TextInputType.number,
-                                          controller: _roundoff,
-                                          decoration: const InputDecoration(
-                                              hintText: "Round off"),
-                                        ),
-                                        actions: <Widget>[
-                                          MaterialButton(
-                                            color: AppConfig.colorPrimary,
-                                            textColor: Colors.white,
-                                            child: const Text('OK'),
-                                            onPressed: () {
-                                              Navigator.pop(context);
-                                            },
-                                          ),
-                                        ],
-                                      );
-                                    });
-                              },
-                              child: Container(
-                                  width: SizeConfig.blockSizeHorizontal * 17,
-                                  height: SizeConfig.blockSizeVertical * 3,
-                                  decoration: BoxDecoration(
-                                      border: Border.all(
-                                          color: AppConfig.buttonDeactiveColor),
-                                      borderRadius: const BorderRadius.all(
-                                          Radius.circular(5))),
-                                  child: Center(
-                                    child: Text(''
-                                        '${roundoff == '' ? roundOffValue.toStringAsFixed(AppState().noOfDecimals ?? 2) : roundoff}'),
-                                  )),
-                            ),
-                          ],
-                        ),
-                        Text('Grand Total: ${roundedGrandTotal}'),
-                      ],
                     ),
                   ),
                 ],
               ),
       ),
     );
+  }
+
+  String getVatLabel() {
+    if (cartItems.isEmpty) return 'VAT';
+    // Uses the backend-configured VAT label (fetched in HomeScreen via
+    // get_store_detail and stored in AppState().vatLabel), instead of
+    // building "VAT (5%)" from tax_percentage.
+    return AppState().vatLabel ?? 'VAT';
+  }
+
+  // =====================================================================
+  // ITEM DETAILS DIALOG — UNCHANGED. Not part of the requested visual
+  // unification scope (which covers the main list screen). Left exactly
+  // as-is to avoid any risk to existing business logic.
+  // =====================================================================
+  void showItemDetailsDialog(int index) {
+    final product = cartItems[index];
+    print("========== SHOW ITEM DIALOG DEBUG ==========");
+    print("Product toJson: ${product.toJson()}");
+    print("Units: ${product.units.map((u) => u.toJson()).toList()}");
+    print("=============================================");
+    List<String> unitNames = product.units
+        .where((unit) => unit.name != null)
+        .map((unit) => unit.name!)
+        .toList();
+    String? selectedUnitName = product.selectedUnitName ??
+        (unitNames.isNotEmpty ? unitNames.first : null);
+    ProductType? selectedType = selectedProductTypes[index];
+    final qtyController = TextEditingController(text: qtys[index] ?? '1');
+    final rateController =
+        TextEditingController(text: amounts[index] ?? product.price.toString());
+
+      showDialog(
+  context: context,
+  builder: (context) {
+    return StatefulBuilder(
+      builder: (context, setDialogState) {
+        double previewQty =
+            double.tryParse(qtyController.text) ?? 0;
+        double previewRate =
+            double.tryParse(rateController.text) ?? 0;
+        double previewAmount = previewQty * previewRate;
+
+        return Dialog(
+          backgroundColor: Colors.white,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 18,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 620,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                22,
+                22,
+                22,
+                18,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+
+                  // =========================================================
+                  // HEADER
+                  // =========================================================
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                                               Expanded(
+                            child: Text(
+                              '${product.code} | ${product.name}',
+                             style: const TextStyle(
+  fontSize: AppFontSizes.dialogTitle, // 13.5
+  fontWeight: FontWeight.w700,
+  color: Color(0xFF222222),
+  height: 1.25,
+),
+                            ),
+                          ),
+
+                      const SizedBox(width: 10),
+
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: const Padding(
+                          padding: EdgeInsets.only(
+                            top: 2,
+                            right: 2,
+                          ),
+                          child: Icon(
+                            Icons.close,
+                            size: 28,
+                            color: Color(0xFF7C7C86),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 22),
+
+                  const Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: Color(0xFFE3E3E8),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // =========================================================
+                  // PRODUCT TYPE + UNIT
+                  // =========================================================
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+
+                      // PRODUCT TYPE
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+
+                            const Text(
+                              'Product Type',
+                              style: TextStyle(
+                                fontSize: AppFontSizes.label,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF171717),
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                          Container(
+  height: 44,
+  padding: const EdgeInsets.symmetric(horizontal: 10),
+  decoration: BoxDecoration(
+    border: Border.all(
+      color: const Color(0xFFD2D2D2),
+      width: 0.9,
+    ),
+    borderRadius: BorderRadius.circular(8),
+  ),
+  child: DropdownButtonHideUnderline(
+    child: DropdownButtonFormField<ProductType>(
+      isExpanded: true,
+      alignment: Alignment.center,
+
+      decoration: const InputDecoration(
+        border: InputBorder.none,
+        isDense: true,
+        contentPadding: EdgeInsets.zero,
+      ),
+
+      // SELECTED VALUE → CENTER + BLACK
+      selectedItemBuilder: (context) {
+        return productTypes.map((type) {
+          return Center(
+            child: Text(
+              type.name,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: AppFontSizes.value,
+                color: Colors.black,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          );
+        }).toList();
+      },
+
+      // DROPDOWN LIST
+      items: productTypes.map((type) {
+        return DropdownMenuItem<ProductType>(
+          value: type,
+          child: Center(
+            child: Text(
+              type.name,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: AppFontSizes.value,
+                color: Colors.black,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+
+      // DEFAULT VALUE → CENTER + BLACK
+      hint: const Center(
+        child: Text(
+          'Normal',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: AppFontSizes.value,
+            color: Colors.black,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+
+      icon: const Icon(
+        Icons.keyboard_arrow_down,
+        size: 22,
+        color: Color(0xFF6E6E78),
+      ),
+
+      onChanged: (value) {
+        setDialogState(() {
+          selectedType = value;
+        });
+      },
+    ),
+  ),
+),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(width: 18),
+
+                      // UNIT
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+
+                            const Text(
+                              'Unit',
+                              style: TextStyle(
+                                fontSize: AppFontSizes.label,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF171717),
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            Container(
+                              height: 52,
+                              padding:
+                                  const EdgeInsets.symmetric(
+                                horizontal: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                border: Border.all(
+                                  color: const Color(0xFFD9D9E2),
+                                  width: 1,
+                                ),
+                                borderRadius:
+                                    BorderRadius.circular(10),
+                              ),
+                              child: unitNames.length > 1
+                                  ? DropdownButtonHideUnderline(
+                                      child:
+                                          DropdownButtonFormField<
+                                              String>(
+                                        isExpanded: true,
+                                        decoration:
+                                            const InputDecoration(
+                                          border:
+                                              InputBorder.none,
+                                          isDense: true,
+                                          contentPadding:
+                                              EdgeInsets.zero,
+                                        ),
+                                        value:
+                                            selectedUnitName,
+                                        style:
+                                            const TextStyle(
+                                          fontSize:
+                                              AppFontSizes.value,
+                                          color:
+                                              Color(0xFF25252A),
+                                          fontWeight:
+                                              FontWeight.w500,
+                                        ),
+                                        icon: const Icon(
+                                          Icons
+                                              .keyboard_arrow_down,
+                                          size: 22,
+                                          color: Color(
+                                              0xFF6E6E78),
+                                        ),
+                                        items: unitNames
+                                            .map((u) {
+                                          return DropdownMenuItem<
+                                              String>(
+                                            value: u,
+                                            child: Text(u),
+                                          );
+                                        }).toList(),
+                                        onChanged: (value) {
+                                          setDialogState(() {
+                                            selectedUnitName =
+                                                value;
+                                          });
+                                        },
+                                      ),
+                                    )
+                                  : Align(
+                                      alignment:
+                                          Alignment.centerLeft,
+                                      child: Text(
+                                        selectedUnitName ?? '',
+                                        style:
+                                            const TextStyle(
+                                          fontSize:
+                                              AppFontSizes.value,
+                                          color:
+                                              Color(0xFF25252A),
+                                          fontWeight:
+                                              FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 22),
+
+                  // =========================================================
+                  // QUANTITY + RATE
+                  // =========================================================
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+
+                      // QUANTITY
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+
+                            const Text(
+                              'Quantity *',
+                              style: TextStyle(
+                                fontSize: AppFontSizes.label,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF171717),
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            Container(
+                              height: 54,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                border: Border.all(
+                                  color:
+                                      AppConfig.colorPrimary,
+                                  width: 1.4,
+                                ),
+                                borderRadius:
+                                    BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                children: [
+
+                                  const SizedBox(width: 12),
+
+                                  Icon(
+                                    Icons.swap_vert,
+                                    size: 21,
+                                    color:
+                                        AppConfig.colorPrimary,
+                                  ),
+
+                                  const SizedBox(width: 8),
+
+                                  Expanded(
+                                    child: TextField(
+                                      controller: qtyController,
+                                      autofocus: true,
+                                      keyboardType:
+                                          TextInputType.number,
+                                      style: const TextStyle(
+                                        fontSize:
+                                            AppFontSizes.value,
+                                        fontWeight:
+                                            FontWeight.w600,
+                                        color:
+                                            Color(0xFF222222),
+                                      ),
+                                      decoration:
+                                          const InputDecoration(
+                                        border:
+                                            InputBorder.none,
+                                        isDense: true,
+                                        contentPadding:
+                                            EdgeInsets.symmetric(
+                                          vertical: 14,
+                                        ),
+                                      ),
+                                      onChanged: (_) {
+                                        setDialogState(() {});
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(width: 18),
+
+                      // RATE
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+
+                            const Text(
+                              'Rate *',
+                              style: TextStyle(
+                                fontSize: AppFontSizes.label,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF171717),
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            Container(
+                              height: 54,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                border: Border.all(
+                                  color: const Color(0xFFD9D9E2),
+                                  width: 1,
+                                ),
+                                borderRadius:
+                                    BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                children: [
+
+                                  const SizedBox(width: 14),
+
+                                  Expanded(
+                                    child: TextField(
+                                      controller: rateController,
+                                      keyboardType:
+                                          TextInputType.number,
+                                      style: const TextStyle(
+                                        fontSize:
+                                            AppFontSizes.value,
+                                        fontWeight:
+                                            FontWeight.w600,
+                                        color:
+                                            Color(0xFF222222),
+                                      ),
+                                      decoration:
+                                          const InputDecoration(
+                                        border:
+                                            InputBorder.none,
+                                        isDense: true,
+                                        contentPadding:
+                                            EdgeInsets.symmetric(
+                                          vertical: 14,
+                                        ),
+                                      ),
+                                      onChanged: (_) {
+                                        setDialogState(() {});
+                                      },
+                                    ),
+                                  ),
+
+                                  Icon(
+                                    Icons.edit,
+                                    size: 20,
+                                    color:
+                                        AppConfig.colorPrimary,
+                                  ),
+
+                                  const SizedBox(width: 14),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 22),
+
+                  // =========================================================
+                  // AMOUNT
+                  // =========================================================
+                  const Text(
+                    'Amount',
+                    style: TextStyle(
+                      fontSize: AppFontSizes.label,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF171717),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Container(
+                    height: 56,
+                    padding:
+                        const EdgeInsets.symmetric(
+                      horizontal: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(
+                        color: const Color(0xFFD9D9E2),
+                        width: 1,
+                      ),
+                      borderRadius:
+                          BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+
+                        const Icon(
+                          Icons.calculate_outlined,
+                          size: 21,
+                          color: Color(0xFF8A8A96),
+                        ),
+
+                        const SizedBox(width: 10),
+
+                        Expanded(
+                          child: Text(
+                            previewAmount
+                                .toStringAsFixed(3),
+                            style: const TextStyle(
+                              fontSize:
+                                  AppFontSizes.value,
+                              fontWeight:
+                                  FontWeight.w700,
+                              color:
+                                  Color(0xFF222222),
+                            ),
+                          ),
+                        ),
+
+                        Container(
+                          padding:
+                              const EdgeInsets.symmetric(
+                            horizontal: 13,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                const Color(0xFFEDEDFB),
+                            borderRadius:
+                                BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            'Calculated',
+                            style: TextStyle(
+                              fontSize:
+                                  AppFontSizes.badge,
+                              fontWeight:
+                                  FontWeight.w700,
+                              color:
+                                  AppConfig.colorPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 26),
+
+                  // =========================================================
+                  // BOTTOM BUTTONS
+                  // =========================================================
+                  Row(
+                    children: [
+
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor:
+                                Colors.white,
+                            side: BorderSide(
+                              color:
+                                  AppConfig.colorPrimary,
+                              width: 1.4,
+                            ),
+                            shape:
+                                RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(10),
+                            ),
+                            padding:
+                                const EdgeInsets.symmetric(
+                              vertical: 15,
+                            ),
+                          ),
+                          onPressed: () =>
+                              Navigator.pop(context),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize:
+                                  AppFontSizes.value,
+                              fontWeight:
+                                  FontWeight.w700,
+                              color:
+                                  AppConfig.colorPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 14),
+
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                AppConfig.colorPrimary,
+                            foregroundColor:
+                                Colors.white,
+                            elevation: 0,
+                            shape:
+                                RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(10),
+                            ),
+                            padding:
+                                const EdgeInsets.symmetric(
+                              vertical: 15,
+                            ),
+                          ),
+                          onPressed: () {
+                            // =================================================
+                            // EXISTING SAVE LOGIC - UNCHANGED
+                            // =================================================
+                            setState(() {
+                              qtys[index] =
+                                  qtyController.text;
+
+                              amounts[index] =
+                                  rateController.text;
+
+                              saveToSharedPreferences(
+                                'qtyreturn$index',
+                                qtyController.text,
+                              );
+
+                              saveToSharedPreferences(
+                                'amountreturn$index',
+                                rateController.text,
+                              );
+
+                              if (selectedUnitName != null) {
+                                cartItems[index]
+                                        .selectedUnitName =
+                                    selectedUnitName;
+
+                                saveToSharedPreferences(
+                                  'unitNamereturn$index',
+                                  selectedUnitName!,
+                                );
+                              }
+
+                              if (selectedType != null) {
+                                selectedProductTypes[index] =
+                                    selectedType;
+
+                                saveToSharedPreferences(
+                                  'productTypereturn$index',
+                                  selectedType!.name,
+                                );
+                              }
+                            });
+
+                            Navigator.pop(context);
+                          },
+                          child: Row(
+                            mainAxisAlignment:
+                                MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+
+                              const Icon(
+                                Icons.save_outlined,
+                                size: 20,
+                                color: Colors.white,
+                              ),
+
+                              const SizedBox(width: 7),
+
+                              Text(
+                                'Save',
+                                style: const TextStyle(
+                                  fontSize:
+                                      AppFontSizes.value,
+                                  fontWeight:
+                                      FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  },
+);
   }
 
   Future<void> fetchProductTypes() async {

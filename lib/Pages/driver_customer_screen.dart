@@ -94,10 +94,11 @@ class _driver_customer_screenState extends State<driver_customer_screen> {
                 },
                 style: const TextStyle(color: Colors.white),
               )
-            : const Text(
-                'Shops',
-                style: TextStyle(color: AppConfig.backButtonColor),
-              ),
+            : const 
+           Text(
+  'Shops',
+  style: AppConfig.pageTitleStyle,
+),
         actions: [
           _isSearching
               ? IconButton(
@@ -134,23 +135,23 @@ class _driver_customer_screenState extends State<driver_customer_screen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            (_initDone && !_nodata)
-                ? SizedBox(
-                    height: SizeConfig.blockSizeVertical * 78,
-                    child: ListView.separated(
-                      separatorBuilder: (BuildContext context, int index) =>
-                          CommonWidgets.verticalSpace(1),
-                      itemCount: (searchQuery.isEmpty
-                              ? customer.data!
-                              : filteredCustomers)
-                          .length,
-                      shrinkWrap: true,
-                      itemBuilder: (context, index) => _customersCard(
-                          searchQuery.isEmpty
-                              ? customer.data![index]
-                              : filteredCustomers[index]),
-                    ),
-                  )
+          (_initDone && !_nodata)
+    ? ListView.separated(
+        padding: EdgeInsets.zero,
+        physics: const NeverScrollableScrollPhysics(),
+        separatorBuilder: (BuildContext context, int index) =>
+            const SizedBox(height: 2),
+        itemCount: (searchQuery.isEmpty
+                ? customer.data!
+                : filteredCustomers)
+            .length,
+        shrinkWrap: true,
+        itemBuilder: (context, index) => _customersCard(
+            searchQuery.isEmpty
+                ? customer.data![index]
+                : filteredCustomers[index]),
+      )
+                  
                 : (_nodata && _initDone)
                     ? Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -248,9 +249,10 @@ class _driver_customer_screenState extends State<driver_customer_screen> {
           'id': data.id,
         });
       },
-      child: Card(
-        elevation: 3,
-        child: Container(
+   child: Card(
+  elevation: 3,
+  margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 0),
+  child: Container(
           width: SizeConfig.blockSizeHorizontal * 90,
           decoration: const BoxDecoration(
             color: AppConfig.backgroundColor,
@@ -291,28 +293,30 @@ class _driver_customer_screenState extends State<driver_customer_screen> {
                             fontWeight: AppConfig.headLineWeight),
                       ),
                     ),
-                    SizedBox(
-                      width: SizeConfig.blockSizeHorizontal * 70,
-                      child: Row(children: [
-                        SizedBox(
-                          width: SizeConfig.blockSizeHorizontal * 60,
-                          child: Text(
-                            'Address:${data.address ?? ''}',
-                            style:
-                                TextStyle(fontSize: AppConfig.textCaption3Size),
-                          ),
-                        ),
-                        const Spacer(),
-                        GestureDetector(
-                          onTap: _openMapScreen,
-                          child: Image.asset(
-                            'Assets/Images/vecteezy_google-maps-icon_16716478.png',
-                            fit: BoxFit.cover,
-                            height: 30,
-                          ),
-                        )
-                      ]),
-                    ),
+                  SizedBox(
+  width: SizeConfig.blockSizeHorizontal * 70,
+  child: Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      SizedBox(
+        width: SizeConfig.blockSizeHorizontal * 60,
+        child: Text(
+          'Address:${data.address ?? ''}',
+          style: TextStyle(fontSize: AppConfig.textCaption3Size),
+        ),
+      ),
+      const Spacer(),
+      GestureDetector(
+        onTap: _openMapScreen,
+        child: Image.asset(
+          'Assets/Images/vecteezy_google-maps-icon_16716478.png',
+          fit: BoxFit.cover,
+          height: 18,
+        ),
+      )
+    ],
+  ),
+),
                     Text(
                       'Contact:${data.contactNumber}',
                       style: TextStyle(fontSize: AppConfig.textCaption3Size),

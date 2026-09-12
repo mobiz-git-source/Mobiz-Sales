@@ -155,6 +155,8 @@ class _StocKTransfer_InnerState extends State<StocKTransfer_Inner> {
       final response = await http.get(url);
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
+        print("API Response: ${response.body}");
+print("Decoded Result: $result");
         if (result["status"] == true) {
           int enteredQty = int.tryParse(quantityController.text.trim()) ?? 1;
           if (enteredQty <= 0) enteredQty = 1;
@@ -169,6 +171,7 @@ class _StocKTransfer_InnerState extends State<StocKTransfer_Inner> {
             'batch': dataMap['batch'] ?? '',
             'expiry': dataMap['expiry'] ?? '',
             'type_name': "Scanned",
+            'tax_percentage': result['tax_percentage'] ?? 0,
           };
 
           setState(() {
@@ -284,7 +287,7 @@ class _StocKTransfer_InnerState extends State<StocKTransfer_Inner> {
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
         title: const Text(
           'Stock Transfer',
-          style: TextStyle(color: AppConfig.backgroundColor),
+           style: AppConfig.pageTitleStyle,
         ),
         backgroundColor: AppConfig.colorPrimary,
         actions: [

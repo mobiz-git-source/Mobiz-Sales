@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:lottie/lottie.dart';
@@ -70,6 +71,14 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // ── NEW: palette used only for the redesigned UI. Data/API logic below is untouched. ──
+  static const Color _screenBg = Color(0xFFF5F6FA);
+  static const Color _darkText = Color(0xFF1F1147);
+  static const Color _brandColor = AppConfig.colorPrimary;
+  // NEW: lets us open the drawer via the custom menu icon now that there's
+  // no AppBar auto-generating one.
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   List<Map<String, dynamic>> savedCartItems = [];
   bool _restrict = false;
   bool isLoading = true;
@@ -94,7 +103,14 @@ class _HomeScreenState extends State<HomeScreen> {
   double amountCollected = 0.0;
   double totalSale = 0.0;
   StoreDetail? storeDetail;
-
+  // NEW: unread notification count for the bell badge. No API field for this
+  // exists yet in the code you shared, so it defaults to 0 (badge hidden).
+  // Wire this to the real unread-count from your notifications API when ready.
+  int notificationCount = 0;
+  int visit = 0;
+  int orders = 0;
+  int invoice = 0;
+  double collection = 0.0;
   bool performLogout() {
     try {
       SharedPref().clear();
@@ -129,46 +145,72 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> fetchDashboardData() async {
     final String url =
         '${RestDatasource().BASE_URL}/api/second_dashbord?store_id=${AppState().storeId}&date=${DateFormat('yyyy-MM-dd').format(selectedDate)}&user_id=${AppState().userId}';
-    final response = await http.get(Uri.parse(url));
+    print("DASHBOARD API URL: $url");
+    try {
+      final response = await http.get(Uri.parse(url));
+      print("STATUS CODE: ${response.statusCode}");
+      print("RESPONSE BODY: ${response.body}");
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        if (jsonResponse['success'] == true) {
+          setState(() {
+            var data = jsonResponse['data'];
 
-    if (response.statusCode == 200) {
-      print(response.request);
-      final Map<String, dynamic> jsonResponse = json.decode(response.body);
-      if (jsonResponse['success']) {
-        setState(() {
-          var data = jsonResponse['data'];
-          completedTodaySchedule = data['todays_schedule']['completed'] ?? 0;
-          totalTodaySchedule = data['todays_schedule']['total'] ?? 0;
-          completedEmergencySchedule =
-              data['emergency_schedule']['completed'] ?? 0;
-          totalEmergencySchedule = data['emergency_schedule']['total'] ?? 0;
-          couponSale =
-              (data['coupon_sale'] ?? 0).toDouble(); // Ensure it's a double
-          usedCoupons = data['used_coupons'] ?? 0;
-          expenses = (data['expenses'] ?? 0).toDouble(); // Ensure it's a double
-          filledBottle = data['filled_bottle'] ?? 0;
-          emptyBottle = data['empty_bottle'] ?? 0;
-          cashInHand =
-              (data['cash_in_hand'] ?? 0).toDouble(); // Ensure it's a double
-          cashSale =
-              (data['cash_sale'] ?? 0).toDouble(); // Ensure it's a double
-          creditSale =
-              (data['credit_sale'] ?? 0).toDouble(); // Ensure it's a double
-          amountPending =
-              (data['amount_pending'] ?? 0).toDouble(); // Ensure it's a double
-          amountCollected = (data['amount_collected'] ?? 0)
-              .toDouble(); // Ensure it's a double
-          totalSale =
-              (data['total_sale'] ?? 0).toDouble(); // Ensure it's a double
-          dataMap = {
-            "Amount Pending": amountPending,
-            "Amount Collected": amountCollected,
-            // "Total Sale": totalSale,
-          };
-        });
+            print("Full Dashboard Response: $data");
+            print("Cash Sale: ${data['cash_sale']}");
+            print("Credit Sale: ${data['credit_sale']}");
+            print("Total Sale: ${data['total_sale']}");
+
+            double safeDouble(dynamic val) {
+              if (val == null) return 0.0;
+              if (val is num) return val.toDouble();
+              if (val is String) return double.tryParse(val) ?? 0.0;
+              return 0.0;
+            }
+
+            int safeInt(dynamic val) {
+              if (val == null) return 0;
+              if (val is int) return val;
+              if (val is String) return int.tryParse(val) ?? 0;
+              return (val as num).toInt();
+            }
+
+            completedTodaySchedule =
+                safeInt(data['todays_schedule']?['completed']);
+            totalTodaySchedule = safeInt(data['todays_schedule']?['total']);
+            completedEmergencySchedule =
+                safeInt(data['emergency_schedule']?['completed']);
+            totalEmergencySchedule =
+                safeInt(data['emergency_schedule']?['total']);
+
+            couponSale = safeDouble(data['coupon_sale']);
+            usedCoupons = safeInt(data['used_coupons']);
+            expenses = safeDouble(data['expenses']);
+            filledBottle = safeInt(data['filled_bottle']);
+            emptyBottle = safeInt(data['empty_bottle']);
+
+            cashInHand = safeDouble(data['cash_in_hand']);
+            print("cash_in_hand from API : ${data['cash_in_hand']}");
+            cashSale = safeDouble(data['cash_sale']);
+            creditSale = safeDouble(data['credit_sale']);
+            amountPending = safeDouble(data['amount_pending']);
+            amountCollected = safeDouble(data['amount_collected']);
+            totalSale = safeDouble(data['total_sale']);
+            visit = safeInt(data['visit']);
+            orders = safeInt(data['orders']);
+            invoice = safeInt(data['invoice']);
+            collection = safeDouble(data['collection']);
+            print(
+                "VISIT: $visit | ORDERS: $orders | INVOICE: $invoice | COLLECTION: $collection");
+            dataMap = {
+              "Amount Pending": amountPending,
+              "Amount Collected": amountCollected,
+            };
+          });
+        }
       }
-    } else {
-      throw Exception('Failed to load dashboard data');
+    } catch (e) {
+      print("DASHBOARD EXCEPTION: $e");
     }
   }
 
@@ -182,8 +224,23 @@ class _HomeScreenState extends State<HomeScreen> {
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
         if (jsonData['success'] == true) {
+          final detail = StoreDetail.fromJson(jsonData);
+
+          print("VAT LABEL FROM API: ${detail.vatLabel}");
+
+          AppState().vatLabel = detail.vatLabel ?? "VAT";
+
+          final prefs = await SharedPreferences.getInstance();
+
+          await prefs.setString(
+            "vat_label",
+            detail.vatLabel ?? "VAT",
+          );
+
+          print("Saved VAT LABEL: ${prefs.getString("vat_label")}");
+
           setState(() {
-            storeDetail = StoreDetail.fromJson(jsonData);
+            storeDetail = detail;
             isLoading = false;
           });
         } else {
@@ -217,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
         } else {
           appIcons = [];
         }
-        paginatedIcons = _paginateList(appIcons, 15);
+        paginatedIcons = _paginateList(appIcons, 16);
       });
     } else {
       throw Exception('Failed to load app icons');
@@ -288,13 +345,13 @@ class _HomeScreenState extends State<HomeScreen> {
         return Icons.wallet_travel_outlined;
       case 'money':
         return Icons.money;
-        case 'call_missed_outgoing_rounded':
+      case 'call_missed_outgoing_rounded':
         return Icons.call_missed_outgoing_rounded;
       case 'transfer_within_a_station':
         return Icons.transfer_within_a_station;
-        case 'production_quantity_limits_outlined':
+      case 'production_quantity_limits_outlined':
         return Icons.production_quantity_limits_outlined;
-        case 'quora':
+      case 'quora':
         return Icons.quora;
       default:
         return Icons.help;
@@ -307,771 +364,329 @@ class _HomeScreenState extends State<HomeScreen> {
     Colors.white,
   ];
 
-  // List<_SalesData> data = [
-  //   _SalesData('Irfan', 20),
-  //   _SalesData('Ahmed', 28),
-  //   _SalesData('Yasir', 34),
-  //   _SalesData('Rouf', 48),
-  //   _SalesData('Imran', 40),
-  //   _SalesData('Prabhu', 30),
-  //   _SalesData('Sudeer', 20),
-  //   _SalesData('Mahesh', 15),
-  // ];
+ @override
+Widget build(BuildContext context) {
+  final bool isTablet =
+      MediaQuery.of(context).size.shortestSide >= 600;
 
-  @override
-  Widget build(BuildContext context) {
-    String currentDate = DateFormat('dd-MMM-yyyy').format(DateTime.now());
-    // final paginatedIcons = paginateIcons(appIcons, 15);
+  String currentDate =
+      DateFormat('dd-MMM-yyyy').format(DateTime.now());
 
-    return WillPopScope(
-      onWillPop: _onWillPop,
-      child: Scaffold(
-        appBar: AppBar(
-          toolbarHeight: 40,
-          centerTitle: false,
-          iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
-          backgroundColor: AppConfig.colorPrimary,
-          titleSpacing: 0,
-          title: RichText(
-            text: TextSpan(
-              text: 'Hello ',
-              style: TextStyle(
-                  color: AppConfig.backgroundColor,
-                  fontSize: AppConfig.textSubtitle3Size),
-              children: <TextSpan>[
-                TextSpan(
-                  text: '${AppState().name}',
-                  style: TextStyle(
-                      color: AppConfig.backgroundColor,
-                      fontSize: AppConfig.textSubtitle3Size),
+  return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+      ),
+      child: WillPopScope(
+        onWillPop: _onWillPop,
+        child: Scaffold(
+          // ── NEW: no separate AppBar — the menu/title/bell now live inside
+          // the gradient header itself (see _buildDashboardHeader). ──
+          key: _scaffoldKey,
+          backgroundColor: _screenBg,
+          drawer: SizedBox(
+            width: SizeConfig.blockSizeHorizontal * 50,
+            child: Drawer(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 10.0),
+                child: Column(
+                  children: [
+                    CommonWidgets.verticalSpace(8),
+                    // NEW: plain brand-color avatar — animation removed
+                    const CircleAvatar(
+                      radius: 45.0,
+                      backgroundColor: _brandColor,
+                      child: Icon(Icons.person, color: Colors.white, size: 46),
+                    ),
+                    ListTile(
+                      leading: Icon(Icons.drive_file_rename_outline),
+                      title: const Text('Edit Profile'),
+                      onTap: () {
+                        print(AppState().routeId);
+                        print(AppState().vanId);
+                      },
+                    ),
+                    ListTile(
+                      leading: Icon(Icons.call),
+                      title: const Text('Contact Us'),
+                      onTap: () {},
+                    ),
+                    ListTile(
+                      leading: Icon(Icons.print),
+                      title: const Text('Printer'),
+                      onTap: () {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PrinterTest(),
+                            ));
+                      },
+                    ),
+                    ListTile(
+                      leading: Icon(Icons.logout),
+                      title: Text('Log Out'),
+                      onTap: () {
+                        conformation(context);
+                        clearSharedPreferences();
+                      },
+                    ),
+                    const Divider(),
+                    Text('v$_appVersion'),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          actions: [
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
-              child: InkWell(onTap: () {
-                Navigator.pushNamed(context, NotificationPage.routeName);
-              },child: Icon(Icons.notifications)),
-            )
-          ],
-        ),
-        drawer: SizedBox(
-          width: SizeConfig.blockSizeHorizontal * 50,
-          child: Drawer(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 10.0),
-              child: Column(
-                children: [
-                  CommonWidgets.verticalSpace(8),
-                  CircleAvatar(
-                      radius: 70.0,
-                      backgroundColor: Colors.transparent,
-                      child: Lottie.asset(
-                          'Assets/Images/Animation - 1722081243637.json',
-                          fit: BoxFit.cover,
-                          width: 70)),
-                  ListTile(
-                    leading: Icon(Icons.drive_file_rename_outline),
-                    title: const Text('Edit Profile'),
-                    onTap: () {
-                      print(AppState().routeId);
-                      print(AppState().vanId);
-                    },
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.call),
-                    title: const Text('Contact Us'),
-                    onTap: () {},
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.print),
-                    title: const Text('Printer'),
-                    onTap: () {
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PrinterTest(),
-                          ));
-                    },
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.logout),
-                    title: Text('Log Out'),
-                    onTap: () {
-                      conformation(context);
-                      clearSharedPreferences();
-                    },
-                  ),
-                  const Divider(),
-                  Text('v$_appVersion'),
-                ],
               ),
             ),
           ),
+   body: Column(
+  children: [
+    isLoading
+        ? const SizedBox.shrink()
+        : storeDetail == null
+            ? const Center(
+                child: Text("No data found"),
+              )
+            : _buildDashboardHeader(),
+
+ Expanded(
+  child: Padding(
+    padding: EdgeInsets.fromLTRB(
+      14,
+      0,
+      14,
+      isTablet ? 10 : 18,
+    ),
+    child: appIcons.isNotEmpty
+        ? PageView.builder(
+            itemCount: paginatedIcons.length,
+            itemBuilder: (context, pageIndex) {
+              final pageData = paginatedIcons[pageIndex];
+
+              return GridView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 10),
+                gridDelegate:
+                    SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 12,
+
+                  // Phone = old layout
+                  // Tablet = slightly smaller rows so all 16 can fit,
+                  // and the page can still scroll if needed.
+                  mainAxisSpacing: isTablet ? 8 : 14,
+
+                 childAspectRatio: isTablet ? 1.45 : 0.8,
+                ),
+                itemCount: pageData.length,
+                itemBuilder: (context, index) {
+                  final iconData = pageData[index];
+
+                  final iconList =
+                      iconData['icon'] as List<dynamic>?;
+
+                  final firstIconObject =
+                      iconList != null && iconList.isNotEmpty
+                          ? iconList[0]
+                          : null;
+
+                  final iconName =
+                      firstIconObject?['icon'] as String?;
+
+                  final name =
+                      firstIconObject?['name'] as String?;
+
+                  final url =
+                      firstIconObject?['url'] as String?;
+
+                  return _iconButtons(
+                    title: name ?? 'Unknown',
+                    routeName: url ?? '',
+                    icon: getIconData(iconName),
+                  );
+                },
+              );
+            },
+          )
+        : const SizedBox.shrink(),
+  ),
+),
+  ],
+),
         ),
-        body: Container(
-          height: MediaQuery.of(context).size.height * 1,
-          child: PageView(
-            children: [
-              Container(
-                child: SingleChildScrollView(
-                  child: Column(
+      ),
+    );
+  }
+
+  // ── NEW: gradient header (menu / title / bell built in) + single merged white card ──
+  Widget _buildDashboardHeader() {
+    return Column(children: [
+      Container(
+        width: double.infinity,
+        padding: EdgeInsets.fromLTRB(
+          20,
+          MediaQuery.of(context).padding.top + 8,
+          20,
+          40,
+        ),
+        decoration: BoxDecoration(
+          // NEW: brand-color base + background image with a dark
+          // overlay so the white text/icons stay readable
+          color: _brandColor,
+          image: DecorationImage(
+            image: const AssetImage('Assets/Images/dashboard_bg.png'),
+            fit: BoxFit.cover,
+            colorFilter: ColorFilter.mode(
+              _brandColor.withOpacity(0.55),
+              BlendMode.darken,
+            ),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                InkWell(
+                  onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                  child: const Icon(Icons.menu, color: Colors.white, size: 26),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final companyName = storeDetail?.name ?? 'Mobiz';
+
+                        double titleSize;
+
+                        if (companyName.length <= 20) {
+                          titleSize = 24;
+                        } else if (companyName.length <= 35) {
+                          titleSize = 21;
+                        } else if (companyName.length <= 50) {
+                          titleSize = 18;
+                        } else {
+                          titleSize = 16;
+                        }
+
+                        return Text(
+                          companyName,
+                          maxLines: 3,
+                          softWrap: true,
+                          textAlign: TextAlign.left,
+                          style: AppConfig.pageTitleStyle.copyWith(
+                            color: Colors.white,
+                            fontSize: titleSize,
+                            height: 1.15,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    Navigator.pushNamed(context, NotificationPage.routeName);
+                  },
+                  child: Stack(
+                    clipBehavior: Clip.none,
                     children: [
-                      CommonWidgets.verticalSpace(2),
-                      isLoading
-                          ? Padding(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: SizeConfig.blockSizeHorizontal * 3,
-                                  vertical: SizeConfig.blockSizeVertical * 1),
-                              child: Shimmer.fromColors(
-                                baseColor: Colors.grey[300]!,
-                                highlightColor: Colors.grey[100]!,
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      width: SizeConfig.safeBlockHorizontal! * 30,
-                                      height: SizeConfig.safeBlockVertical! * 5,
-                                      color: Colors.white,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                          : storeDetail == null
-                              ? const Center(child: Text("No data found"))
-                              : Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal:
-                                            SizeConfig.blockSizeHorizontal * 3,
-                                        vertical:
-                                            SizeConfig.blockSizeVertical * 1),
-                                    child: Text(
-                                      "${storeDetail!.name}",
-                                      style: TextStyle(
-                                          fontSize: AppConfig.textCaptionSize,
-                                          fontWeight: FontWeight.w900,
-                                          color: AppConfig.colorPrimary),
-                                    ),
-                                  ),
-                                ),
-                      Padding(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          children: [
-                            // CommonWidgets.verticalSpace(2),
-                            Center(
-                              child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Image.asset(
-                                      'Assets/Images/main logo.png',
-                                      fit: BoxFit.cover,
-                                      width: SizeConfig.blockSizeHorizontal * 18,
-                                      height: SizeConfig.blockSizeVertical * 8,
-                                    ),
-                                  ]),
+                      const Icon(Icons.notifications,
+                          color: Colors.white, size: 24),
+                      if (notificationCount > 0)
+                        Positioned(
+                          right: -4,
+                          top: -3,
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            constraints: const BoxConstraints(
+                                minWidth: 15, minHeight: 15),
+                            decoration: const BoxDecoration(
+                              color: Colors.redAccent,
+                              shape: BoxShape.circle,
                             ),
-                            CommonWidgets.verticalSpace(3.8),
-                            Container(
-                              height: MediaQuery.of(context).size.height * 0.68,
-                              child: paginatedIcons.isNotEmpty
-                                  ? PageView.builder(
-                                      itemCount: paginatedIcons.length,
-                                      itemBuilder: (context, pageIndex) {
-                                        final pageData =
-                                            paginatedIcons[pageIndex];
-                                        return SingleChildScrollView(
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 15),
-                                            child: GridView.builder(
-                                              shrinkWrap: true,
-                                              physics:
-                                                  NeverScrollableScrollPhysics(),
-                                              gridDelegate:
-                                                  SliverGridDelegateWithFixedCrossAxisCount(
-                                                crossAxisCount: 3,
-                                                crossAxisSpacing: 13,
-                                                childAspectRatio: .95,
-                                                mainAxisSpacing: 10,
-                                              ),
-                                              itemCount: pageData.length,
-                                              itemBuilder: (context, index) {
-                                                final iconData = pageData[index];
-                                                final iconList = iconData['icon']
-                                                    as List<dynamic>?;
-                                                final firstIconObject =
-                                                    iconList != null &&
-                                                            iconList.isNotEmpty
-                                                        ? iconList[0]
-                                                        : null;
-
-                                                final iconName =
-                                                    firstIconObject != null
-                                                        ? firstIconObject['icon']
-                                                            as String?
-                                                        : null;
-                                                final name =
-                                                    firstIconObject != null
-                                                        ? firstIconObject['name']
-                                                            as String?
-                                                        : 'Unknown';
-                                                final url =
-                                                    firstIconObject != null
-                                                        ? firstIconObject['url']
-                                                            as String?
-                                                        : '';
-
-                                                return _iconButtons(
-                                                  title: name ?? 'Unknown',
-                                                  routeName: url ?? '',
-                                                  icon: getIconData(iconName),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    )
-                                  : Center(
-                                      child: Shimmer.fromColors(
-                                        baseColor: Colors.grey.shade300,
-                                        highlightColor: Colors.white,
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(35.0),
-                                          child: Column(
-                                            children: [
-                                              Expanded(
-                                                child: GridView.builder(
-                                                  scrollDirection: Axis.vertical,
-                                                  shrinkWrap: true,
-                                                  physics:
-                                                      BouncingScrollPhysics(),
-                                                  itemCount: 12,
-                                                  gridDelegate:
-                                                      SliverGridDelegateWithFixedCrossAxisCount(
-                                                    crossAxisCount: 3,
-                                                    mainAxisExtent: 120,
-                                                    crossAxisSpacing: 20,
-                                                    mainAxisSpacing: 30,
-                                                  ),
-                                                  itemBuilder: (context, index) {
-                                                    return Container(
-                                                      decoration: BoxDecoration(
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                                10),
-                                                        color:
-                                                            Colors.grey.shade200,
-                                                      ),
-                                                    );
-                                                  },
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                            )
-                          ],
+                            child: Text(
+                              notificationCount > 9
+                                  ? '9+'
+                                  : '$notificationCount',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'Hello, ${AppState().name}',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w400,
+                color: Colors.white,
               ),
-              Container(
-                child: SingleChildScrollView(
-                  child: Column(
+            ),
+          ],
+        ),
+      ),
+      // NEW: single merged white card — summary tiles on top, a divider,
+      // then the Visits/Orders/Invoices/Collections stat row underneath.
+      Transform.translate(
+        offset: const Offset(0, -30),
+        child: Column(
+          children: [
+            /// ================= TOP ROW =================
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: SizeConfig.blockSizeHorizontal * 3,
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 18,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(.08),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: IntrinsicHeight(
+                  child: Row(
                     children: [
-                      SizedBox(
-                        height: SizeConfig.safeBlockVertical! * 7,
+                      Expanded(
+                        child: _summaryTile(
+                          icon: Icons.show_chart_rounded,
+                          label: "Today's Sales",
+                          amount: totalSale.toStringAsFixed(
+                            AppState().noOfDecimals ?? 2,
+                          ),
+                        ),
                       ),
-                      Container(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: SizeConfig.blockSizeHorizontal * 3),
-                          child: Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Container(
-                                    height: SizeConfig.safeBlockVertical! * 22,
-                                    width: SizeConfig.blockSizeHorizontal * 45,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(5),
-                                      color: AppConfig.colorPrimary,
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        SizedBox(
-                                          height:
-                                              SizeConfig.safeBlockVertical! * 2.5,
-                                        ),
-                                        Text(
-                                          'TODAY\'S SCHEDULE',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            // fontWeight: FontWeight.w700
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          height:
-                                              SizeConfig.safeBlockVertical! * 2.5,
-                                        ),
-                                        CircularPercentIndicator(
-                                          radius: 50.0,
-                                          lineWidth: 10.0,
-                                          percent: completedTodaySchedule /
-                                              totalTodaySchedule,
-                                          center: Text(
-                                            "$completedTodaySchedule/$totalTodaySchedule", // Text inside the circle
-                                            style: TextStyle(
-                                                fontSize:
-                                                    AppConfig.textSubtitle3Size,
-                                                color: Colors.white),
-                                          ),
-                                          progressColor: Colors
-                                              .green, // Color of the progress line
-                                          backgroundColor: Colors
-                                              .blueAccent, // Background color of the circle
-                                          circularStrokeCap: CircularStrokeCap
-                                              .round, // Rounded edges of the stroke
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    height: SizeConfig.safeBlockVertical! * 22,
-                                    width: SizeConfig.blockSizeHorizontal * 45,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(5),
-                                      color: AppConfig.colorPrimary,
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        SizedBox(
-                                          height:
-                                              SizeConfig.safeBlockVertical! * 2.5,
-                                        ),
-                                        Text(
-                                          'EMERGENCY SCHEDULE',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            // fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          height:
-                                              SizeConfig.safeBlockVertical! * 2.5,
-                                        ),
-                                        CircularPercentIndicator(
-                                          radius: 50.0, // Size of the circle
-                                          lineWidth:
-                                              10.0, // Width of the circle's stroke
-                                          percent: completedEmergencySchedule /
-                                              totalEmergencySchedule, // Progress percentage (2 out of 70)
-                                          center: Text(
-                                            "$completedEmergencySchedule/$totalEmergencySchedule", // Text inside the circle
-                                            style: TextStyle(
-                                                fontSize:
-                                                    AppConfig.textSubtitle3Size,
-                                                color: Colors.white),
-                                          ),
-                                          progressColor: Colors
-                                              .green, // Color of the progress line
-                                          backgroundColor: Colors
-                                              .blueAccent, // Background color of the circle
-                                          circularStrokeCap: CircularStrokeCap
-                                              .round, // Rounded edges of the stroke
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical! * 3,
-                              ),
-                              Row(
-                                children: [
-                                  Container(
-                                    height: SizeConfig.safeBlockVertical! * 7,
-                                    width:
-                                        SizeConfig.safeBlockHorizontal! * 30.52,
-                                    decoration: BoxDecoration(
-                                        color: AppConfig.colorPrimary,
-                                        borderRadius: BorderRadius.circular(5)),
-                                    child: Column(
-                                      children: [
-                                        SizedBox(
-                                          height: 7,
-                                        ),
-                                        Text(
-                                          'COUPON SALE',
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize:
-                                                  AppConfig.textCaption3Size),
-                                        ),
-                                        Text(
-                                          couponSale.toStringAsFixed(
-                                              2), // Converts double to a string with 2 decimal places
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: AppConfig.textCaption2Size,
-                                          ),
-                                        )
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 5,
-                                  ),
-                                  Container(
-                                    height: SizeConfig.safeBlockVertical! * 7,
-                                    width:
-                                        SizeConfig.safeBlockHorizontal! * 30.52,
-                                    decoration: BoxDecoration(
-                                        color: AppConfig.colorPrimary,
-                                        borderRadius: BorderRadius.circular(5)),
-                                    child: Column(
-                                      children: [
-                                        SizedBox(
-                                          height: 7,
-                                        ),
-                                        Text(
-                                          'USED COUPONS',
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize:
-                                                  AppConfig.textCaption3Size),
-                                        ),
-                                        Text(
-                                          usedCoupons
-                                              .toString(), // Converts double to a string with 2 decimal places
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: AppConfig.textCaption2Size,
-                                          ),
-                                        )
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 5,
-                                  ),
-                                  Container(
-                                    height: SizeConfig.safeBlockVertical! * 7,
-                                    width:
-                                        SizeConfig.safeBlockHorizontal! * 30.52,
-                                    decoration: BoxDecoration(
-                                        color: AppConfig.colorPrimary,
-                                        borderRadius: BorderRadius.circular(5)),
-                                    child: Column(
-                                      children: [
-                                        SizedBox(
-                                          height: 7,
-                                        ),
-                                        Text(
-                                          'EXPENSES',
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize:
-                                                  AppConfig.textCaption3Size),
-                                        ),
-                                        Text(expenses.toStringAsFixed(AppState().noOfDecimals ?? 2),
-                                            style: TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w700,
-                                                fontSize:
-                                                    AppConfig.textCaption2Size))
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(
-                                  height: SizeConfig.safeBlockVertical! * 1.5),
-                              Row(
-                                children: [
-                                  Container(
-                                    height: SizeConfig.safeBlockVertical! * 7,
-                                    width:
-                                        SizeConfig.safeBlockHorizontal! * 30.52,
-                                    decoration: BoxDecoration(
-                                        color: AppConfig.colorPrimary,
-                                        borderRadius: BorderRadius.circular(5)),
-                                    child: Column(
-                                      children: [
-                                        SizedBox(
-                                          height: 7,
-                                        ),
-                                        Text(
-                                          'FILLED BOTTLE',
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize:
-                                                  AppConfig.textCaption3Size),
-                                        ),
-                                        Text(filledBottle.toString(),
-                                            style: TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w700,
-                                                fontSize:
-                                                    AppConfig.textCaption2Size))
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 5,
-                                  ),
-                                  Container(
-                                    height: SizeConfig.safeBlockVertical! * 7,
-                                    width:
-                                        SizeConfig.safeBlockHorizontal! * 30.52,
-                                    decoration: BoxDecoration(
-                                        color: AppConfig.colorPrimary,
-                                        borderRadius: BorderRadius.circular(5)),
-                                    child: Column(
-                                      children: [
-                                        SizedBox(
-                                          height: 7,
-                                        ),
-                                        Text(
-                                          'EMPTY BOTTLE',
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize:
-                                                  AppConfig.textCaption3Size),
-                                        ),
-                                        Text(emptyBottle.toString(),
-                                            style: TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w700,
-                                                fontSize:
-                                                    AppConfig.textCaption2Size))
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 5,
-                                  ),
-                                  Container(
-                                    height: SizeConfig.safeBlockVertical! * 7,
-                                    width:
-                                        SizeConfig.safeBlockHorizontal! * 30.52,
-                                    decoration: BoxDecoration(
-                                        color: AppConfig.colorPrimary,
-                                        borderRadius: BorderRadius.circular(5)),
-                                    child: Column(
-                                      children: [
-                                        SizedBox(
-                                          height: 7,
-                                        ),
-                                        Text(
-                                          'CASH IN HAND',
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize:
-                                                  AppConfig.textCaption3Size),
-                                        ),
-                                        Text(cashInHand.toStringAsFixed(AppState().noOfDecimals ?? 2),
-                                            style: TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w700,
-                                                fontSize:
-                                                    AppConfig.textCaption2Size))
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(
-                                height: SizeConfig.safeBlockVertical! * 3,
-                              ),
-                              Container(
-                                height: SizeConfig.safeBlockVertical! * 37,
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                    color: AppConfig.colorPrimary,
-                                    borderRadius: BorderRadius.circular(8)),
-                                child: Column(
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Padding(
-                                          padding: EdgeInsets.symmetric(
-                                              horizontal: 10),
-                                          child: Column(
-                                            children: [
-                                              SizedBox(
-                                                height: SizeConfig
-                                                        .safeBlockVertical! *
-                                                    2,
-                                              ),
-                                              Container(
-                                                padding: EdgeInsets.symmetric(
-                                                    horizontal: SizeConfig
-                                                            .blockSizeHorizontal! *
-                                                        8,
-                                                    vertical: SizeConfig
-                                                            .blockSizeVertical! *
-                                                        1.2),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.indigo.shade300,
-                                                  borderRadius:
-                                                      BorderRadius.circular(10),
-                                                ),
-                                                child: Text(
-                                                  'CASH SALES', // Show the current date
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                              SizedBox(
-                                                height: 15,
-                                              ),
-                                              dataMap.isEmpty
-                                                  ? const Center(child: CircularProgressIndicator())
-                                              :Container(
-                                                height: SizeConfig
-                                                        .safeBlockVertical! *
-                                                    24,
-                                                width: SizeConfig
-                                                        .safeBlockHorizontal! *
-                                                    50,
-                                                child: PieChart(
-                                                  dataMap: dataMap,
-                                                  colorList: colorList,
-                                                  chartRadius:
-                                                      MediaQuery.of(context)
-                                                              .size
-                                                              .width *
-                                                          .5,
-                                                  centerText: "",
-                                                  chartValuesOptions:
-                                                      ChartValuesOptions(
-                                                    showChartValues: true,
-                                                    showChartValuesInPercentage:
-                                                        false,
-                                                    showChartValuesOutside: false,
-                                                    chartValueStyle: TextStyle(
-                                                      color: Colors.black,
-                                                      fontSize: 16,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                  ringStrokeWidth: 30,
-                                                  legendOptions: LegendOptions(
-                                                      showLegends: false),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            // SizedBox(height: 10,),
-                                            Text(
-                                              'CREDIT SALES',
-                                              style: TextStyle(
-                                                  color: Colors.grey,
-                                                  fontWeight: FontWeight.w900),
-                                            ),
-                                            SizedBox(
-                                              height: 110,
-                                            ),
-                                            Row(
-                                              children: [
-                                                CircleAvatar(
-                                                  radius:
-                                                      10, // Size of the circle
-                                                  backgroundColor: Colors
-                                                      .greenAccent, // Green color for "Amount Pending"
-                                                ),
-                                                SizedBox(width: 10),
-                                                Text(
-                                                  'AMOUNT PENDING',
-                                                  style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 12),
-                                                ),
-                                              ],
-                                            ),
-                                            SizedBox(
-                                                height: 15), // Space between rows
-
-                                            // Amount Collected
-                                            Row(
-                                              children: [
-                                                CircleAvatar(
-                                                  radius:
-                                                      10, // Size of the circle
-                                                  backgroundColor: Colors
-                                                      .blue, // Blue color for "Amount Collected"
-                                                ),
-                                                SizedBox(width: 10),
-                                                Text(
-                                                  'AMOUNT COLLECTED',
-                                                  style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 12),
-                                                ),
-                                              ],
-                                            ),
-                                            SizedBox(
-                                                height: 15), // Space between rows
-
-                                            // Total Sales
-                                            Row(
-                                              children: [
-                                                CircleAvatar(
-                                                  radius:
-                                                      10, // Size of the circle
-                                                  backgroundColor: Colors
-                                                      .white, // White color for "Total Sales"
-                                                ),
-                                                SizedBox(width: 10),
-                                                Row(
-                                                  children: [
-                                                    Text(
-                                                      'Total Sales: ',
-                                                      style: TextStyle(
-                                                          color: Colors.white,
-                                                          fontSize: 12),
-                                                    ),
-                                                    Text(
-                                                      totalSale
-                                                          .toStringAsFixed(AppState().noOfDecimals ?? 2),
-                                                      style: TextStyle(
-                                                          color: Colors.white),
-                                                    )
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              )
-                            ],
+                      const VerticalDivider(
+                        width: 20,
+                        thickness: 1,
+                        color: Color(0xFFE8E8E8),
+                      ),
+                      Expanded(
+                        child: _summaryTile(
+                          icon: Icons.account_balance_wallet_rounded,
+                          label: "Cash in Hand",
+                          amount: cashInHand.toStringAsFixed(
+                            AppState().noOfDecimals ?? 2,
                           ),
                         ),
                       ),
@@ -1079,23 +694,221 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-            ],
+            ),
+
+            const SizedBox(height: 14),
+
+            /// ================= BOTTOM CARD =================
+            Container(
+              margin: EdgeInsets.symmetric(
+                horizontal: SizeConfig.blockSizeHorizontal * 3,
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 10, // ← 18-il ninnu 10-akki kurachu
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: IntrinsicHeight(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _statItem(
+                        icon: Icons.location_on,
+                        label: "Visits",
+                        value: "$visit",
+                      ),
+                    ),
+                    const VerticalDivider(
+                      thickness: .8,
+                      width: 1,
+                      color: Color(0xFFE8E8E8),
+                    ),
+                    Expanded(
+                      child: _statItem(
+                        icon: Icons.shopping_cart,
+                        label: "Orders",
+                        value: "$orders",
+                      ),
+                    ),
+                    const VerticalDivider(
+                      thickness: .8,
+                      width: 1,
+                      color: Color(0xFFE8E8E8),
+                    ),
+                    Expanded(
+                      child: _statItem(
+                        icon: Icons.receipt_long,
+                        label: "Invoices",
+                        value: "$invoice",
+                      ),
+                    ),
+                    const VerticalDivider(
+                      thickness: .8,
+                      width: 1,
+                      color: Color(0xFFE8E8E8),
+                    ),
+                    Expanded(
+                      child: _statItem(
+                        icon: Icons.account_balance_wallet,
+                        label: "Collections",
+                        value: collection.toStringAsFixed(
+                          AppState().noOfDecimals ?? 2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      )
+    ]);
+  }
+
+  // ── NEW: top-icon stat item used in the Visits/Orders/Invoices/Collections
+  // strip — plain brand-colored icon, no badge (matches the reference).
+  // Optional `prefix` (e.g. "AED") renders smaller/lighter in front of value. ──
+  Widget _statItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 26, color: _brandColor),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xFF666666),
+            fontWeight: FontWeight.w400,
           ),
         ),
-      ),
+        const SizedBox(height: 3),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            style: const TextStyle(
+              fontSize: 13, // ✅ uniform size
+              fontWeight: FontWeight.w700,
+              color: _darkText,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
+  // NEW: `amount` is the plain number (e.g. "3,922.00") — "AED" is rendered
+  // smaller/lighter in front of it so the value never gets cramped or
+  // truncated inside the card.
+ Widget _summaryTile({
+  required IconData icon,
+  required String label,
+  required String amount,
+}) {
+  return Row(                               // ✅ Expanded ഒഴിവാക്കി, Row മാത്രം
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 40,
+        height: 40,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: _brandColor,
+        ),
+        child: Icon(icon, color: Colors.white, size: 20),
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$label (AED)',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 3),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                amount,
+                maxLines: 1,
+                style: const TextStyle(
+                  color: _darkText,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );                                        // ✅ Row-ന്റെ closing bracket മാത്രം
+}
+
+  // ── NEW: light rounded card with a soft-purple circular icon, same tap logic as before ──
   Widget _iconButtons({
     IconData? icon,
     required String title,
     String? image,
     String? routeName,
   }) {
+    void navigateAndRefresh(String route) {
+      Navigator.pushNamed(context, route).then((_) {
+        fetchDashboardData();
+      });
+    }
+
     return GestureDetector(
       onTap: () {
         if (routeName != null) {
           switch (routeName) {
+            case 'Expensespage':
+              navigateAndRefresh(Expensespage.routeName);
+              break;
+            case 'SaleInvoiceScrreen':
+              navigateAndRefresh(SaleInvoiceScrreen.routeName);
+              break;
+            case 'ReceiptScreen':
+              navigateAndRefresh(ReceiptScreen.receiptScreen);
+              break;
+            case 'HomereturnScreen':
+              navigateAndRefresh(HomereturnScreen.routeName);
+              break;
+            case 'Dayclose':
+              navigateAndRefresh(Dayclose.routeName);
+              break;
+            case 'PDC':
+              navigateAndRefresh(BankReconciliationScreen.routeName);
+              break;
+            case 'ChequeReceipt':
+              navigateAndRefresh(ChequeReceipt.routeName);
+              break;
             case 'VanStockScreen':
               if (_restrict) {
                 CommonWidgets.showDialogueBox(
@@ -1126,24 +939,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.pushNamed(context, ProductsScreen.routeName);
               }
               break;
-            case 'Expensespage':
-              Navigator.pushNamed(context, Expensespage.routeName);
-              break;
             case 'HomeWater':
               Navigator.pushNamed(context, HomeWater.routeName);
               break;
-            case 'SaleInvoiceScrreen':
-              Navigator.pushNamed(context, SaleInvoiceScrreen.routeName);
-              break;
-            case 'ReceiptScreen':
-              Navigator.pushNamed(context, ReceiptScreen.receiptScreen);
-              break;
-            case 'HomereturnScreen':
-              Navigator.pushNamed(context, HomereturnScreen.routeName);
-              break;
             case 'SchedulePage':
               Navigator.pushNamed(context, SchedulePage.routeName);
-              // Navigator.pushNamed(context, Productionorder.routeName);
               break;
             case 'ScheduleDriver':
               Navigator.pushNamed(context, ScheduleDriver.routeName);
@@ -1163,13 +963,10 @@ class _HomeScreenState extends State<HomeScreen> {
             case 'VantransferOption':
               Navigator.pushNamed(context, VantransferOption.routeName);
               break;
-            case 'Dayclose':
-              Navigator.pushNamed(context, Dayclose.routeName);
-              break;
             case 'HomeorderScreen':
               Navigator.pushNamed(context, HomeorderScreen.routeName);
               break;
-              case 'QuotationHome':
+            case 'QuotationHome':
               Navigator.pushNamed(context, QuotationHome.routeName);
               break;
             case 'StockName_RequestScreen':
@@ -1178,19 +975,13 @@ class _HomeScreenState extends State<HomeScreen> {
             case 'StockTransferPage':
               Navigator.pushNamed(context, StockTransferPage.routeName);
               break;
-            case 'ChequeReceipt':
-              Navigator.pushNamed(context, ChequeReceipt.routeName);
-              break;
             case 'DeliveryDetailsDriver':
               Navigator.pushNamed(context, DeliveryDetailsDriver.routeName);
               break;
             case 'Aging':
               Navigator.pushNamed(context, AgeingSummaryScreen.routeName);
               break;
-            case 'PDC':
-              Navigator.pushNamed(context, BankReconciliationScreen.routeName);
-              break;
-              case 'PickingListPage':
+            case 'PickingListPage':
               Navigator.pushNamed(context, PickingListPage.routeName);
               break;
             case 'DUE':
@@ -1205,37 +996,48 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       },
       child: Container(
-        width: SizeConfig.blockSizeHorizontal * 25,
-        height: SizeConfig.blockSizeVertical * 12.5,
-        decoration: const BoxDecoration(
-          borderRadius: BorderRadius.all(Radius.circular(10)),
-          color: AppConfig.colorPrimary,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            if (icon != null)
-              Icon(
-                icon,
-                color: AppConfig.backgroundColor,
-                size: 40,
-              )
-            else if (image != null)
-              Image.asset(
-                image,
-                width: 50,
-                height: 40,
-                fit: BoxFit.contain,
-              ),
+            // NEW: rounded-square gradient badge instead of the plain
+            // light-purple circle — bolder, more colorful icon container.
             SizedBox(
-              width: SizeConfig.blockSizeHorizontal * 18,
+              width: 44,
+              height: 44,
+              child: icon != null
+                  ? Icon(icon, color: _brandColor, size: 30)
+                  : (image != null
+                      ? Image.asset(image,
+                          width: 26,
+                          height: 26,
+                          fit: BoxFit.contain,
+                          color: _brandColor)
+                      : const SizedBox.shrink()),
+            ),
+            const SizedBox(height: 7),
+            SizedBox(
+              width: SizeConfig.blockSizeHorizontal * 20,
               child: Center(
                 child: Text(
                   title,
                   textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: AppConfig.backgroundColor,
+                    color: _darkText,
+                    fontWeight: FontWeight.w500,
                     fontSize: AppConfig.textCaption3Size,
                   ),
                 ),
@@ -1285,7 +1087,7 @@ class _HomeScreenState extends State<HomeScreen> {
             height: SizeConfig.safeBlockVertical! * 5,
             decoration: const BoxDecoration(
                 borderRadius: BorderRadius.all(Radius.circular(25.0)),
-                color: AppConfig.colorPrimary),
+                color: _brandColor),
             child: Center(
               child: Text(
                 'LOG OUT',
@@ -1300,7 +1102,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ],
     );
-    // set up the AlertDialog
     Dialog alert = Dialog(
       child: Padding(
         padding: const EdgeInsets.all(15.0),
@@ -1344,8 +1145,6 @@ class _HomeScreenState extends State<HomeScreen> {
       userData = UserDetailsModel.fromJson(resJson);
       AppState().vanId = userData.data![0].vanId;
       AppState().routeId = userData.data![0].routeId;
-      // print('userData.data![0].vanId');
-      // print(userData.data![0].vanId);
     } else {
       if (mounted) {
         _restrict = true;
@@ -1356,24 +1155,25 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
   }
+
   Future<bool> _onWillPop() async {
     return (await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Exit App'),
-        content: Text('Are you sure you want to exit the app?'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('NO'),
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Exit App'),
+            content: Text('Are you sure you want to exit the app?'),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text('NO'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text('YES'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text('YES'),
-          ),
-        ],
-      ),
-    )) ??
+        )) ??
         false;
   }
 }

@@ -101,7 +101,7 @@ class _DaycloseReportState extends State<DaycloseReport> {
         backgroundColor: AppConfig.colorPrimary,
         title: Text(
           'Day Close Report',
-          style: TextStyle(color: AppConfig.backgroundColor),
+          style: AppConfig.pageTitleStyle,
         ),
       ),
       body: Column(

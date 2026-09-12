@@ -78,7 +78,7 @@ class _CustomerVisitState extends State<CustomerVisit> {
           backgroundColor: AppConfig.colorPrimary,
           title: Text(
             'Visit',
-            style: TextStyle(color: AppConfig.backgroundColor),
+            style: AppConfig.pageTitleStyle,
           ),
         ),
         body: FutureBuilder<VisitReasonResponse>(

@@ -6,11 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
-
 import '../Components/commonwidgets.dart';
 import '../Models/appstate.dart';
 import '../Models/attendance_model.dart';
 import '../Utilities/rest_ds.dart';
+import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
 import 'homepage.dart';
@@ -29,9 +29,8 @@ class _AttendanceState extends State<Attendance> {
   bool isLoading = true;
   late Timer _timer;
   DateTime _currentTime = DateTime.now();
-  String formattedTime = DateFormat('hh:mm a').format(DateTime.now());
-  String formattedDate =
-      DateFormat('dd MMMM yyyy, EEEE').format(DateTime.now());
+ String formattedTime = DateFormat('hh:mm a').format(DateTime.now());
+  String formattedDate = DateHelper.displayFromDateTime(DateTime.now());
   late Future<ApiResponse> futureApiResponse;
   String _containerText = '';
   String _containerText1 = '';
@@ -54,18 +53,25 @@ class _AttendanceState extends State<Attendance> {
     });
   }
 
-  void fetchData() async {
-    // print('lastOdometerOut');
-    // print(lastOdometerOut);
-    try {
-      final data = await fetchCheckInDetails();
-      setState(() {
-        checkInDetails = data['data'];
-      });
-    } catch (e) {
-      print('Error fetching data: $e');
-    }
+ void fetchData() async {
+  try {
+    final data = await fetchCheckInDetails();
+
+    setState(() {
+      if (data['data'] is List) {
+        // No check-in data found
+        checkInDetails = null;
+      } else {
+        checkInDetails = data['data'] as Map<String, dynamic>;
+      }
+    });
+  } catch (e) {
+    print('Error fetching data: $e');
+    setState(() {
+      checkInDetails = null;
+    });
   }
+}
   TextEditingController remarksController = TextEditingController();
 
   void _showDialog1() {
@@ -151,10 +157,10 @@ class _AttendanceState extends State<Attendance> {
           ),
         ),
         backgroundColor: AppConfig.colorPrimary,
-        title: Text(
-          'Attendance',
-          style: TextStyle(color: AppConfig.backgroundColor),
-        ),
+      title: const Text(
+  'Attendance',
+  style: AppConfig.pageTitleStyle,
+),
       ),
       body: Center(
         child: FutureBuilder<ApiResponse>(
@@ -353,8 +359,7 @@ class _AttendanceState extends State<Attendance> {
                           children: [
                             Text(
                               "Hello, ${AppState().name ?? ''}",
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 20),
+                              style: AppConfig.pageTitleStyle,
                             ),
                           ],
                         ),

@@ -360,7 +360,7 @@ class _Stock_NameState extends State<Stock_Name> {
           iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
           title: const Text(
             'Stock Take Request',
-            style: TextStyle(color: AppConfig.backgroundColor),
+            style: AppConfig.pageTitleStyle,
           ),
           backgroundColor: AppConfig.colorPrimary,
           actions: [
@@ -766,7 +766,10 @@ class _Stock_NameState extends State<Stock_Name> {
                           Text(
                             'Available Qty: ${selectedUnit!['stock']}',
                             style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                          ),SizedBox(height: 8),
+
+
+SizedBox(height: 10),
                         ],
                         if (units != null &&
                             units.any((unit) => unit != null)) ...[

@@ -264,7 +264,7 @@ class _DeliveryDetailsDriverState extends State<DeliveryDetailsDriver>
         ),
         title: Text(
           'Delivery',
-          style: TextStyle(color: AppConfig.backgroundColor),
+         style: AppConfig.pageTitleStyle,
         ),
       ),
       body: Column(
@@ -481,21 +481,31 @@ class _DeliveryDetailsDriverState extends State<DeliveryDetailsDriver>
                                                             );
                                                           }).toList(),
                                                         ),
-                                                        ElevatedButton(
-                                                          style: ElevatedButton.styleFrom(
-                                                            backgroundColor:
-                                                            _isButtonDisabled ? Colors.grey : AppConfig.colorPrimary,
-                                                          ),
-                                                          onPressed: _isButtonDisabled
-                                                              ? null
-                                                              : () {
-                                                            postDeliveryDriverConfirm(delivery.id);
-                                                          },
-                                                          child: Text(
-                                                            'Confirm',
-                                                            style: TextStyle(color: Colors.white),
-                                                          ),
-                                                        )
+                                                        IntrinsicWidth(
+  child: ElevatedButton(
+    style: ElevatedButton.styleFrom(
+      backgroundColor:
+          _isButtonDisabled ? Colors.grey : AppConfig.colorPrimary,
+      minimumSize: Size(0, 40.h),
+      padding: EdgeInsets.symmetric(horizontal: 24.w),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    ),
+    onPressed: _isButtonDisabled
+        ? null
+        : () {
+            postDeliveryDriverConfirm(delivery.id);
+          },
+    child: Text(
+      'Confirm',
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.visible,
+      style: TextStyle(
+        color: Colors.white,
+      ),
+    ),
+  ),
+)
                                                       ],
                                                     ),
                                                   ))

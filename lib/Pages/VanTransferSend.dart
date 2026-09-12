@@ -10,9 +10,9 @@ import '../Models/appstate.dart';
 import '../Models/requestmodelclass.dart';
 import '../Models/stockdata.dart';
 import '../Utilities/rest_ds.dart';
+import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
-
 class VanTransferSend extends StatefulWidget {
   static const routeName = "/VanTransferSend";
   const VanTransferSend({super.key});
@@ -42,7 +42,7 @@ class _VanTransferSendState extends State<VanTransferSend> {
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
         title: const Text(
           'Van Transfer Send',
-          style: TextStyle(color: AppConfig.backgroundColor),
+         style: AppConfig.pageTitleStyle,
         ),
       ),
       body: Padding(
@@ -166,12 +166,12 @@ class _VanTransferSendState extends State<VanTransferSend> {
                       ],
                     ),
                   ),
-                  Text(
-                    data.inDate!.substring(0, 10),
-                    style: TextStyle(
-                        fontSize: AppConfig.textCaption3Size * 0.9,
-                        fontWeight: AppConfig.headLineWeight),
-                  ),
+               Text(
+  DateHelper.displayDate(data.inDate),
+  style: TextStyle(
+      fontSize: AppConfig.textCaption3Size * 0.9,
+      fontWeight: AppConfig.headLineWeight),
+),
                 ],
               ),
             ],

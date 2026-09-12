@@ -275,10 +275,10 @@ class _HomeWaterState extends State<HomeWater> {
           child: const Icon(Icons.arrow_back, color: Colors.white),
         ),
         backgroundColor: AppConfig.colorPrimary,
-        title: const Text(
-          'Water',
-          style: TextStyle(color: AppConfig.backgroundColor),
-        ),
+       title: const Text(
+  'Water',
+  style: AppConfig.pageTitleStyle,
+),
       ),
       body: SingleChildScrollView(
         child: Column(

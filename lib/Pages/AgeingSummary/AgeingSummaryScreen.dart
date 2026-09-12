@@ -10,6 +10,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 
 import '../../Models/appstate.dart';
+import '../../Utilities/date_helper.dart';
 
 class AgeingSummaryScreen extends StatefulWidget {
   static const routeName = "/AgeingSummaryScreen";
@@ -27,9 +28,10 @@ class _AgeingSummaryScreenState extends State<AgeingSummaryScreen> {
   double totalOutstanding = 0.0;
   bool isLoading = true;
   String errorMessage = '';
-  TextEditingController customerSearchController = TextEditingController();
+TextEditingController customerSearchController = TextEditingController();
   DateTime asOnDate = DateTime.now();
   String reportType = 'All';
+  bool _isSearching = false;
 
   @override
   void initState() {
@@ -75,101 +77,27 @@ class _AgeingSummaryScreenState extends State<AgeingSummaryScreen> {
   }
 
   void applyFilters() {
-    if (apiData == null) return;
+  if (apiData == null) return;
 
-    final searchText = customerSearchController.text.toLowerCase();
-    final formattedAsOnDate = asOnDate;
-    final dataCopy = json.decode(json.encode(apiData)) as Map<String, dynamic>;
+  final searchText = customerSearchController.text.toLowerCase();
 
-    if (dataCopy['data'] != null) {
-      dataCopy['data'] = (dataCopy['data'] as List).where((customer) {
-        final nameMatches = customer['name']?.toString().toLowerCase().contains(searchText) ?? false;
-        final balance = customer['total']?['balance'] as num? ?? 0;
+  final dataCopy = json.decode(json.encode(apiData));
 
-        bool typeMatches = false;
-        if (reportType == 'All') {
-          typeMatches = true;
-        } else if (reportType == 'Receivable') {
-          typeMatches = balance > 0;
-        } else if (reportType == 'Payable') {
-          typeMatches = balance < 0;
-        }
+  dataCopy['data'] = (dataCopy['data'] as List).where((customer) {
+    return customer['name']
+            ?.toString()
+            .toLowerCase()
+            .contains(searchText) ??
+        false;
+  }).toList();
 
-        return nameMatches && typeMatches;
-      }).toList();
-
-      for (var customer in dataCopy['data']) {
-        if (customer['invoices'] != null) {
-          customer['invoices'] = (customer['invoices'] as List).where((invoice) {
-            try {
-              final invoiceDate = DateTime.parse(invoice['invoice_date']);
-              return invoiceDate.isBefore(formattedAsOnDate.add(const Duration(days: 1)));
-            } catch (e) {
-              return false;
-            }
-          }).toList();
-
-          final total = {
-            '0_30': 0.0,
-            '31_60': 0.0,
-            '61_90': 0.0,
-            '91_120': 0.0,
-            '120_plus': 0.0,
-            'balance': 0.0,
-          };
-
-          if (customer['invoices'].isNotEmpty) {
-            for (var invoice in customer['invoices']) {
-              final unpaid = invoice['unpaid'] is num
-                  ? (invoice['unpaid'] as num).toDouble()
-                  : 0.0;
-              final bucket = invoice['bucket']?.toString() ?? '';
-
-              if (bucket == '0_30') total['0_30'] = total['0_30']! + unpaid;
-              else if (bucket == '31_60') total['31_60'] = total['31_60']! + unpaid;
-              else if (bucket == '61_90') total['61_90'] = total['61_90']! + unpaid;
-              else if (bucket == '91_120') total['91_120'] = total['91_120']! + unpaid;
-              else if (bucket == '120_plus') total['120_plus'] = total['120_plus']! + unpaid;
-
-              total['balance'] = total['balance']! + unpaid;
-            }
-          }
-
-          customer['total'] = total;
-        }
-      }
-
-      // Recalculate grand totals
-      final grandTotals = {
-        '0_30': 0.0,
-        '31_60': 0.0,
-        '61_90': 0.0,
-        '91_120': 0.0,
-        '120_plus': 0.0,
-        'balance': 0.0,
-      };
-
-      for (var customer in dataCopy['data']) {
-        if (customer['total'] != null) {
-          grandTotals['0_30'] = grandTotals['0_30']! + (customer['total']['0_30'] as num?)!.toDouble();
-          grandTotals['31_60'] = grandTotals['31_60']! + (customer['total']['31_60'] as num?)!.toDouble();
-          grandTotals['61_90'] = grandTotals['61_90']! + (customer['total']['61_90'] as num?)!.toDouble();
-          grandTotals['91_120'] = grandTotals['91_120']! + (customer['total']['91_120'] as num?)!.toDouble();
-          grandTotals['120_plus'] = grandTotals['120_plus']! + (customer['total']['120_plus'] as num?)!.toDouble();
-          grandTotals['balance'] = grandTotals['balance']! + (customer['total']['balance'] as num?)!.toDouble();
-        }
-      }
-
-      dataCopy['grand_totals'] = grandTotals;
-    }
-
-    setState(() {
-      filteredData = dataCopy;
-      customers = filteredData?['data'] ?? [];
-      totalOutstanding = _parseAmount(filteredData?['grand_totals']?['balance'] ?? 0);
-    });
-  }
-
+  setState(() {
+    filteredData = dataCopy;
+    customers = filteredData?['data'] ?? [];
+    totalOutstanding =
+        _parseAmount(filteredData?['grand_totals']?['balance'] ?? 0);
+  });
+}
   double _parseAmount(dynamic value) {
     if (value == null) return 0.0;
     if (value is String) return double.tryParse(value) ?? 0.0;
@@ -177,14 +105,8 @@ class _AgeingSummaryScreenState extends State<AgeingSummaryScreen> {
     if (value is double) return value;
     return 0.0;
   }
-
-  String _formatDate(String dateString) {
-    try {
-      final date = DateTime.parse(dateString);
-      return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-    } catch (e) {
-      return dateString;
-    }
+ String _formatDate(String dateString) {
+    return DateHelper.displayDate(dateString);
   }
 
   String _formatAmount(dynamic amount) {
@@ -194,14 +116,9 @@ class _AgeingSummaryScreenState extends State<AgeingSummaryScreen> {
     return amount?.toString() ?? '0.00';
   }
 
-  String _formatDisplayDate(String? apiDate) {
+ String _formatDisplayDate(String? apiDate) {
     if (apiDate == null) return 'N/A';
-    try {
-      final parsedDate = DateTime.parse(apiDate);
-      return DateFormat('dd MMM yy').format(parsedDate);
-    } catch (e) {
-      return apiDate;
-    }
+    return DateHelper.displayDate(apiDate);
   }
 
   Future<void> _generateAndSharePdf() async {
@@ -496,8 +413,8 @@ class _AgeingSummaryScreenState extends State<AgeingSummaryScreen> {
                 pw.Text('Ageing Summary Report',
                     style: pw.TextStyle(
                         fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                pw.Text(
-                    'As on: ${asOnDate.day.toString().padLeft(2, '0')}/${asOnDate.month.toString().padLeft(2, '0')}/${asOnDate.year}'),
+               pw.Text(
+                    'As on: ${DateHelper.displayFromDateTime(asOnDate)}'),
               ],
             ),
           ),
@@ -531,9 +448,38 @@ class _AgeingSummaryScreenState extends State<AgeingSummaryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(iconTheme: IconThemeData(color: Colors.white),
-        title:Text('Ageing Report',style: TextStyle(color: Colors.white),),
+     appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
+        title: _isSearching
+            ? TextField(
+                autofocus: true,
+                controller: customerSearchController,
+                decoration: const InputDecoration(
+                  hintText: 'Search Customer...',
+                  hintStyle: TextStyle(color: Colors.white70),
+                  border: InputBorder.none,
+                ),
+                style: const TextStyle(color: Colors.white),
+                onChanged: (value) => applyFilters(),
+              )
+            : const Text('Ageing Report',  style: AppConfig.pageTitleStyle,),
         backgroundColor: AppConfig.colorPrimary,
+        actions: [
+          IconButton(
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
+            onPressed: () {
+              setState(() {
+                if (_isSearching) {
+                  customerSearchController.clear();
+                  applyFilters();
+                  _isSearching = false;
+                } else {
+                  _isSearching = true;
+                }
+              });
+            },
+          ),
+        ],
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -544,89 +490,7 @@ class _AgeingSummaryScreenState extends State<AgeingSummaryScreen> {
           : Column(
         children: [
           // Filter controls
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.all(16),
-            child: Container(
-              constraints: BoxConstraints(
-                minWidth: MediaQuery.of(context).size.width,
-              ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 300, // Fixed width or use MediaQuery
-                    child: TextFormField(
-                      controller: customerSearchController,
-                      decoration: InputDecoration(
-                        labelText: 'Search Customer',
-                        border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.search),
-                          onPressed: applyFilters,
-                        ),
-                      ),
-                      onChanged: (value) => applyFilters(),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  SizedBox(
-                    width: 200,
-                    child: DropdownButtonFormField<String>(
-                      value: reportType,
-                      items: ['All', 'Receivable', 'Payable']
-                          .map((type) => DropdownMenuItem(
-                        value: type,
-                        child: Text(type),
-                      ))
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          reportType = value!;
-                        });
-                        applyFilters();
-                      },
-                      decoration: const InputDecoration(
-                        labelText: 'Report Type',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  SizedBox(
-                    width: 200,
-                    child: GestureDetector(
-                      onTap: () async {
-                        final selectedDate = await showDatePicker(
-                          context: context,
-                          initialDate: asOnDate,
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime.now(),
-                        );
-                        if (selectedDate != null) {
-                          setState(() {
-                            asOnDate = selectedDate;
-                          });
-                          applyFilters();
-                        }
-                      },
-                      child: AbsorbPointer(
-                        child: TextFormField(
-                          decoration: const InputDecoration(
-                            labelText: 'As on Date',
-                            border: OutlineInputBorder(),
-                            suffixIcon: Icon(Icons.calendar_today),
-                          ),
-                          controller: TextEditingController(
-                            text: '${asOnDate.day.toString().padLeft(2, '0')}/${asOnDate.month.toString().padLeft(2, '0')}/${asOnDate.year}',
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+       const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [

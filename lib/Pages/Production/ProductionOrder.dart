@@ -59,7 +59,7 @@ class _ProductionorderState extends State<Productionorder> {
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'Production Order',
-          style: TextStyle(color: Colors.white),
+          style: AppConfig.pageTitleStyle,
         ),
         actions: [
           IconButton(

@@ -328,6 +328,8 @@
 //     return data;
 //   }
 // }
+import 'package:mobizapp/Models/DayReport.dart';
+
 class Invoice {
   final int id;
   final int customerId;
@@ -337,6 +339,7 @@ class Invoice {
   final String invoiceType;
   final double amount;
   final double paid;
+  final double balance;
   final List<Collection> collection;
 
   Invoice({
@@ -348,6 +351,7 @@ class Invoice {
     required this.invoiceType,
     required this.amount,
     required this.paid,
+    required this.balance,
     required this.collection,
   });
 
@@ -359,39 +363,12 @@ class Invoice {
       invoiceNo: json['invoice_no'],
       invoiceDate: json['invoice_date'],
       invoiceType: json['invoice_type'],
-      amount: double.parse(json['amount']),
-      paid: double.parse(json['paid']),
+      amount: double.parse(json['amount'].toString()),
+      paid: double.parse(json['paid'].toString()),
+      balance: double.parse(json['balance'].toString()),
       collection: List<Collection>.from(
-          json['collection'].map((item) => Collection.fromJson(item))),
-    );
-  }
-}
-
-class Collection {
-  final int id;
-  final double amount;
-  final String inDate;
-  final String inTime;
-  final String collectionType;
-  final String voucherNo;
-
-  Collection({
-    required this.id,
-    required this.amount,
-    required this.inDate,
-    required this.inTime,
-    required this.collectionType,
-    required this.voucherNo,
-  });
-
-  factory Collection.fromJson(Map<String, dynamic> json) {
-    return Collection(
-      id: json['id'],
-      amount: double.parse(json['amount']),
-      inDate: json['in_date'],
-      inTime: json['in_time'],
-      collectionType: json['collection_type'],
-      voucherNo: json['voucher_no'],
+        json['collection'].map((item) => Collection.fromJson(item)),
+      ),
     );
   }
 }

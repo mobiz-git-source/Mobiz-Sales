@@ -4,11 +4,13 @@ import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:mobizapp/Models/appstate.dart';
 import 'package:mobizapp/Pages/DayReport.dart';
+import 'package:mobizapp/Utilities/date_helper.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:image/image.dart' as img;
@@ -37,7 +39,8 @@ TextEditingController ChequeHandedOverAmountcontrol = TextEditingController();
 
 class _DaycloseState extends State<Dayclose> {
   late Future<Map<String, dynamic>> futureData;
-  String formattedDate = DateFormat('dd/MM/yyyy', 'en_US').format(DateTime.now());
+
+  String formattedDate = DateHelper.apiDate(DateTime.now());
   String cashdeposit = '0';
   String cashHanded = '0';
   String Ncheqdepo = '0';
@@ -77,6 +80,12 @@ class _DaycloseState extends State<Dayclose> {
     });
   }
 
+  String _fmt(dynamic value) {
+    final n = double.tryParse(value?.toString() ?? '');
+    if (n == null) return '';
+    return n.toStringAsFixed(AppState().noOfDecimals ?? 2);
+  }
+
   bool isdayclose = false;
   Map<String, dynamic>? Dayclosedata;
 
@@ -93,11 +102,12 @@ class _DaycloseState extends State<Dayclose> {
                 leading: Icon(Icons.photo_library),
                 title: Text('Photo Library'),
                 onTap: () async {
-                  final List<XFile>? pickedFiles = await picker.pickMultiImage();
+                  final List<XFile>? pickedFiles =
+                      await picker.pickMultiImage();
                   if (pickedFiles != null && pickedFiles.isNotEmpty) {
                     for (var xFile in pickedFiles) {
                       final compressedImage =
-                      await _compressImage(File(xFile.path));
+                          await _compressImage(File(xFile.path));
                       setState(() {
                         _attachedImages.add(compressedImage);
                       });
@@ -157,13 +167,15 @@ class _DaycloseState extends State<Dayclose> {
   }
 
   Future<bool> fetchPendingStatus() async {
-    var apiUrl = '${RestDatasource().BASE_URL}/api/get_dayclose_user_pending?user_id=${AppState().userId}&store_id=${AppState().storeId}';
+    var apiUrl =
+        '${RestDatasource().BASE_URL}/api/get_dayclose_user_pending?user_id=${AppState().userId}&store_id=${AppState().storeId}';
     final response = await http.get(Uri.parse(apiUrl));
 
     if (response.statusCode == 200) {
       print(response.request);
       final data = jsonDecode(response.body);
-      return data['data'] == 'pending'; // Adjust this based on the actual response structure
+      return data['data'] ==
+          'pending'; // Adjust this based on the actual response structure
     } else {
       throw Exception('Failed to load pending status');
     }
@@ -182,8 +194,8 @@ class _DaycloseState extends State<Dayclose> {
 
   Future<Map<String, dynamic>> fetchDayclose() async {
     var apiUrl =
-        // '${RestDatasource().BASE_URL}/api/get_dayclose_outstanding_by_date?van_id=${AppState().vanId}&store_id=${AppState().storeId}&in_date=${DateFormat('dd/MM/yyyy').format(selectedDate)}&user_id=${AppState().userId}';
-        '${RestDatasource().BASE_URL}/api/get_dayclose_outstanding_by_date?van_id=${AppState().vanId}&store_id=${AppState().storeId}&in_date=$formattedDate';
+        '${RestDatasource().BASE_URL}/api/get_dayclose_outstanding_by_date?van_id=${AppState().vanId}&store_id=${AppState().storeId}&in_date=${DateHelper.apiDate(selectedDate)}';
+
     final response = await http.get(Uri.parse(apiUrl));
 
     if (response.statusCode == 200) {
@@ -209,9 +221,9 @@ class _DaycloseState extends State<Dayclose> {
             ),
           ),
           backgroundColor: AppConfig.colorPrimary,
-          title: Text(
+          title: const Text(
             'Day Close',
-            style: TextStyle(color: AppConfig.backgroundColor),
+            style: AppConfig.pageTitleStyle,
           ),
           actions: [
             GestureDetector(
@@ -257,25 +269,36 @@ class _DaycloseState extends State<Dayclose> {
 
                 request.fields["expense"] = data['expense'].toString();
                 request.fields["petty_cash"] = data['petty_cash'].toString();
-                request.fields["in_date"] = formattedDate;
+                request.fields["in_date"] = DateHelper.apiDate(selectedDate);
                 request.fields["store_id"] = AppState().storeId.toString();
                 request.fields["van_id"] = AppState().vanId.toString();
                 request.fields["user_id"] = AppState().userId.toString();
                 request.fields["scheduled"] = data['sheduled'].toString();
                 request.fields["visited"] = data['vist_customer'].toString();
-                request.fields["not_visited"] = data['non_vist_customer'].toString();
+                request.fields["not_visited"] =
+                    data['non_vist_customer'].toString();
                 request.fields["visit_pending"] = data['pending'].toString();
                 request.fields["no_of_sales"] = data['no_of_sales'].toString();
-                request.fields["amount_of_sales"] = data['amount_of_sales'].toString();
-                request.fields["no_of_order"] = data['no_of_sales_order'].toString();
-                request.fields["amount_of_order"] = data['amount_of_sales_order'].toString();
-                request.fields["no_of_returns"] = data['no_of_sales_return'].toString();
-                request.fields["amount_of_returns"] = data['amount_of_sales_return'].toString();
-                request.fields["collection_cash_amount"] = data['collection_cash'].toString();
-                request.fields["collection_cheque_amount"] = data['collection_cheque'].toString();
-                request.fields["last_day_balance_amount"] = data['last_day_balance_amount'].toString();
-                request.fields["last_day_balance_no_of_cheque"] = data['last_day_balance_no_of_cheque'].toString();
-                request.fields["last_day_balance_cheque_amount"] = data['last_day_balance_cheque_amount'].toString();
+                request.fields["amount_of_sales"] =
+                    data['amount_of_sales'].toString();
+                request.fields["no_of_order"] =
+                    data['no_of_sales_order'].toString();
+                request.fields["amount_of_order"] =
+                    data['amount_of_sales_order'].toString();
+                request.fields["no_of_returns"] =
+                    data['no_of_sales_return'].toString();
+                request.fields["amount_of_returns"] =
+                    data['amount_of_sales_return'].toString();
+                request.fields["collection_cash_amount"] =
+                    data['collection_cash'].toString();
+                request.fields["collection_cheque_amount"] =
+                    data['collection_cheque'].toString();
+                request.fields["last_day_balance_amount"] =
+                    data['last_day_balance_amount'].toString();
+                request.fields["last_day_balance_no_of_cheque"] =
+                    data['last_day_balance_no_of_cheque'].toString();
+                request.fields["last_day_balance_cheque_amount"] =
+                    data['last_day_balance_cheque_amount'].toString();
                 request.fields["cash_deposited"] = cashdeposit;
                 request.fields["cash_hand_over"] = cashHanded;
                 request.fields["no_of_cheque_deposited"] = Ncheqdepo;
@@ -285,7 +308,8 @@ class _DaycloseState extends State<Dayclose> {
                 request.fields["balance_cash_in_hand"] = balcash;
                 request.fields["no_of_cheque_in_hand"] = cheqhand;
                 request.fields["cheque_amount_in_hand"] = amtinhand;
-                request.fields["collection_no_of_cheque"] = data['collection_no_cheque'].toString();
+                request.fields["collection_no_of_cheque"] =
+                    data['collection_no_cheque'].toString();
 
                 for (var file in _attachedImages) {
                   request.files.add(await http.MultipartFile.fromPath(
@@ -296,7 +320,8 @@ class _DaycloseState extends State<Dayclose> {
 
                 try {
                   var streamedResponse = await request.send();
-                  var response = await http.Response.fromStream(streamedResponse);
+                  var response =
+                      await http.Response.fromStream(streamedResponse);
 
                   if (response.statusCode == 200) {
                     print('Data posted successfully');
@@ -346,48 +371,62 @@ class _DaycloseState extends State<Dayclose> {
                   return false; // ❌ fail
                 }
               }
+
               if (cashdeposit.isNotEmpty && cashHanded.isNotEmpty) {
-                balcash = ((((data['collection_cash']) +
-                    (data['last_day_balance_amount'])) -
-                    (double.parse(cashdeposit) +
-                        double.parse(cashHanded))) -
-                    data['expense'])
-                    .toString();
-              }
-              if (cashdeposit.isNotEmpty && cashHanded.isNotEmpty) {
-                balcash = ((((data['collection_cash']) +
-                    (data['last_day_balance_amount'])) -
-                    (double.parse(cashdeposit) +
-                        double.parse(cashHanded))) -
-                    data['expense'])
-                    .toString();
+                final balance = (((data['collection_cash'] as num).toDouble() +
+                        (data['last_day_balance_amount'] as num).toDouble()) -
+                    (double.parse(cashdeposit) + double.parse(cashHanded)) -
+                    (data['expense'] as num).toDouble());
+
+                balcash = balance.toStringAsFixed(AppState().noOfDecimals ?? 2);
               }
               if (Ncheqdepo.isNotEmpty && cheqhandedovr.isNotEmpty) {
                 cheqhand = (((data['collection_no_cheque']) +
-                    (data['last_day_balance_no_of_cheque'])) -
-                    (double.parse(Ncheqdepo) +
-                        double.parse(cheqhandedovr)))
+                            (data['last_day_balance_no_of_cheque'])) -
+                        (double.parse(Ncheqdepo) + double.parse(cheqhandedovr)))
                     .toString();
               }
-              if (cheqdepo.isNotEmpty && cheqhandedovr.isNotEmpty) {
+              if (cheqdepo.isNotEmpty && cheqhandedamt.isNotEmpty) {
                 amtinhand = (((data['collection_cheque']) +
-                    (data['last_day_balance_cheque_amount'])) -
-                    (double.parse(cheqdepo) +
-                        double.parse(cheqhandedamt)))
-                    .toString();
+                            (data['last_day_balance_cheque_amount'])) -
+                        (double.parse(cheqdepo) + double.parse(cheqhandedamt)))
+                    .toStringAsFixed(AppState().noOfDecimals ?? 2);
               }
-              Future<void> _showDialog(TextEditingController control, String field,String title) async {
+              Future<void> _showDialog(
+                TextEditingController control,
+                String field,
+                String title,
+              ) async {
+                control.selection = TextSelection(
+                  baseOffset: 0,
+                  extentOffset: control.text.length,
+                );
+
                 String? dialogValue = await showDialog<String>(
                   context: context,
                   builder: (BuildContext context) {
                     return AlertDialog(
-                      title: Text('$title'),
+                      title: Text(title),
                       content: TextField(
-                        keyboardType: TextInputType.number,
                         controller: control,
-                        decoration: const InputDecoration(hintText: "Enter here"),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(
+                              '^\\d*\\.?\\d{0,${AppState().noOfDecimals ?? 2}}\$',
+                            ),
+                          ),
+                        ],
+                        autofocus: true,
+                        textAlign: TextAlign.center,
+                        decoration: const InputDecoration(
+                          hintText: "Enter Amount",
+                          border: OutlineInputBorder(),
+                        ),
                       ),
-                      actions: <Widget>[
+                      actions: [
                         TextButton(
                           style: TextButton.styleFrom(
                             fixedSize: const Size(100, 10),
@@ -397,34 +436,42 @@ class _DaycloseState extends State<Dayclose> {
                             backgroundColor: AppConfig.colorPrimary,
                           ),
                           onPressed: () {
-                            // Validate input first
                             final enteredValue = double.tryParse(control.text);
 
                             if (enteredValue == null || enteredValue < 0) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text("Please enter a valid positive number"),
-                                  duration: Duration(seconds: 2),
+                                  content: Text(
+                                      "Please enter a valid positive number"),
                                 ),
                               );
                               return;
                             }
 
-                            // Field-specific validations
+                            // Cheque deposited amount validation
                             if (field == 'cheqdepoamt') {
-                              double amtssinhand = ((data['collection_cheque'] as num).toDouble() +
-                                  (data['last_day_balance_cheque_amount'] as num).toDouble()) -
-                                  ((num.tryParse(cheqdepo) ?? 0) + (num.tryParse(cheqhandedamt) ?? 0));
+                              double amtssinhand = ((data['collection_cheque']
+                                              as num)
+                                          .toDouble() +
+                                      (data['last_day_balance_cheque_amount']
+                                              as num)
+                                          .toDouble()) -
+                                  ((num.tryParse(cheqdepo) ?? 0) +
+                                      (num.tryParse(cheqhandedamt) ?? 0));
 
                               final maxAllowedValue = Dayclosedata != null
-                                  ? double.tryParse(Dayclosedata!['cheque_amount_in_hand']?.toString() ?? '0') ?? 0.0
+                                  ? double.tryParse(
+                                          Dayclosedata!['cheque_amount_in_hand']
+                                                  ?.toString() ??
+                                              '0') ??
+                                      0.0
                                   : amtssinhand;
 
                               if (enteredValue > maxAllowedValue) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text("Value cannot exceed $maxAllowedValue."),
-                                    duration: const Duration(seconds: 2),
+                                    content: Text(
+                                        "Value cannot exceed ${_fmt(maxAllowedValue)}."),
                                   ),
                                 );
                                 return;
@@ -432,75 +479,94 @@ class _DaycloseState extends State<Dayclose> {
                             }
 
                             // Cheque count validation
-                            if (field == 'Ncheqdepo' || field == 'cheqhandedovr') {
+                            if (field == 'Ncheqdepo' ||
+                                field == 'cheqhandedovr') {
                               final chequeInHand = isdayclose == false
                                   ? Dayclosedata == null
-                                  ? '0'
-                                  : "${Dayclosedata!['no_of_cheque_in_hand']}"
+                                      ? '0'
+                                      : "${Dayclosedata!['no_of_cheque_in_hand']}"
                                   : cheqhand;
 
-                              final chequeInHandValue = double.tryParse(chequeInHand) ?? 0;
-                              double currentDeposited = double.tryParse(Ncheqdepo) ?? 0;
-                              double currentHandedOver = double.tryParse(cheqhandedovr) ?? 0;
+                              final chequeInHandValue =
+                                  double.tryParse(chequeInHand) ?? 0;
+
+                              double currentDeposited =
+                                  double.tryParse(Ncheqdepo) ?? 0;
+
+                              double currentHandedOver =
+                                  double.tryParse(cheqhandedovr) ?? 0;
 
                               if (field == 'Ncheqdepo') {
                                 currentDeposited = enteredValue;
-                              } else if (field == 'cheqhandedovr') {
+                              } else {
                                 currentHandedOver = enteredValue;
                               }
 
-                              if ((currentDeposited + currentHandedOver) > chequeInHandValue) {
+                              if ((currentDeposited + currentHandedOver) >
+                                  chequeInHandValue) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text("Total cheques cannot exceed available cheques in hand $chequeInHandValue"),
-                                    duration: const Duration(seconds: 3),
+                                    content: Text(
+                                      "Total cheques cannot exceed available cheques in hand $chequeInHandValue",
+                                    ),
                                   ),
                                 );
                                 return;
                               }
                             }
 
-                            Navigator.of(context).pop(control.text);
+                            final formattedValue =
+                                (double.tryParse(control.text) ?? 0)
+                                    .toStringAsFixed(
+                                        AppState().noOfDecimals ?? 2);
+
+                            Navigator.pop(context, formattedValue);
                           },
-                          child: Text('OK', style: TextStyle(color: AppConfig.backgroundColor)),
+                          child: Text(
+                            "OK",
+                            style: TextStyle(color: AppConfig.backgroundColor),
+                          ),
                         ),
                       ],
                     );
                   },
                 );
 
-                // Update state if value entered
                 if (dialogValue != null) {
                   setState(() {
                     switch (field) {
-                      case 'cashdeposit': cashdeposit = dialogValue; break;
-                      case 'cashHanded': cashHanded = dialogValue; break;
-                      case 'Ncheqdepo': Ncheqdepo = dialogValue; break;
-                      case 'cheqdepoamt': cheqdepo = dialogValue; break;
-                      case 'cheqhandedovr': cheqhandedovr = dialogValue; break;
-                      case 'cheqhandedamt': cheqhandedamt = dialogValue; break;
-                    }
-
-                    if (field == 'Ncheqdepo' || field == 'cheqhandedovr') {
-                      final collectionCheque = double.tryParse(Dayclosedata?['collection_no_cheque']?.toString() ?? '0') ?? 0;
-                      final lastDayBalanceCheque = double.tryParse(Dayclosedata?['last_day_balance_no_of_cheque']?.toString() ?? '0') ?? 0;
-                      final deposited = double.tryParse(Ncheqdepo) ?? 0;
-                      final handed = double.tryParse(cheqhandedovr) ?? 0;
-
-                      cheqhand = (collectionCheque + lastDayBalanceCheque - deposited - handed).toString();
+                      case 'cashdeposit':
+                        cashdeposit = dialogValue;
+                        break;
+                      case 'cashHanded':
+                        cashHanded = dialogValue;
+                        break;
+                      case 'Ncheqdepo':
+                        Ncheqdepo = dialogValue;
+                        break;
+                      case 'cheqdepoamt':
+                        cheqdepo = dialogValue;
+                        break;
+                      case 'cheqhandedovr':
+                        cheqhandedovr = dialogValue;
+                        break;
+                      case 'cheqhandedamt':
+                        cheqhandedamt = dialogValue;
+                        break;
                     }
                   });
                 }
               }
 
-
-
+              print("isdayclose: $isdayclose");
+              print("Dayclosedata: ${Dayclosedata?['balance_cash_in_hand']}");
+              print("balcash: $balcash");
               return Scaffold(
                 body: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(
+                      const SizedBox(
                         height: 10,
                       ),
                       Padding(
@@ -512,19 +578,24 @@ class _DaycloseState extends State<Dayclose> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text('Hello ${AppState().name}'),
+                                Text(
+                                  'Hello ${AppState().name}',
+                                  style: AppConfig.pageTitleStyle,
+                                ),
                                 Row(
                                   children: [
                                     GestureDetector(
                                       onTap: () {
                                         _attachDocuments();
                                       },
-                                      child: Icon(
+                                      child: const Icon(
                                         CupertinoIcons.paperclip,
                                         color: Colors.red,
                                       ),
                                     ),
-                                    SizedBox(width: 20,),
+                                    SizedBox(
+                                      width: 20,
+                                    ),
                                     GestureDetector(
                                       onTap: () {
                                         Navigator.pushNamed(
@@ -558,7 +629,7 @@ class _DaycloseState extends State<Dayclose> {
                                   children: [
                                     TextSpan(
                                         text:
-                                            '${data['no_of_sales']} | ${data['amount_of_sales'].toStringAsFixed(AppState().noOfDecimals ?? 2)}',
+                                            '${data['no_of_sales']} | ${_fmt(data['amount_of_sales'])}',
                                         style: TextStyle(color: Colors.grey))
                                   ]),
                             ),
@@ -568,24 +639,26 @@ class _DaycloseState extends State<Dayclose> {
                                   style: TextStyle(color: Colors.black),
                                   children: [
                                     TextSpan(
-                                        text:
-                                            '${data['no_of_sales_return']} | ${data['amount_of_sales_return']}',
-                                        style: TextStyle(color: Colors.grey))
+                                      text:
+                                          '${data['no_of_sales_return']} | ${_fmt(data['amount_of_sales_return'])}',
+                                    )
                                   ]),
                             ),
                             Text('Collection'),
                             Text(
-                              'Cash ${data['collection_cash']}',
-                              style: TextStyle(color: Colors.grey),
+                              'Cash ${_fmt(data['collection_cash'])}',
+                              style: const TextStyle(color: Colors.grey),
                             ),
                             Text(
-                                'Cheque ${data['collection_cheque']} | ${data['collection_no_cheque']}',
+                                'Cheque ${_fmt(data['collection_cheque'])} | ${data['collection_no_cheque']}',
                                 style: TextStyle(color: Colors.grey)),
                             Text('Last Day Balance'),
-                            Text('Cash ${data['last_day_balance_amount']}',
-                                style: TextStyle(color: Colors.grey)),
                             Text(
-                                'Cheque ${data['last_day_balance_no_of_cheque']} | ${data['last_day_balance_cheque_amount']}',
+                              'Cash ${_fmt(data['last_day_balance_amount'])}',
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                            Text(
+                                'Cheque ${data['last_day_balance_no_of_cheque']} | ${_fmt(data['last_day_balance_cheque_amount'])}',
                                 style: TextStyle(color: Colors.grey)),
                           ],
                         ),
@@ -601,42 +674,70 @@ class _DaycloseState extends State<Dayclose> {
                         children: [
                           Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   // Petty Cash
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Text('Petty Cash'),
-                                      Container(
-                                        child: Center(child: Text("${data['petty_cash']}")),
-                                        width: SizeConfig.safeBlockHorizontal! * 17,
-                                        // margin: EdgeInsets.only(top: 5),
-                                        height: SizeConfig.safeBlockVertical! * 2.6,
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey.shade300,
-                                          borderRadius: BorderRadius.circular(3),
-                                        ),
-                                      ),
+                                   Container(
+  alignment: Alignment.center,
+  width: SizeConfig.safeBlockHorizontal! * 17,
+  height: SizeConfig.safeBlockVertical! * 2.6,
+  padding: const EdgeInsets.symmetric(horizontal: 4),
+  decoration: BoxDecoration(
+    color: Colors.grey.shade300,
+    borderRadius: BorderRadius.circular(3),
+  ),
+  child: FittedBox(
+    fit: BoxFit.scaleDown,
+    child: Text(
+      _fmt(data['petty_cash']),
+      textAlign: TextAlign.center,
+      strutStyle: const StrutStyle(forceStrutHeight: true, height: 1.0),
+    ),
+  ),
+),
                                     ],
                                   ),
                                   Divider(),
 
                                   // Expense
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Text('Expense'),
                                       Container(
-                                        child: Center(child: Text("${data['expense']}")),
-                                        width: SizeConfig.safeBlockHorizontal! * 17,
-                                        height: SizeConfig.safeBlockVertical! * 2.6,
+                                        alignment: Alignment.center,
+                                        width: SizeConfig.safeBlockHorizontal! *
+                                            17,
+                                        height:
+                                            SizeConfig.safeBlockVertical! * 2.6,
                                         decoration: BoxDecoration(
                                           color: Colors.grey.shade300,
-                                          borderRadius: BorderRadius.circular(3),
+                                          borderRadius:
+                                              BorderRadius.circular(3),
                                         ),
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),   // Container-ൽ ചേർത്തു
+
+child: FittedBox(
+  fit: BoxFit.scaleDown,
+  child: Text(
+    _fmt(data['expense']),
+    textAlign: TextAlign.center,
+    strutStyle: const StrutStyle(forceStrutHeight: true, height: 1.0),
+  ),
+),
                                       ),
                                     ],
                                   ),
@@ -644,28 +745,47 @@ class _DaycloseState extends State<Dayclose> {
 
                                   // Cash Deposited
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Text('Cash Deposited'),
                                       GestureDetector(
                                         onTap: isdayclose == false
                                             ? null
                                             : () {
-                                          _showDialog(CashDepositedcontrol,
-                                              'cashdeposit', 'Cash Deposited');
-                                        },
+                                                _showDialog(
+                                                    CashDepositedcontrol,
+                                                    'cashdeposit',
+                                                    'Cash Deposited');
+                                              },
                                         child: Container(
-                                          child: Center(
-                                              child: Text(isdayclose == false
-                                                  ? Dayclosedata == null
-                                                  ? ''
-                                                  : Dayclosedata!['cash_deposited']
-                                                  : cashdeposit)),
-                                          width: SizeConfig.safeBlockHorizontal! * 17,
-                                          height: SizeConfig.safeBlockVertical! * 2.6,
+                                          alignment: Alignment.center,
+                                          width:
+                                              SizeConfig.safeBlockHorizontal! *
+                                                  17,
+                                          height:
+                                              SizeConfig.safeBlockVertical! *
+                                                  2.6,
                                           decoration: BoxDecoration(
-                                              borderRadius: BorderRadius.circular(3),
-                                              border: Border.all(color: Colors.grey)),
+                                            borderRadius:
+                                                BorderRadius.circular(3),
+                                            border:
+                                                Border.all(color: Colors.grey),
+                                          ),
+                                        padding: const EdgeInsets.symmetric(horizontal: 4),   // Container-ൽ ചേർത്തു
+
+child: FittedBox(
+  fit: BoxFit.scaleDown,
+  child: Text(
+    isdayclose == false
+        ? Dayclosedata == null ? '' : _fmt(Dayclosedata!['cash_deposited'])
+        : _fmt(cashdeposit),
+    textAlign: TextAlign.center,
+    strutStyle: const StrutStyle(forceStrutHeight: true, height: 1.0),
+  ),
+),
                                         ),
                                       ),
                                     ],
@@ -674,28 +794,46 @@ class _DaycloseState extends State<Dayclose> {
 
                                   // Cash Handed Over
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Text('Cash Handed Over'),
                                       GestureDetector(
                                         onTap: isdayclose == false
                                             ? null
                                             : () {
-                                          _showDialog(CashHandedOvercontrol,
-                                              'cashHanded', 'Cash Handed Over');
-                                        },
+                                                _showDialog(
+                                                    CashHandedOvercontrol,
+                                                    'cashHanded',
+                                                    'Cash Handed Over');
+                                              },
                                         child: Container(
-                                          child: Center(
-                                              child: Text(isdayclose == false
-                                                  ? Dayclosedata == null
-                                                  ? ''
-                                                  : Dayclosedata!['cash_hand_over']
-                                                  : cashHanded)),
-                                          width: SizeConfig.safeBlockHorizontal! * 17,
-                                          height: SizeConfig.safeBlockVertical! * 2.6,
+                                          alignment: Alignment.center,
+                                          width:
+                                              SizeConfig.safeBlockHorizontal! *
+                                                  17,
+                                          height:
+                                              SizeConfig.safeBlockVertical! *
+                                                  2.6,
                                           decoration: BoxDecoration(
-                                              borderRadius: BorderRadius.circular(3),
-                                              border: Border.all(color: Colors.grey)),
+                                              borderRadius:
+                                                  BorderRadius.circular(3),
+                                              border: Border.all(
+                                                  color: Colors.grey)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),   // Container-ൽ ചേർത്തു
+
+child: FittedBox(
+  fit: BoxFit.scaleDown,
+  child: Text(
+    isdayclose == false
+        ? Dayclosedata == null ? '' : _fmt(Dayclosedata!['cash_hand_over'])
+        : _fmt(cashHanded),
+    textAlign: TextAlign.center,
+    strutStyle: const StrutStyle(forceStrutHeight: true, height: 1.0),
+  ),
+),
                                         ),
                                       ),
                                     ],
@@ -735,39 +873,55 @@ class _DaycloseState extends State<Dayclose> {
 
                                   // Cheque Deposited Amount
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text('Cheque Deposited Amount'),
-                                      GestureDetector(
-                                        onTap: isdayclose == false
-                                            ? null
-                                            : () {
-                                          _showDialog(
-                                              ChequeDepositedAmountcontrol,
-                                              'cheqdepoamt',
-                                              'Cheque Deposited Amount');
-                                          print(double.tryParse(
-                                              Dayclosedata?['cheque_amount_in_hand']
-                                                  ?.toString() ??
-                                                  '0') ??
-                                              0.0);
-                                        },
-                                        child: Container(
-                                          child: Center(
-                                              child: Text(isdayclose == false
-                                                  ? Dayclosedata == null
-                                                  ? ''
-                                                  : Dayclosedata!['cheque_deposited_amount']
-                                                  : cheqdepo)),
-                                          width: SizeConfig.safeBlockHorizontal! * 17,
-                                          height: SizeConfig.safeBlockVertical! * 2.6,
-                                          decoration: BoxDecoration(
-                                              borderRadius: BorderRadius.circular(3),
-                                              border: Border.all(color: Colors.grey)),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        Text('Cheque Deposited Amount'),
+                                        GestureDetector(
+                                          onTap: isdayclose == false
+                                              ? null
+                                              : () {
+                                                  _showDialog(
+                                                      ChequeDepositedAmountcontrol,
+                                                      'cheqdepoamt',
+                                                      'Cheque Deposited Amount');
+                                                  print(double.tryParse(
+                                                          Dayclosedata?[
+                                                                      'cheque_amount_in_hand']
+                                                                  ?.toString() ??
+                                                              '0') ??
+                                                      0.0);
+                                                },
+                                          child: Container(
+                                            alignment: Alignment.center,
+                                            width: SizeConfig
+                                                    .safeBlockHorizontal! *
+                                                17,
+                                            height:
+                                                SizeConfig.safeBlockVertical! *
+                                                    2.6,
+                                            decoration: BoxDecoration(
+                                                borderRadius:
+                                                    BorderRadius.circular(3),
+                                                border: Border.all(
+                                                    color: Colors.grey)),
+                                          padding: const EdgeInsets.symmetric(horizontal: 4),   // Container-ൽ ചേർത്തു
+
+child: FittedBox(
+  fit: BoxFit.scaleDown,
+  child: Text(
+    isdayclose == false
+        ? Dayclosedata == null ? '' : _fmt(Dayclosedata!['cheque_deposited_amount'])
+        : _fmt(cheqdepo),
+    textAlign: TextAlign.center,
+    strutStyle: const StrutStyle(forceStrutHeight: true, height: 1.0),
+  ),
+),
+                                          ),
+                                        )
+                                      ]),
                                   Divider(),
 
                                   // No of Cheque Handed Over (commented out, kept as-is)
@@ -801,30 +955,46 @@ class _DaycloseState extends State<Dayclose> {
 
                                   // Cheque Handed Over Amount
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Text('Cheque Handed Over Amount'),
                                       GestureDetector(
                                         onTap: isdayclose == false
                                             ? null
                                             : () {
-                                          _showDialog(
-                                              ChequeHandedOverAmountcontrol,
-                                              'cheqhandedamt',
-                                              'Cheque Handed Over Amount');
-                                        },
+                                                _showDialog(
+                                                    ChequeHandedOverAmountcontrol,
+                                                    'cheqhandedamt',
+                                                    'Cheque Handed Over Amount');
+                                              },
                                         child: Container(
-                                          child: Center(
-                                              child: Text(isdayclose == false
-                                                  ? Dayclosedata == null
-                                                  ? ''
-                                                  : Dayclosedata!['cheque_hand_over_amount']
-                                                  : cheqhandedamt)),
-                                          width: SizeConfig.safeBlockHorizontal! * 17,
-                                          height: SizeConfig.safeBlockVertical! * 2.6,
+                                          alignment: Alignment.center,
+                                          width:
+                                              SizeConfig.safeBlockHorizontal! *
+                                                  17,
+                                          height:
+                                              SizeConfig.safeBlockVertical! *
+                                                  2.6,
                                           decoration: BoxDecoration(
-                                              borderRadius: BorderRadius.circular(3),
-                                              border: Border.all(color: Colors.grey)),
+                                              borderRadius:
+                                                  BorderRadius.circular(3),
+                                              border: Border.all(
+                                                  color: Colors.grey)),
+                                         padding: const EdgeInsets.symmetric(horizontal: 4),   // Container-ൽ ചേർത്തു
+
+child: FittedBox(
+  fit: BoxFit.scaleDown,
+  child: Text(
+    isdayclose == false
+        ? Dayclosedata == null ? '' : _fmt(Dayclosedata!['cheque_hand_over_amount'])
+        : _fmt(cheqhandedamt),
+    textAlign: TextAlign.center,
+    strutStyle: const StrutStyle(forceStrutHeight: true, height: 1.0),
+  ),
+),
                                         ),
                                       ),
                                     ],
@@ -832,23 +1002,37 @@ class _DaycloseState extends State<Dayclose> {
                                   Divider(),
 
                                   // Balance Cash in Hand
+                                  // Balance Cash in Hand
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Text('Balance Cash in Hand'),
                                       Container(
-                                        child: Center(
-                                            child: Text(isdayclose == false
-                                                ? Dayclosedata == null
-                                                ? ''
-                                                : "${Dayclosedata!['balance_cash_in_hand']}"
-                                                : balcash)),
-                                        width: SizeConfig.safeBlockHorizontal! * 17,
-                                        height: SizeConfig.safeBlockVertical! * 2.6,
+                                        alignment: Alignment.center,
+                                        width: SizeConfig.safeBlockHorizontal! *
+                                            17,
+                                        height:
+                                            SizeConfig.safeBlockVertical! * 2.6,
                                         decoration: BoxDecoration(
                                           color: Colors.grey.shade300,
-                                          borderRadius: BorderRadius.circular(3),
+                                          borderRadius:
+                                              BorderRadius.circular(3),
                                         ),
+                                     padding: const EdgeInsets.symmetric(horizontal: 4),   // Container-ൽ ചേർത്തു
+
+child: FittedBox(
+  fit: BoxFit.scaleDown,
+  child: Text(
+    isdayclose == false
+        ? Dayclosedata == null ? '' : _fmt(Dayclosedata!['balance_cash_in_hand'])
+        : _fmt(balcash),
+    textAlign: TextAlign.center,
+    strutStyle: const StrutStyle(forceStrutHeight: true, height: 1.0),
+  ),
+),
                                       ),
                                     ],
                                   ),
@@ -887,23 +1071,35 @@ class _DaycloseState extends State<Dayclose> {
 
                                   // Cheque Amount in Hand (last item — no trailing divider)
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Text('Cheque Amount in Hand'),
                                       Container(
-                                        child: Center(
-                                          child: Text(isdayclose == false
-                                              ? Dayclosedata == null
-                                              ? ''
-                                              : "${Dayclosedata!['cheque_amount_in_hand']}"
-                                              : amtinhand),
-                                        ),
-                                        width: SizeConfig.safeBlockHorizontal! * 17,
-                                        height: SizeConfig.safeBlockVertical! * 2.6,
+                                        alignment: Alignment.center,
+                                        width: SizeConfig.safeBlockHorizontal! *
+                                            17,
+                                        height:
+                                            SizeConfig.safeBlockVertical! * 2.6,
                                         decoration: BoxDecoration(
                                           color: Colors.grey.shade300,
-                                          borderRadius: BorderRadius.circular(3),
+                                          borderRadius:
+                                              BorderRadius.circular(3),
                                         ),
+                                        padding: const EdgeInsets.symmetric(horizontal: 4),   // Container-ൽ ചേർത്തു
+
+child: FittedBox(
+  fit: BoxFit.scaleDown,
+  child: Text(
+    isdayclose == false
+        ? Dayclosedata == null ? '' : _fmt(Dayclosedata!['cheque_amount_in_hand'])
+        : _fmt(amtinhand),
+    textAlign: TextAlign.center,
+    strutStyle: const StrutStyle(forceStrutHeight: true, height: 1.0),
+  ),
+),
                                       ),
                                     ],
                                   ),
@@ -951,7 +1147,10 @@ class _DaycloseState extends State<Dayclose> {
                                               _attachedImages.remove(file);
                                             });
                                           },
-                                          child: Icon(Icons.close, color: Colors.red,),
+                                          child: Icon(
+                                            Icons.close,
+                                            color: Colors.red,
+                                          ),
                                         ),
                                       )
                                     ],
@@ -967,33 +1166,39 @@ class _DaycloseState extends State<Dayclose> {
                         children: [
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: (isPending || _pendingExpensesCount != 0 || _isPosting)
+                              backgroundColor: (isPending ||
+                                      _pendingExpensesCount != 0 ||
+                                      _isPosting)
                                   ? Colors.grey
                                   : AppConfig.colorPrimary,
-                              minimumSize: Size(SizeConfig.safeBlockHorizontal! * 40, 40), // Wider min size
+                              minimumSize: Size(
+                                  SizeConfig.safeBlockHorizontal! * 40,
+                                  40), // Wider min size
                               shape: BeveledRectangleBorder(),
                             ),
-                            onPressed: (isPending || _pendingExpensesCount != 0 || _isPosting)
+                            onPressed: (isPending ||
+                                    _pendingExpensesCount != 0 ||
+                                    _isPosting)
                                 ? null
                                 : () async {
-                              setState(() => _isPosting = true);
-                              bool success = await postData();
-                              if (!success && mounted) {
-                                setState(() => _isPosting = false);
-                              }
-                            },
+                                    setState(() => _isPosting = true);
+                                    bool success = await postData();
+                                    if (!success && mounted) {
+                                      setState(() => _isPosting = false);
+                                    }
+                                  },
                             child: _isPosting
                                 ? SizedBox(
-                              height: 16,
-                              width: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
+                                    height: 16,
+                                    width: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white),
+                                  )
                                 : FittedBox(
-                              child: Text("Send for Approval", style: TextStyle(color: Colors.white)),
-                            ),
+                                    child: Text("Send for Approval",
+                                        style: TextStyle(color: Colors.white)),
+                                  ),
                           ),
-
-
                         ],
                       ),
                     ],
@@ -1008,7 +1213,8 @@ class _DaycloseState extends State<Dayclose> {
   }
 
   Future<void> _fetchPendingExpenses() async {
-    final url = "${RestDatasource().BASE_URL}/api/get_pending_expense?store_id=${AppState().storeId}&user_id=${AppState().userId}";
+    final url =
+        "${RestDatasource().BASE_URL}/api/get_pending_expense?store_id=${AppState().storeId}&user_id=${AppState().userId}";
 
     try {
       final response = await http.get(Uri.parse(url));

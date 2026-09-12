@@ -19,6 +19,7 @@ import '../Models/productquantirydetails.dart' as Qty;
 import '../Models/salesdata.dart';
 import '../Models/vansaleproduct.dart';
 import '../Utilities/rest_ds.dart';
+import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
 import '../Components/commonwidgets.dart';
@@ -181,7 +182,7 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
         title: _isSearching ? _buildSearchField() : const Text(
           'Sales Order',
-          style: TextStyle(color: AppConfig.backgroundColor),
+          style: AppConfig.pageTitleStyle,
         ),
         backgroundColor: AppConfig.colorPrimary,
         actions: _buildActions(),
@@ -315,8 +316,8 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                '${data.invoiceNo!} | ${DateFormat('dd MMMM yyyy').format(DateTime.parse(data.inDate!))} ${data.inTime}',
+                          Text(
+                                '${data.invoiceNo!} | ${DateHelper.displayDate(data.inDate)} ${data.inTime}',
                                 style: TextStyle(
                                   fontSize: AppConfig.textCaption3Size,
                                 ),
@@ -617,7 +618,7 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
 
     String invoiceDetails = '''
   Order No: ${invoice.data!.invoiceNo!}
-  Date: ${DateFormat('dd MMMM yyyy').format(DateTime.parse(invoice.data!.inDate!))}
+  Date: ${DateHelper.displayDate(invoice.data!.inDate)}
   ''';
 
     page.graphics.drawString(

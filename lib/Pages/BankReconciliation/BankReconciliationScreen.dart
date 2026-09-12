@@ -11,7 +11,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import '../../Models/appstate.dart';
-
+import '../../Utilities/date_helper.dart';
 class BankReconciliationScreen extends StatefulWidget {
   static const routeName = "/BankReconciliation";
 
@@ -77,32 +77,9 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> {
     }
   }
 
-  String _formatDate(String? dateString) {
+ String _formatDate(String? dateString) {
     if (dateString == null) return 'N/A';
-    try {
-      final date = DateTime.parse(dateString);
-      return DateFormat('dd MMM yyyy').format(date);
-    } catch (e) {
-      try {
-        // Handle formats like "26-Apr-2025"
-        final parts = dateString.split('-');
-        if (parts.length == 3) {
-          final monthMap = {
-            'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
-            'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
-            'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
-          };
-          final month = monthMap[parts[1]];
-          if (month != null) {
-            final formattedDate = DateTime.parse('${parts[2]}-$month-${parts[0]}');
-            return DateFormat('dd MMM yyyy').format(formattedDate);
-          }
-        }
-      } catch (e) {
-        return dateString;
-      }
-      return dateString;
-    }
+    return DateHelper.displayDate(dateString);
   }
 
   String _formatTime(String? dateTimeString) {
@@ -271,8 +248,8 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> {
               child: pw.Text(receipt['cheque_no']?.toString() ?? 'N/A'),
               padding: pw.EdgeInsets.all(4),
             ),
-            pw.Padding(
-              child: pw.Text(receipt['cheque_date']?.toString() ?? 'N/A'),
+         pw.Padding(
+              child: pw.Text(DateHelper.displayDate(receipt['cheque_date']?.toString())),
               padding: pw.EdgeInsets.all(4),
             ),
           ],
@@ -375,7 +352,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> {
           style: const TextStyle(color: Colors.white),
           onChanged: _filterReceipts,
         )
-            : const Text('PDC', style: TextStyle(color: Colors.white)),
+            : const Text('PDC', style: AppConfig.pageTitleStyle,),
         actions: [
           IconButton(
             icon: Icon(_isSearching ? Icons.close : Icons.search, color: Colors.white),

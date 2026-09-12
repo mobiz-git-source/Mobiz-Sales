@@ -345,7 +345,7 @@ class _VanStocksoffState extends State<VanStocksoff> {
           iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
           title: const Text(
             'Off Load Request',
-            style: TextStyle(color: AppConfig.backgroundColor),
+           style: AppConfig.pageTitleStyle,
           ),
           backgroundColor: AppConfig.colorPrimary,
           actions: [
@@ -711,10 +711,7 @@ class _VanStocksoffState extends State<VanStocksoff> {
                             children: [
                               Text(
                                 'Return',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                ),
+                              style: AppConfig.pageTitleStyle,
                               ),
                             ],
                           ),

@@ -10,6 +10,7 @@ import '../Models/appstate.dart';
 import '../Models/requestmodelclass.dart';
 import '../Models/stockdata.dart';
 import '../Utilities/rest_ds.dart';
+import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
 
@@ -42,7 +43,7 @@ class _VanTransferConfirmState extends State<VanTransferConfirm> {
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
         title: const Text(
           'Van Transfer Confirm',
-          style: TextStyle(color: AppConfig.backgroundColor),
+          style: AppConfig.pageTitleStyle,
         ),
       ),
       body: Padding(
@@ -165,12 +166,12 @@ class _VanTransferConfirmState extends State<VanTransferConfirm> {
                       ],
                     ),
                   ),
-                  Text(
-                    data.inDate!.substring(0, 10),
-                    style: TextStyle(
-                        fontSize: AppConfig.textCaption3Size * 0.9,
-                        fontWeight: AppConfig.headLineWeight),
-                  ),
+                Text(
+  DateHelper.displayDate(data.inDate),
+  style: TextStyle(
+      fontSize: AppConfig.textCaption3Size * 0.9,
+      fontWeight: AppConfig.headLineWeight),
+),
                 ],
               ),
             ],

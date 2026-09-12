@@ -9,6 +9,7 @@ import 'package:mobizapp/Utilities/rest_ds.dart';
 import 'package:mobizapp/confg/appconfig.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobizapp/confg/sizeconfig.dart';
+import 'package:mobizapp/Utilities/date_helper.dart';
 
 class ChequeCollectionPage extends StatefulWidget {
   static const routeName = "/ChequeCollection";
@@ -24,7 +25,7 @@ class _ChequeCollectionPageState extends State<ChequeCollectionPage> {
   int? selectedId;
   List<int> groupIds = [];
   List<int> customerIds = [];
-  String selectedDate = DateFormat('dd-MMM-yyyy').format(DateTime.now());
+ String selectedDate = DateHelper.displayFromDateTime(DateTime.now());
   String collectionType = 'Cheque';
   TextEditingController bankController = TextEditingController();
   TextEditingController chequeNoController = TextEditingController();
@@ -46,10 +47,9 @@ class _ChequeCollectionPageState extends State<ChequeCollectionPage> {
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
-
-    if (pickedDate != null) {
+  if (pickedDate != null) {
       setState(() {
-        selectedDate = DateFormat('dd-MMM-yyyy').format(pickedDate);
+        selectedDate = DateHelper.displayFromDateTime(pickedDate);
       });
     }
   }
@@ -178,7 +178,7 @@ class _ChequeCollectionPageState extends State<ChequeCollectionPage> {
       appBar: AppBar(
         title: Text(
           'Cheque Collection',
-          style: TextStyle(color: Colors.white),
+          style: AppConfig.pageTitleStyle,
         ),
         leading: IconButton(
           icon: Icon(

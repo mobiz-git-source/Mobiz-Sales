@@ -158,7 +158,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
         title: const Text(
           'Select Products',
-          style: TextStyle(color: AppConfig.backgroundColor),
+           style: AppConfig.pageTitleStyle,
         ),
         backgroundColor: AppConfig.colorPrimary,
         actions: [
@@ -338,10 +338,11 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
     );
   }
 
-  void showProductDetailsDialog(BuildContext context, Product product) async {
+void showProductDetailsDialog(BuildContext context, Product product) async {
     int? id;
     final response = await http.get(Uri.parse(
         'http://68.183.92.8:3699/api/get_product_with_units_by_product_without_unit_price?store_id=${AppState().storeId}&id=${product.id}&user_id=${AppState().userId}&van_id=${AppState().vanId}'));
+    print(response.request); 
     final typeResponse = await http.get(Uri.parse('${RestDatasource().BASE_URL}/api/get_product_return_type?store_id=${AppState().storeId}'));
 
     if (response.statusCode == 200 && typeResponse.statusCode == 200) {

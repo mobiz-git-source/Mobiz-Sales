@@ -131,15 +131,11 @@ class _HomepageDriverState extends State<HomepageDriver> {
         title: RichText(
           text: TextSpan(
             text: 'Hello ',
-            style: TextStyle(
-                color: AppConfig.backgroundColor,
-                fontSize: AppConfig.textSubtitle3Size),
+            style: AppConfig.pageTitleStyle,
             children: <TextSpan>[
               TextSpan(
                 text: '${AppState().name}',
-                style: TextStyle(
-                    color: AppConfig.backgroundColor,
-                    fontSize: AppConfig.textSubtitle3Size),
+               style: AppConfig.pageTitleStyle,
               ),
             ],
           ),

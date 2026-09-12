@@ -54,7 +54,7 @@ class _TotalSalesState extends State<TotalSales> {
         backgroundColor: AppConfig.colorPrimary,
         title: const Text(
           'Total Sale',
-          style: TextStyle(color: AppConfig.backgroundColor),
+          style: AppConfig.pageTitleStyle,
         ),
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
       ),

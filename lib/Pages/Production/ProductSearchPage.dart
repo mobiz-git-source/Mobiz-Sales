@@ -62,7 +62,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
       appBar: AppBar(
         iconTheme: IconThemeData(color: Colors.white),
         backgroundColor: AppConfig.colorPrimary,
-        title: const Text("Select Product",style: TextStyle(color: Colors.white),),
+        title: const Text("Select Product", style: AppConfig.pageTitleStyle,),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())

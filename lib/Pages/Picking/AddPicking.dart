@@ -258,7 +258,7 @@ class _PickingAddPageState extends State<PickingAddPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Picking - Add', style: TextStyle(color: Colors.white)),
+        title: const Text('Picking - Add', style: AppConfig.pageTitleStyle,),
         backgroundColor: AppConfig.colorPrimary,
         actions: [
           IconButton(

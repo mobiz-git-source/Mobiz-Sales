@@ -125,7 +125,7 @@ class _OverdueCustomerPageState extends State<OverdueCustomerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('All Dues', style: TextStyle(color: Colors.white)),
+        title: const Text('All Dues',  style: AppConfig.pageTitleStyle,),
         iconTheme: const IconThemeData(color: Colors.white),
         backgroundColor: AppConfig.colorPrimary, // Replace with AppConfig.colorPrimary
       ),
@@ -152,20 +152,28 @@ class _OverdueCustomerPageState extends State<OverdueCustomerPage> {
                   padding: const EdgeInsets.all(16.0),
                   child: Table(
                     border: TableBorder.all(color: Colors.grey),
+                    // Give the Salesman column less relative space and the
+                    // two number columns more, so amounts have room to fit
+                    // on a single line instead of wrapping.
+                    columnWidths: const {
+                      0: FlexColumnWidth(1.1),
+                      1: FlexColumnWidth(1.0),
+                      2: FlexColumnWidth(1.0),
+                    },
                     children: [
                       const TableRow(
                         decoration: BoxDecoration(color: Colors.grey),
                         children: [
                           Padding(
-                            padding: EdgeInsets.all(8.0),
+                            padding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 8.0),
                             child: Text('Salesman', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                           Padding(
-                            padding: EdgeInsets.all(8.0),
+                            padding: EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
                             child: Text('Balance', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                           Padding(
-                            padding: EdgeInsets.all(8.0),
+                            padding: EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
                             child: Text('Over Due', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                         ],
@@ -175,23 +183,24 @@ class _OverdueCustomerPageState extends State<OverdueCustomerPage> {
                           InkWell(
                             // onTap: () => _toggleSalesmanExpansion(salesman.name),
                             child: Padding(
-                              padding: const EdgeInsets.all(8.0),
+                              padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 8.0),
                               child: Text(
                                 salesman.name,
-                                style: const TextStyle(fontWeight: FontWeight.w500),
+                                style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
                               ),
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(_formatCurrency(salesman.balance),textAlign: TextAlign.right,),
+                            padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
+                            child: _AmountCell(
+                              text: _formatCurrency(salesman.balance),
+                            ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(
-                              _formatCurrency(salesman.overdue),
-          textAlign: TextAlign.right,
-                              style: TextStyle(color: Colors.red),
+                            padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
+                            child: _AmountCell(
+                              text: _formatCurrency(salesman.overdue),
+                              color: Colors.red,
                             ),
                           ),
                         ],
@@ -200,21 +209,22 @@ class _OverdueCustomerPageState extends State<OverdueCustomerPage> {
                         decoration: BoxDecoration(color: Colors.grey[200]),
                         children: [
                           const Padding(
-                            padding: EdgeInsets.all(8.0),
+                            padding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 8.0),
                             child: Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                           Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(
-                              _formatCurrency(totalBalance),textAlign: TextAlign.right,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
+                            child: _AmountCell(
+                              text: _formatCurrency(totalBalance),
+                              bold: true,
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(
-                              _formatCurrency(totalOverdue),
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),textAlign: TextAlign.right,
+                            padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
+                            child: _AmountCell(
+                              text: _formatCurrency(totalOverdue),
+                              color: Colors.red,
+                              bold: true,
                             ),
                           ),
                         ],
@@ -345,6 +355,50 @@ class _OverdueCustomerPageState extends State<OverdueCustomerPage> {
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (Match m) => '${m[1]},',
     )}";
+  }
+}
+
+// Renders an amount that always stays on a single line: if the number
+// is too wide for the column, the font is scaled down to fit instead
+// of wrapping onto a second line.
+class _AmountCell extends StatelessWidget {
+  final String text;
+  final Color? color;
+  final bool bold;
+
+  const _AmountCell({
+    required this.text,
+    this.color,
+    this.bold = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // FittedBox needs a bounded height to calculate its scale factor.
+    // Inside a Table row, height constraints can be unbounded, which
+    // makes FittedBox skip scaling and let the Text wrap instead.
+    // Wrapping it in a fixed-height SizedBox gives it something concrete
+    // to scale against, guaranteeing a single line every time.
+    return SizedBox(
+      height: 20,
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerRight,
+          child: Text(
+            text,
+            maxLines: 1,
+            softWrap: false,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              color: color,
+              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

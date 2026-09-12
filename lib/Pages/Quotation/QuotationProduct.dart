@@ -187,7 +187,7 @@ class _QuotationProductState
           iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
           title: const Text(
             'Select Products',
-            style: TextStyle(color: AppConfig.backgroundColor),
+           style: AppConfig.pageTitleStyle,
           ),
           backgroundColor: AppConfig.colorPrimary,
           actions: [
@@ -550,7 +550,11 @@ class _QuotationProductState
                           Text(
                             'Available Qty: ${selectedUnit!['stock']}',
                             style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                          ),SizedBox(height: 8),
+
+
+
+SizedBox(height: 10),
                         ],
                         if (units != null &&
                             units.any((unit) => unit != null)) ...[

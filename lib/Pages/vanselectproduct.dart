@@ -112,7 +112,7 @@ class _VanselectproductsState extends State<Vanselectproducts> {
           iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
           title: const Text(
             'Select Products',
-            style: TextStyle(color: AppConfig.backgroundColor),
+            style: AppConfig.pageTitleStyle,
           ),
           backgroundColor: AppConfig.colorPrimary,
           actions: [
@@ -327,11 +327,13 @@ class _VanselectproductsState extends State<Vanselectproducts> {
         availableStock =
             double.tryParse(selectedUnit?['stock']?.toString() ?? '0');
       }
-      bool isQuantityValid(String? value) {
+   bool isQuantityValid(String? value) {
         final quantityValue = double.tryParse(value ?? '') ?? 0;
         return value != null && value.isNotEmpty && quantityValue > 0;
         // && quantityValue <= (availableStock ?? 0);
       }
+
+                                                                          // ✅ ADDED
 
       if (ModalRoute.of(context)!.settings.arguments != null) {
         final Map<String, dynamic>? params =
@@ -391,7 +393,11 @@ class _VanselectproductsState extends State<Vanselectproducts> {
                           Text(
                             'Available Qty: ${selectedUnit!['stock']}',
                             style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                          ),SizedBox(height: 8),
+
+
+
+SizedBox(height: 10),
                         ],
                         if (units != null &&
                             units.any((unit) => unit != null)) ...[
@@ -474,21 +480,18 @@ class _VanselectproductsState extends State<Vanselectproducts> {
                             hint: Text('Select Unit'),
                           ),
                           SizedBox(height: 10.h),
-                          TextFormField(
-                            keyboardType: TextInputType.number,
-                            controller: amountController,
-                            decoration: InputDecoration(
-                                labelText: 'Amount',
-                                labelStyle:
-                                    TextStyle(fontWeight: FontWeight.bold),
-                                contentPadding: EdgeInsets.symmetric(
-                                    vertical: 2.h, horizontal: 10.w),
-                                hintText: 'Amt',
-                                border: OutlineInputBorder(
-                                    borderSide: BorderSide.none),
-                                filled: true,
-                                fillColor: Colors.grey.shade300),
-                          ),
+                    TextFormField(
+  keyboardType: TextInputType.number,
+  controller: amountController,
+  decoration: InputDecoration(
+      labelText: 'Amount',
+      labelStyle: TextStyle(fontWeight: FontWeight.bold),
+      contentPadding: EdgeInsets.symmetric(vertical: 2.h, horizontal: 10.w),
+      hintText: 'Amt',
+      border: OutlineInputBorder(borderSide: BorderSide.none),
+      filled: true,
+      fillColor: Colors.grey.shade300),
+),
                           SizedBox(height: 10.h),
                           TextFormField(
                             autofocus: true,
@@ -533,60 +536,60 @@ class _VanselectproductsState extends State<Vanselectproducts> {
                     },
                   ),
                   if (units != null && units.any((unit) => unit != null)) ...[
-                    TextButton(
-                      style: TextButton.styleFrom(
-                          backgroundColor: isQuantityValid(quantity)
-                              ? AppConfig.colorPrimary
-                              : Colors.grey,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(5.r))),
-                      child: Text(
-                        'Save',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      onPressed: isQuantityValid(quantity)
-                          ? () async {
-                              final prefs =
-                                  await SharedPreferences.getInstance();
-                              List<String>? selectedProducts =
-                                  prefs.getStringList('selected_products');
-                              selectedProducts ??= [];
-                              final serialNumber = DateTime.now()
-                                      .millisecondsSinceEpoch
-                                      .toString() +
-                                  '-' +
-                                  (1000 + (DateTime.now().microsecond % 9000))
-                                      .toString();
-                              final selectedProduct = {
-                                'serial_number': serialNumber,
-                                'id': product.id,
-                                'code': product.code,
-                                'name': product.name,
-                                'pro_image': product.proImage,
-                                'type_id': selectedProductTypeId,
-                                'type_name': productTypes.firstWhere((type) =>
-                                    type['id'].toString() ==
-                                    selectedProductTypeId)['name'],
-                                'unit_id': selectedUnitId,
-                                'unit_name': selectedUnit?['name'],
-                                'quantity': quantity ?? '',
-                                'amount': amountController.text ?? '',
-                              };
-                              selectedProducts.add(jsonEncode(selectedProduct));
-                              await prefs.setStringList(
-                                  'selected_products', selectedProducts);
-                              Navigator.pop(context);
-                              Navigator.pushReplacementNamed(
-                                  context, '/VanTransfer', arguments: {
-                                'name': name,
-                                'customerId': id
-                              }).then((value) {
-                                // _initDone = false;
-                                // _getTypes();
-                              });
-                            }
-                          : null,
-                    ),
+                  TextButton(
+  style: TextButton.styleFrom(
+      backgroundColor: isQuantityValid(quantity)
+          ? AppConfig.colorPrimary
+          : Colors.grey,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(5.r))),
+  child: Text(
+    'Save',
+    style: TextStyle(color: Colors.white),
+  ),
+  onPressed: isQuantityValid(quantity)
+      ? () async {
+          final prefs =
+              await SharedPreferences.getInstance();
+          List<String>? selectedProducts =
+              prefs.getStringList('selected_products');
+          selectedProducts ??= [];
+          final serialNumber = DateTime.now()
+                  .millisecondsSinceEpoch
+                  .toString() +
+              '-' +
+              (1000 + (DateTime.now().microsecond % 9000))
+                  .toString();
+          final selectedProduct = {
+            'serial_number': serialNumber,
+            'id': product.id,
+            'code': product.code,
+            'name': product.name,
+            'pro_image': product.proImage,
+            'type_id': selectedProductTypeId,
+            'type_name': productTypes.firstWhere((type) =>
+                type['id'].toString() ==
+                selectedProductTypeId)['name'],
+            'unit_id': selectedUnitId,
+            'unit_name': selectedUnit?['name'],
+            'quantity': quantity ?? '',
+            'amount': amountController.text ?? '',
+          };
+          selectedProducts.add(jsonEncode(selectedProduct));
+          await prefs.setStringList(
+              'selected_products', selectedProducts);
+          Navigator.pop(context);
+          Navigator.pushReplacementNamed(
+              context, '/VanTransfer', arguments: {
+            'name': name,
+            'customerId': id
+          }).then((value) {
+            // _initDone = false;
+            // _getTypes();
+          });
+        }
+      : null,
+),
                   ] else ...[
                     SizedBox.shrink(),
                   ],

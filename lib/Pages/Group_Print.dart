@@ -12,6 +12,7 @@ import '../Models/Group_Model.dart';
 import '../Models/Group_Model.dart' as Invoice;
 import 'package:http/http.dart' as http;
 import 'package:mobizapp/Utilities/rest_ds.dart';
+import 'package:mobizapp/Utilities/date_helper.dart';
 
 class GroupPrint extends StatefulWidget {
   static const routeName = "/GroupPrint";
@@ -113,7 +114,7 @@ class _GroupPrintState extends State<GroupPrint> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sale Return Collection Print',
-            style: TextStyle(color: Colors.white)),
+             style: AppConfig.pageTitleStyle,),
         backgroundColor: AppConfig.colorPrimary,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -185,8 +186,8 @@ class _GroupPrintState extends State<GroupPrint> {
           invoice.sales?.invoiceNo ?? invoice.returnData?.invoiceNo ?? 'N/A';
       String? rawDate = invoice.sales?.inDate ?? invoice.returnData?.inDate;
       String? rawTime = invoice.sales?.inTime ?? invoice.returnData?.inTime;
-      String invoiceDate = rawDate != null && rawDate.isNotEmpty
-          ? DateFormat('dd MMMM yyyy').format(DateTime.parse(rawDate))
+   String invoiceDate = rawDate != null && rawDate.isNotEmpty
+          ? DateHelper.displayDate(rawDate)
           : 'N/A';
 
       void printAlignedText(String leftText, String rightText) {
@@ -376,8 +377,9 @@ class _GroupPrintState extends State<GroupPrint> {
           printAlignedText('Collection Type: Cheque', ' ');
           printAlignedText('Bank Name: ${invoice.collection!.bank}', ' ');
           printAlignedText('Cheque No: ${invoice.collection!.chequeNo}', ' ');
-          printAlignedText(
+       printAlignedText(
               'Cheque Date: ${invoice.collection!.chequeDate}', ' ');
+
         } else if (invoice.collection!.collectionType == 'Cash') {
           printAlignedText('Collection Type: Cash', ' ');
         }

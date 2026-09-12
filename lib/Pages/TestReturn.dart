@@ -14,6 +14,7 @@ import 'dart:typed_data';
 import '../Components/commonwidgets.dart';
 import '../Models/appstate.dart';
 import '../Models/pdfgenerate.dart';
+import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
 
@@ -143,7 +144,7 @@ class _HomereturnScreenState extends State<HomereturnScreen> {
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
         title: const Text(
           'Return',
-          style: TextStyle(color: AppConfig.backgroundColor),
+          style: AppConfig.pageTitleStyle,
         ),
         backgroundColor: AppConfig.colorPrimary,
       ),
@@ -262,7 +263,7 @@ class _HomereturnScreenState extends State<HomereturnScreen> {
                   child: SizedBox(
                     width: SizeConfig.blockSizeHorizontal * 70,
                     child: Text(
-                      '${data.invoiceNo!} | ${DateFormat('dd MMMM yyyy').format(DateTime.parse(data.inDate!))} ${data.inTime}',
+                      '${data.invoiceNo!} | ${DateHelper.displayDate(data.inDate)} ${data.inTime}',
                       style: TextStyle(
                         fontSize: AppConfig.textCaption3Size,
                       ),
@@ -363,7 +364,7 @@ class _HomereturnScreenState extends State<HomereturnScreen> {
                   ),
                 ),
                 Text(
-                  'Total Tax: ${data.totalTax ?? ''}',
+                  '${AppState().vatLabel ?? 'Tax'}: ${data.totalTax ?? ''}',
                   style: TextStyle(
                     fontSize: AppConfig.textCaption3Size,
                   ),
@@ -469,14 +470,14 @@ class _HomereturnScreenState extends State<HomereturnScreen> {
 
     // ====== HEADER LAYOUT (LEFT TEXT + RIGHT LOGO) ======
 
-    final double leftX = 20;            // Left column start
-    final double topY = 20;             // Starting Y position
+    final double leftX = 20; // Left column start
+    final double topY = 20; // Starting Y position
     double currentY = topY;
     final double pageWidth = page.getClientSize().width;
 
-
 // Load logo
-    final Uint8List? imageData = await _readImageData(invoice.data!.store![0].logo);
+    final Uint8List? imageData =
+        await _readImageData(invoice.data!.store![0].logo);
     if (imageData != null && imageData.isNotEmpty) {
       final PdfBitmap image = PdfBitmap(imageData);
       // Position logo at top-right (adjust width/height as needed)
@@ -484,9 +485,9 @@ class _HomereturnScreenState extends State<HomereturnScreen> {
         image,
         Rect.fromLTWH(
           pageWidth - 100, // Right-aligned with 100px width
-          30,             // Top margin
-          80,             // Logo width
-          80,             // Logo height
+          30, // Top margin
+          80, // Logo width
+          80, // Logo height
         ),
       );
     }
@@ -526,7 +527,8 @@ class _HomereturnScreenState extends State<HomereturnScreen> {
 
 // ===== TITLE BELOW HEADER =====
     final title = 'TAX CREDIT NOTE';
-    final PdfFont titleFont = PdfStandardFont(PdfFontFamily.helvetica, 16, style: PdfFontStyle.bold);
+    final PdfFont titleFont =
+        PdfStandardFont(PdfFontFamily.helvetica, 16, style: PdfFontStyle.bold);
     final Size titleSize = titleFont.measureString(title);
 
     page.graphics.drawString(
@@ -539,7 +541,6 @@ class _HomereturnScreenState extends State<HomereturnScreen> {
         titleSize.height,
       ),
     );
-
 
     // Draw a line below the text
     final double yPosition = 165;
@@ -564,8 +565,8 @@ class _HomereturnScreenState extends State<HomereturnScreen> {
 
     String invoiceDetails = '''
   Reference No: ${invoice.data!.invoiceNo!}
-  Date: ${DateFormat('dd MMMM yyyy').format(DateTime.parse(invoice.data!.inDate!))}
-  Due Date: ${DateFormat('dd MMMM yyyy').format(DateTime.parse(invoice.data!.inDate!))}
+  Date: ${DateHelper.displayDate(invoice.data!.inDate)}
+  Due Date: ${DateHelper.displayDate(invoice.data!.inDate)}
   ''';
 
     page.graphics.drawString(
@@ -613,7 +614,7 @@ class _HomereturnScreenState extends State<HomereturnScreen> {
     headerRow.cells[4].value = 'Type';
     headerRow.cells[5].value = 'Rate';
     headerRow.cells[6].value = 'Total';
-    headerRow.cells[7].value = 'Vat';
+    headerRow.cells[7].value = AppState().vatLabel ?? 'Tax';
     headerRow.cells[8].value = 'Amount';
 
     for (int k = 0; k < invoice.data!.detail!.length; k++) {
@@ -690,12 +691,9 @@ class _HomereturnScreenState extends State<HomereturnScreen> {
   ${invoice.data!.discount != null && invoice.data!.discount! > 0 ? 'Discount: ${invoice.data!.discount!.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : '\t'}
 
   Total: ${invoice.data!.total}
-  Tax: ${invoice.data!.totalTax}
+  ${AppState().vatLabel ?? 'Tax'}: ${invoice.data!.totalTax}
   ${num.parse(invoice.data!.roundOff.toString()) != 0 ? 'Round off: ${invoice.data!.roundOff}\nGrand Total: ${invoice.data!.grandTotal}' : 'Grand Total: ${invoice.data!.grandTotal}'}
-
-
-  ''';
-
+''';
     lastPage.graphics.drawString(
       bottomInvoiceDetails,
       PdfStandardFont(PdfFontFamily.helvetica, 12),
@@ -777,14 +775,17 @@ Salesman: ${invoice.data!.user![0].name}
           invoice.data!.customer![0].contactNumber ?? 'N/A';
       String customerTRN = invoice.data!.customer![0].trn ?? '';
       String invoiceNumber = invoice.data!.invoiceNo ?? 'N/A';
-      String invoiceDate = DateFormat('dd MMMM yyyy')
-          .format(DateTime.parse(invoice.data!.inDate!));
-      String dueDate = DateFormat('dd MMMM yyyy')
-          .format(DateTime.parse(invoice.data!.inDate!));
-      String Total = invoice.data!.total?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
-      String tax = invoice.data!.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
-      String grandTotal =
-          invoice.data!.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
+      String invoiceDate = DateHelper.displayDate(invoice.data!.inDate);
+      String dueDate = DateHelper.displayDate(invoice.data!.inDate);
+      String Total =
+          invoice.data!.total?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
+              '0.00';
+      String tax = invoice.data!.totalTax
+              ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
+          '0.00';
+      String grandTotal = invoice.data!.grandTotal
+              ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
+          '0.00';
       String Discount;
       if (invoice.data!.discount != null &&
           double.tryParse(invoice.data!.discount!.toString()) != null &&
@@ -903,13 +904,16 @@ Salesman: ${invoice.data!.user![0].name}
             invoice.data!.detail![i].quantity?.toString() ?? '0';
         String productType =
             invoice.data!.detail![i].productType?.toString() ?? '0';
-        String productRate =
-            invoice.data!.detail![i].mrp?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
-        String productTotal =
-            invoice.data!.detail![i].taxable?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
+        String productRate = invoice.data!.detail![i].mrp
+                ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
+            '0.00';
+        String productTotal = invoice.data!.detail![i].taxable
+                ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
+            '0.00';
         // String productTax = tax.toString();
-        String productAmount =
-            invoice.data!.detail![i].amount?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00';
+        String productAmount = invoice.data!.detail![i].amount
+                ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
+            '0.00';
         // (invoice.data!.detail![i].mrp! * invoice.data!.detail![i].quantity!)
         //     .toStringAsFixed(AppState().noOfDecimals ?? 2);
 
@@ -955,7 +959,11 @@ Salesman: ${invoice.data!.user![0].name}
         printAlignedText("Van: $van", ""); // Skip printing Total
       }
       printAlignedText("Salesman: $salesman", "Total: $Total");
-      printer.printCustom("Tax: $tax", 1, 2);
+      printer.printCustom(
+        "${AppState().vatLabel ?? 'Tax'}: $tax",
+        1,
+        2,
+      );
       printer.printCustom("Grand Total: $grandTotal", 1, 2); // Right aligned
       printer.printNewLine();
       printer.printCustom(amountInWords, 1, 0); // Centered

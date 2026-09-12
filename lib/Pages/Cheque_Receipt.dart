@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:mobizapp/Models/appstate.dart';
 import 'package:mobizapp/Pages/Cheque/Cheque_Colection.dart';
 import 'package:mobizapp/Utilities/rest_ds.dart';
+import 'package:mobizapp/Utilities/date_helper.dart';
 import 'package:mobizapp/confg/appconfig.dart';
 import 'package:mobizapp/confg/sizeconfig.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -135,10 +136,10 @@ class _ChequeReceiptState extends State<ChequeReceipt> {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              "Cheque Receipt",
-              style: TextStyle(color: Colors.white),
-            ),
+         const Text(
+  "Cheque Receipt",
+  style: AppConfig.pageTitleStyle,
+),
             GestureDetector(
               onTap: () {
                 Navigator.pushReplacementNamed(context, ChequeCollectionPage.routeName);
@@ -197,8 +198,17 @@ class _ChequeReceiptState extends State<ChequeReceipt> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                      // BEFORE
                         Text(
                           data.chequeDate??'',
+                          style: TextStyle(
+                            fontSize: AppConfig.textCaption3Size,
+                          ),
+                        ),
+
+// AFTER
+                        Text(
+                          DateHelper.displayDate(data.chequeDate),
                           style: TextStyle(
                             fontSize: AppConfig.textCaption3Size,
                           ),
@@ -309,10 +319,8 @@ class _ChequeReceiptState extends State<ChequeReceipt> {
         printer.printCustom('$leftText$spaces$rightText', 1,
             0); // Print with left-aligned text
       }
-      String formatDate(String date) {
-        DateTime parsedDate = DateTime.parse(date);
-        return DateFormat('dd-MM-yyyy').format(parsedDate);
-      }
+    String formatDate(String date) {
+  return DateHelper.displayDate(date);}
       printer.printNewLine();
       String companyName =
           '${storeDetail.name}';
@@ -328,7 +336,7 @@ class _ChequeReceiptState extends State<ChequeReceipt> {
       printer.printCustom("-" * 72, 1, 1); // Centered
       if (data.collectionType == 'Cheque') {
         printAlignedText('Collection Type: Cheque', 'Cheque No: ${data.chequeNo}');
-        printAlignedText('Bank Name: ${data.bank}', 'Cheque Date: ${data.chequeDate}');
+        printAlignedText('Bank Name: ${data.bank}', 'Cheque Date: ${DateHelper.displayDate(data.chequeDate)}');
       } else if (data.collectionType == 'Cash') {
         printAlignedText('Collection Type: Cash', ' '); // Uncomment if needed
       }

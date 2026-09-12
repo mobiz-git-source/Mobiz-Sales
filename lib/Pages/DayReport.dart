@@ -17,8 +17,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../Models/DayReport.dart';
+import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
-
 class DayReport extends StatefulWidget {
   static const routeName = "/DayReport";
   @override
@@ -129,8 +129,8 @@ class _DayReportState extends State<DayReport> {
           children: [
             pw.Text('Salesman: ${report.data!.user}',
                 style: pw.TextStyle(fontSize: 20)),
-            pw.Text(
-                'Date: ${report.data?.date != null ? DateFormat('dd-MMM-yyyy').format(DateTime.parse(report.data!.date!)) : 'No Date'}',
+        pw.Text(
+                'Date: ${report.data?.date != null ? DateHelper.displayDate(report.data!.date) : 'No Date'}',
                 style: pw.TextStyle(fontSize: 20)),
             pw.Text('VAN NO: ${report.data!.van}',
                 style: pw.TextStyle(fontSize: 20)),
@@ -164,7 +164,8 @@ class _DayReportState extends State<DayReport> {
                       pw.Text('INVOICE NO',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                       pw.Text('Amount',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),textAlign: pw.TextAlign.right),
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          textAlign: pw.TextAlign.right),
                     ],
                   ),
                   ...report.sales!.map((sale) {
@@ -178,10 +179,13 @@ class _DayReportState extends State<DayReport> {
 
                     return pw.TableRow(
                       children: [
-                        pw.Text('${report.sales!.indexOf(sale) + 1}',textAlign: pw.TextAlign.center), // SI NO
+                        pw.Text('${report.sales!.indexOf(sale) + 1}',
+                            textAlign: pw.TextAlign.center), // SI NO
                         pw.Text(formattedShopName), // SHOP NAME
                         pw.Text('${sale.invoiceNo}'), // INVOICE NO
-                        pw.Text('${sale.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)}',textAlign: pw.TextAlign.right), // Amount
+                        pw.Text(
+                            '${sale.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
+                            textAlign: pw.TextAlign.right), // Amount
                       ],
                     );
                   }).toList(),
@@ -192,8 +196,10 @@ class _DayReportState extends State<DayReport> {
                       pw.SizedBox(), // Empty SHOP NAME column
                       pw.Text('Total:',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text('${totalSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),textAlign: pw.TextAlign.right),
+                      pw.Text(
+                          '${totalSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          textAlign: pw.TextAlign.right),
                     ],
                   ),
                 ],
@@ -228,7 +234,8 @@ class _DayReportState extends State<DayReport> {
                       pw.Text('Reference',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                       pw.Text('Amount',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),textAlign: pw.TextAlign.right),
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          textAlign: pw.TextAlign.right),
                     ],
                   ),
                   ...report.salesReturn!.map((returns) {
@@ -241,12 +248,13 @@ class _DayReportState extends State<DayReport> {
                         : customerNames;
                     return pw.TableRow(
                       children: [
-                        pw.Text(
-                            '${report.salesReturn!.indexOf(returns) + 1}',textAlign: pw.TextAlign.center), // SI NO
+                        pw.Text('${report.salesReturn!.indexOf(returns) + 1}',
+                            textAlign: pw.TextAlign.center), // SI NO
                         pw.Text(formattedShopName), // SHOP NAME
                         pw.Text(
                             '${returns.invoiceNo ?? 'No Invoice'}'), // Reference
-                        pw.Text('${returns.grandTotal}',textAlign: pw.TextAlign.right), // Amount
+                        pw.Text('${returns.grandTotal}',
+                            textAlign: pw.TextAlign.right), // Amount
                       ],
                     );
                   }).toList(),
@@ -256,8 +264,10 @@ class _DayReportState extends State<DayReport> {
                       pw.SizedBox(), // Empty SHOP NAME column
                       pw.Text('Total:',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text('${totalSalesreturn.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),textAlign: pw.TextAlign.right),
+                      pw.Text(
+                          '${totalSalesreturn.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          textAlign: pw.TextAlign.right),
                     ],
                   ),
                 ],
@@ -292,7 +302,8 @@ class _DayReportState extends State<DayReport> {
                       pw.Text('TYPE',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                       pw.Text('Amount',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),textAlign: pw.TextAlign.right),
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          textAlign: pw.TextAlign.right),
                     ],
                   ),
                   ...report.collection!.map((collection) {
@@ -305,12 +316,13 @@ class _DayReportState extends State<DayReport> {
                         : customerNames;
                     return pw.TableRow(
                       children: [
-                        pw.Text(
-                            '${report.collection!.indexOf(collection) + 1}',textAlign: pw.TextAlign.center), // SI NO
+                        pw.Text('${report.collection!.indexOf(collection) + 1}',
+                            textAlign: pw.TextAlign.center), // SI NO
                         pw.Text(formattedShopName), // SHOP NAME
                         pw.Text(
                             '${collection.collectionType ?? 'No Type'}'), // TYPE
-                        pw.Text('${collection.totalAmount}',textAlign: pw.TextAlign.right), // Amount
+                        pw.Text('${collection.totalAmount}',
+                            textAlign: pw.TextAlign.right), // Amount
                       ],
                     );
                   }).toList(),
@@ -320,8 +332,10 @@ class _DayReportState extends State<DayReport> {
                       pw.SizedBox(), // Empty SHOP NAME column
                       pw.Text('Total:',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text('${totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),textAlign: pw.TextAlign.right),
+                      pw.Text(
+                          '${totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          textAlign: pw.TextAlign.right),
                     ],
                   ),
                 ],
@@ -356,7 +370,8 @@ class _DayReportState extends State<DayReport> {
                       pw.Text('Remarks',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                       pw.Text('Amount',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),textAlign: pw.TextAlign.right),
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          textAlign: pw.TextAlign.right),
                     ],
                   ),
                   ...report.expense!.map((expense) {
@@ -369,7 +384,8 @@ class _DayReportState extends State<DayReport> {
                         pw.Text(expenseTypes), // Type
                         pw.Text(
                             '${expense.description ?? 'No Remarks'}'), // Remarks
-                        pw.Text('${expense.amount}',textAlign: pw.TextAlign.right), // Amount
+                        pw.Text('${expense.amount}',
+                            textAlign: pw.TextAlign.right), // Amount
                       ],
                     );
                   }).toList(),
@@ -379,8 +395,10 @@ class _DayReportState extends State<DayReport> {
                       pw.SizedBox(), // Empty Type column
                       pw.Text('Total:',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text('${totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),textAlign: pw.TextAlign.center),
+                      pw.Text(
+                          '${totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          textAlign: pw.TextAlign.center),
                     ],
                   ),
                 ],
@@ -461,8 +479,8 @@ class _DayReportState extends State<DayReport> {
 
       // Printing section headers and key info
       printer.printCustom('Salesman: ${report.data!.user}', 1, 0);
-      printer.printCustom(
-          'Date: ${report.data?.date != null ? DateFormat('dd-MMM-yyyy').format(DateTime.parse(report.data!.date!)) : 'No Date'}',
+     printer.printCustom(
+          'Date: ${report.data?.date != null ? DateHelper.displayDate(report.data!.date) : 'No Date'}',
           1,
           0);
       printer.printCustom('VAN NO: ${report.data!.van}', 1, 0);
@@ -534,7 +552,8 @@ class _DayReportState extends State<DayReport> {
           }
         }
         printer.printNewLine();
-        printAlignedText('', 'Total Sales: ${totalSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
+        printAlignedText('',
+            'Total Sales: ${totalSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         printer.printNewLine();
       }
 
@@ -584,8 +603,8 @@ class _DayReportState extends State<DayReport> {
           }
         }
         printer.printNewLine();
-        printAlignedText(
-            '', 'Total Sales Return: ${totalSalesreturn.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
+        printAlignedText('',
+            'Total Sales Return: ${totalSalesreturn.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         // printer.printCustom('Total Collections: $totalCollections', 1, 0);
         printer.printNewLine();
         // printer.printCustom('Return', 1, 0);
@@ -654,69 +673,87 @@ class _DayReportState extends State<DayReport> {
           }
         }
         printer.printNewLine();
-        printAlignedText(
-            '', 'Total Collections: ${totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
+        printAlignedText('',
+            'Total Collections: ${totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
         // printer.printCustom('Total Collections: $totalCollections', 1, 0);
         printer.printNewLine();
       }
 
       // Printing Expense Section
+
       if (report.expense != null && report.expense!.isNotEmpty) {
-        const int columnWidth1 = 10; // S.No
-        const int columnWidth2 = 30; // Shop Name
-        const int columnWidth3 = 12; // Invoice No
-        const int columnWidth4 = 8; // Amount
+   const int columnWidth1 = 6; // SI NO
+        const int columnWidth2 = 12; // Reference
+        const int columnWidth3 = 20; // Expense Name
+        const int columnWidth4 = 18; // Remarks
+        const int columnWidth5 = 10; // Amount
 
-        // Print the table header
-        String headers = "${'SI NO'.padRight(columnWidth1)}"
-            "${'SHOP NAME'.padRight(columnWidth2)}"
-            "${'TYPE'.padRight(columnWidth3)}"
-            "${'Amount'.padLeft(columnWidth4)}";
-        printer.printCustom('Expense', 1, 0); // Section title
-        printer.printCustom(headers, 1, 0); // Print table headers
 
-        // Helper function to split text by word count
-        List<String> splitByWords(String text, int maxWords) {
-          List<String> words = text.split(' ');
-          List<String> lines = [];
-          for (int i = 0; i < words.length; i += maxWords) {
-            lines.add(words
-                .sublist(i,
-                    i + maxWords > words.length ? words.length : i + maxWords)
-                .join(' '));
-          }
-          return lines;
-        }
 
-        for (var expense in report.expense!) {
-          String expenseTypes = expense.expense!.map((e) => e.name).join(", ");
-          List<String> customerNameLines = splitByWords(expenseTypes, 4);
-          String firstLine =
-              "${(report.expense!.indexOf(expense) + 1).toString().padRight(columnWidth1)}"
-              "${customerNameLines[0].padRight(columnWidth2)}"
-              "${(expense.description ?? 'No Type').padRight(columnWidth3)}"
-              "${(double.tryParse(expense.amount ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00').padLeft(columnWidth4)}";
+  String headers =
+      "${'SI NO'.padRight(columnWidth1)}"
+      "${'REFERENCE'.padRight(columnWidth2)}"
+      "${'EXPENSE'.padRight(columnWidth3)}"
+      "${'REMARKS'.padRight(columnWidth4)}"
+      "${'AMOUNT'.padLeft(columnWidth5)}";
 
-          printer.printCustom(firstLine, 1, 0);
-          for (int i = 1; i < customerNameLines.length; i++) {
-            String subsequentLine = "${''.padRight(columnWidth1)}"
-                "${customerNameLines[i].padRight(columnWidth2)}";
-            printer.printCustom(subsequentLine, 1, 0);
-          }
+  printer.printCustom('Expense', 1, 0);
+  printer.printCustom(headers, 1, 0);
 
-          // printer.printCustom(
-          //     '${(report.expense!.indexOf(expense) + 1).toString().padRight(6)}'
-          //         '${expenseTypes.padRight(16)}'
-          //         '${expense.description?.padRight(12) ?? 'No Remarks'.padRight(12)}'
-          //         '${expense.amount.toString().padLeft(8)}',
-          //     1, 0);
-        }
-        printer.printNewLine();
-        printAlignedText(
-            '', 'Total Expenses: ${totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
-        printer.printNewLine();
-      }
+  List<String> splitByWords(String text, int maxWords) {
+    List<String> words = text.split(' ');
+    List<String> lines = [];
 
+    for (int i = 0; i < words.length; i += maxWords) {
+      lines.add(
+        words
+            .sublist(
+              i,
+              i + maxWords > words.length ? words.length : i + maxWords,
+            )
+            .join(' '),
+      );
+    }
+
+    return lines;
+  }
+
+  for (var expense in report.expense!) {
+    String expenseName =
+        expense.expense?.map((e) => e.name).join(", ") ?? "";
+
+    String remarks = expense.description ?? "";
+    String reference = expense.invoiceNo ?? "";
+
+    List<String> expenseLines = splitByWords(expenseName, 3);
+    List<String> remarkLines = splitByWords(remarks, 3);
+
+    int maxLines = expenseLines.length > remarkLines.length
+        ? expenseLines.length
+        : remarkLines.length;
+
+    for (int i = 0; i < maxLines; i++) {
+      printer.printCustom(
+        "${i == 0 ? (report.expense!.indexOf(expense) + 1).toString().padRight(columnWidth1) : ''.padRight(columnWidth1)}"
+        "${i == 0 ? reference.padRight(columnWidth2) : ''.padRight(columnWidth2)}"
+        "${(i < expenseLines.length ? expenseLines[i] : '').padRight(columnWidth3)}"
+        "${(i < remarkLines.length ? remarkLines[i] : '').padRight(columnWidth4)}"
+        "${i == 0 ? (double.tryParse(expense.amount ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00').padLeft(columnWidth5) : ''}",
+        1,
+        0,
+      );
+    }
+  }
+
+  printer.printNewLine();
+
+  printAlignedText(
+    '',
+    'Total Expenses: ${totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
+  );
+
+  printer.printNewLine();
+}
       // Net Cash Balance
       // double netCashBalance =
       //     // (report.data!.pettyCash ?? 0) +
@@ -738,9 +775,9 @@ class _DayReportState extends State<DayReport> {
       appBar: AppBar(
         backgroundColor: AppConfig.colorPrimary,
         title: const Text(
-          'Day Report',
-          style: TextStyle(color: AppConfig.backgroundColor),
-        ),
+  'Day Report',
+   style: AppConfig.pageTitleStyle,
+),
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
       ),
       body: FutureBuilder<DayCloseOutstandingReport>(
@@ -762,12 +799,14 @@ class _DayReportState extends State<DayReport> {
 
             double totalSale = sales.fold(0.0, (sum, returns) {
               return sum +
-                  (double.tryParse(returns.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)) ??
+                  (double.tryParse(returns.grandTotal!
+                          .toStringAsFixed(AppState().noOfDecimals ?? 2)) ??
                       0.0);
             });
             double totalSum = salesReturns.fold(0.0, (sum, returns) {
               return sum +
-                  (double.tryParse(returns.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)) ??
+                  (double.tryParse(returns.grandTotal!
+                          .toStringAsFixed(AppState().noOfDecimals ?? 2)) ??
                       0.0);
             });
             // Calculate totals only if the lists are not empty
@@ -783,7 +822,8 @@ class _DayReportState extends State<DayReport> {
               return sum + (double.tryParse(returns.amount.toString()) ?? 0.0);
             });
 
-            String totalExpenseFormated = totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2);
+            String totalExpenseFormated =
+                totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2);
             double netCashBalance =
                 // (report.data?.pettyCash ?? 0) +
                 totalCollections - totalExpenses;
@@ -805,8 +845,8 @@ class _DayReportState extends State<DayReport> {
                               'Salesman: ${report.data?.user ?? 'No User'}',
                               // style: TextStyle(fontSize: AppConfig.labelSize),
                             ),
-                            Text(
-                              'Date: ${report.data?.date != null ? DateFormat('dd-MMM-yyyy').format(DateTime.parse(report.data!.date!)) : 'No Date'}',
+                       Text(
+                              'Date: ${report.data?.date != null ? DateHelper.displayDate(report.data!.date) : 'No Date'}',
                             ),
                           ],
                         ),
@@ -1001,7 +1041,8 @@ class _DayReportState extends State<DayReport> {
                                 child: Text(
                                   'SI NO',
                                   textAlign: TextAlign.left,
-                                  style: TextStyle(fontWeight: FontWeight.w600,
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w600,
                                       fontSize: AppConfig.text3Sizepre),
                                 ),
                               ),
@@ -1010,7 +1051,8 @@ class _DayReportState extends State<DayReport> {
                                 child: Text(
                                   'SHOP NAME',
                                   textAlign: TextAlign.left,
-                                  style: TextStyle(fontWeight: FontWeight.w600,
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w600,
                                       fontSize: AppConfig.text3Sizepre),
                                 ),
                               ),
@@ -1019,7 +1061,8 @@ class _DayReportState extends State<DayReport> {
                                 child: Text(
                                   'Reference',
                                   textAlign: TextAlign.left,
-                                  style: TextStyle(fontWeight: FontWeight.w600,
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w600,
                                       fontSize: AppConfig.text3Sizepre),
                                 ),
                               ),
@@ -1028,7 +1071,8 @@ class _DayReportState extends State<DayReport> {
                                 child: Text(
                                   'Amount',
                                   textAlign: TextAlign.right,
-                                  style: TextStyle(fontWeight: FontWeight.w600,
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w600,
                                       fontSize: AppConfig.text3Sizepre),
                                 ),
                               ),
@@ -1189,7 +1233,8 @@ class _DayReportState extends State<DayReport> {
                                 int splitIndex = 0;
 
                                 for (int i = 0; i < words.length; i++) {
-                                  charCount += words[i].length + (i > 0 ? 1 : 0); // include spaces
+                                  charCount += words[i].length +
+                                      (i > 0 ? 1 : 0); // include spaces
                                   if (charCount > 15 || i == 4) {
                                     splitIndex = i;
                                     break;
@@ -1197,7 +1242,7 @@ class _DayReportState extends State<DayReport> {
                                 }
 
                                 formattedShopName =
-                                '${words.take(splitIndex).join(' ')}\n${words.skip(splitIndex).join(' ')}';
+                                    '${words.take(splitIndex).join(' ')}\n${words.skip(splitIndex).join(' ')}';
                               } else {
                                 formattedShopName = shopName;
                               }
@@ -1215,7 +1260,7 @@ class _DayReportState extends State<DayReport> {
                                       alignment: Alignment.centerLeft,
                                       child: Text(
                                         formattedShopName,
-                                          textAlign: TextAlign.left,
+                                        textAlign: TextAlign.left,
                                       ),
                                     ),
                                   ),
@@ -1269,99 +1314,142 @@ class _DayReportState extends State<DayReport> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Header Row
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Header Row
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: 35, // matches data row SI NO width
+                          child: Text(
+                            'SI NO',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: AppConfig.text3Sizepre,
+                            ),
+                          ),
+                        ),
+
+                        Expanded(
+                          flex: 2, // matches data row REFERENCE flex
+                          child: Text(
+                            'REFERENCE',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: AppConfig.text3Sizepre,
+                            ),
+                          ),
+                        ),
+
+                        Expanded(
+                          flex: 4, // matches data row EXPENSE NAME flex
+                          child: Text(
+                            'EXPENSE NAME',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: AppConfig.text3Sizepre,
+                            ),
+                          ),
+                        ),
+
+                        Expanded(
+                          flex: 3, // matches data row REMARKS flex
+                          child: Text(
+                            'REMARKS',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: AppConfig.text3Sizepre,
+                            ),
+                          ),
+                        ),
+
+                        SizedBox(
+                          width: 70, // matches data row AMOUNT width
+                          child: Text(
+                            'AMOUNT',
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: AppConfig.text3Sizepre,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8),
+
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: expenses.length,
+                      itemBuilder: (context, index) {
+                        final expense = expenses[index];
+
+                        String expenseName =
+                            expense.expense?.map((e) => e.name).join(", ") ?? "";
+
+                        String reference = expense.invoiceNo ?? "";
+
+                        String remarks = expense.description ?? "";
+
+                        String amount = (double.tryParse(expense.amount ?? '0')
+                                ?.toStringAsFixed(AppState().noOfDecimals ?? 2)) ??
+                            '0.00';
+
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.0),
+                          child: Row(
                             children: [
                               SizedBox(
-                                width: AppConfig.textSubTitleSize,
+                                width: 35, // matches header SI NO width
                                 child: Text(
-                                  'SI NO',
+                                  '${index + 1}',
                                   textAlign: TextAlign.left,
-                                  style: TextStyle(fontWeight: FontWeight.w600,
-                                      fontSize: AppConfig.text3Sizepre),
                                 ),
                               ),
-                              Flexible(
-                                flex: 5, // Fixed width for SHOP NAME
-                                child: Text(
-                                  'EXPENSE NAME',
-                                  textAlign: TextAlign.left,
-                                  style: TextStyle(fontWeight: FontWeight.w600,
-                                      fontSize: AppConfig.text3Sizepre),
-                                ),
-                              ),
-                              Flexible(
-                                flex: 11, // Less space for Reference
-                                child: Text(
-                                  'Reference',
-                                  textAlign: TextAlign.left,
-                                  style: TextStyle(fontWeight: FontWeight.w600,
-                                      fontSize: AppConfig.text3Sizepre),
-                                ),
-                              ),
+
                               Expanded(
-                                flex: 3, // More space for Amount
+                                flex: 2,
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    reference,
+                                    textAlign: TextAlign.left,
+                                    maxLines: 1, // keeps EX0048 on one line
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+
+                              Expanded(
+                                flex: 4,
                                 child: Text(
-                                  'Amount',
+                                  expenseName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+
+                              Expanded(
+                                flex: 3,
+                                child: Text(
+                                  remarks,
+                                  textAlign: TextAlign.left,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+
+                              SizedBox(
+                                width: 70, // matches header AMOUNT width
+                                child: Text(
+                                  amount,
                                   textAlign: TextAlign.right,
-                                  style: TextStyle(fontWeight: FontWeight.w600,
-                                      fontSize: AppConfig.text3Sizepre),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
-                          SizedBox(height: 8), // Space between header and list
-
-                          // ListView for expense data
-                          ListView.builder(
-                            scrollDirection: Axis.vertical,
-                            shrinkWrap: true,
-                            physics: BouncingScrollPhysics(),
-                            itemCount: expenses.length,
-                            itemBuilder: (context, index) {
-                              final expense = expenses[index];
-                              print(
-                                  "NetBamlance${report.data!.netCashBalance}");
-                              String expenseName =
-                                  '${expense.expense?.map((exp) => exp.name).join(", ") ?? 'No Expense'}';
-
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 4.0), // Padding between rows
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    SizedBox(
-                                      width: 20, // Fixed width for SI NO
-                                      child: Text('${index + 1}',
-                                          textAlign: TextAlign.left), // SI NO
-                                    ),
-                                    Flexible(
-                                      flex: 6, // Fixed width for EXPENSE NAME
-                                      child: Text(
-                                        expenseName, // EXPENSE NAME
-                                        textAlign: TextAlign.left,
-                                      ),
-                                    ),
-                                    Flexible(
-                                      flex: 5, // Less space for Reference
-                                      child: Text(
-                                          '${expense.description ?? 'No Reference'}',
-                                          textAlign:
-                                              TextAlign.left), // Reference
-                                    ),
-                                    Expanded(
-                                      flex: 3, // More space for Amount
-                                      child: Text(
-                                          '${expense.amount.toString()}',
-                                          textAlign: TextAlign.right), // Amount
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
+                        );
+                      },
+                    ),
                           // Total Row
                           Padding(
                             padding: const EdgeInsets.only(top: 16.0),
@@ -1393,7 +1481,8 @@ class _DayReportState extends State<DayReport> {
                           style: TextStyle(fontWeight: FontWeight.w500),
                         ),
                         Text(
-                          report.data!.netCashBalance!.toStringAsFixed(AppState().noOfDecimals ?? 2),
+                          report.data!.netCashBalance!
+                              .toStringAsFixed(AppState().noOfDecimals ?? 2),
                         )
                       ],
                     )

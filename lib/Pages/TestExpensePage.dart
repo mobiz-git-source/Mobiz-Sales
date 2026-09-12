@@ -7,6 +7,7 @@ import 'package:shimmer/shimmer.dart';
 import '../Components/commonwidgets.dart';
 import 'Expense_add.dart';
 import '../Utilities/rest_ds.dart';
+import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
 
@@ -32,48 +33,13 @@ class _ExpensespageState extends State<Expensespage> {
     _fetchExpenses();
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
-          _scrollController.position.maxScrollExtent - 100 &&
+              _scrollController.position.maxScrollExtent - 100 &&
           !_isLoading &&
           _hasMore) {
         _fetchExpenses();
       }
     });
   }
-
-  // Future<void> _fetchPendingExpenses() async {
-  //   final url = "${RestDatasource().BASE_URL}/api/get_pending_expense?store_id=${AppState().storeId}";
-  //
-  //   try {
-  //     final response = await http.get(Uri.parse(url));
-  //     if (response.statusCode == 200) {
-  //       final jsonData = json.decode(response.body);
-  //       final pendingExpenses = jsonData['data'] as int;
-  //
-  //       setState(() {
-  //         _pendingExpensesCount = pendingExpenses;
-  //       });
-  //
-  //       if (_pendingExpensesCount == 0) {
-  //         Navigator.push(
-  //           context,
-  //           MaterialPageRoute(builder: (context) => ExpenseAdd()),
-  //         );
-  //       } else {
-  //         ScaffoldMessenger.of(context).showSnackBar(
-  //           SnackBar(
-  //             content: Text(
-  //                 "$_pendingExpensesCount number of expenses are pending to be approved"),
-  //             duration: Duration(seconds: 3),
-  //           ),
-  //         );
-  //       }
-  //     } else {
-  //       throw Exception("Failed to load pending expenses");
-  //     }
-  //   } catch (e) {
-  //     print("Error fetching pending expenses: $e");
-  //   }
-  // }
 
   Future<void> _fetchExpenses() async {
     if (_isLoading || !_hasMore) return;
@@ -82,17 +48,20 @@ class _ExpensespageState extends State<Expensespage> {
       _isLoading = true;
     });
 
-    final url = "${RestDatasource().BASE_URL}/api/get_expense_detail.api?store_id=${AppState().storeId}&user_id=${AppState().userId}&page=$_currentPage";
+    final url =
+        "${RestDatasource().BASE_URL}/api/get_expense_detail.api?store_id=${AppState().storeId}&user_id=${AppState().userId}&page=$_currentPage";
 
     try {
       print("Fetching data for page $_currentPage...");
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         print(response.request);
+        print(response.body);
+
         final jsonData = json.decode(response.body);
         final expenseResponse = ExpenseResponse.fromJson(jsonData);
-        isExpandedList.addAll(List.generate(expenseResponse.data.length, (index) => false));
-
+        isExpandedList.addAll(
+            List.generate(expenseResponse.data.length, (index) => false));
 
         setState(() {
           _expenses.addAll(expenseResponse.data);
@@ -122,6 +91,15 @@ class _ExpensespageState extends State<Expensespage> {
     super.dispose();
   }
 
+  // Formats a raw amount string using the store's configured number of
+  // decimals (AppState().noOfDecimals), same as the Receipt / Sales
+  // Invoice screens, instead of the hardcoded 2 decimals that were
+  // baked into the API response earlier.
+  String _formatAmount(String? value) {
+    final double parsed = double.tryParse(value ?? '') ?? 0;
+    return parsed.toStringAsFixed(AppState().noOfDecimals ?? 2);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -138,27 +116,17 @@ class _ExpensespageState extends State<Expensespage> {
         backgroundColor: AppConfig.colorPrimary,
         title: Text(
           'Expenses',
-          style: TextStyle(color: AppConfig.backgroundColor),
+          style: AppConfig.pageTitleStyle,
         ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 10.0),
             child: GestureDetector(
               onTap: () {
-                // if (_pendingExpensesCount == 0) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => ExpenseAdd()),
-                  );
-                // } else {
-                //   ScaffoldMessenger.of(context).showSnackBar(
-                //     SnackBar(
-                //       content: Text(
-                //           "$_pendingExpensesCount number of expenses are pending to be approved"),
-                //       duration: Duration(seconds: 3),
-                //     ),
-                //   );
-                // }
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ExpenseAdd()),
+                );
               },
               child: Icon(
                 Icons.add,
@@ -168,156 +136,200 @@ class _ExpensespageState extends State<Expensespage> {
           ),
         ],
       ),
-      body:  _expenses.isEmpty && _isLoading
-          ? Center(child: Shimmer.fromColors(
-        baseColor: AppConfig.buttonDeactiveColor.withOpacity(0.1),
-        highlightColor: AppConfig.backButtonColor,
-        child: ListView.builder(
-          itemCount: 6,
-          itemBuilder: (context, index) =>
-              CommonWidgets.loadingContainers(
-                height: SizeConfig.blockSizeVertical * 10,
-                width: SizeConfig.blockSizeHorizontal * 90,
-              ),
-        ),
-      ),): _expenses.isEmpty
+      body: _expenses.isEmpty && _isLoading
           ? Center(
-        child: Text(
-          'No data found',
-        ),
-      )
-          : ListView.builder(
-        controller: _scrollController,
-        itemCount: _expenses.length + (_hasMore ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index == _expenses.length) {
-            return Center(
-              child: CircularProgressIndicator()
-            );
-          }
-          var expenseDetail = _expenses[index];
-          // bool isExpanded = isExpandedList[index];
-          String detailText = '';
-
-          if (expenseDetail.status == 'Approved') {
-            detailText = expenseDetail.approvedReason ??
-                'No approval reason provided';
-          } else if (expenseDetail.status == 'Rejected') {
-            detailText = expenseDetail.rejectedReason ??
-                'No rejection reason provided';
-          }
-
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                isExpandedList[index] = !isExpandedList[index];
-              });
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 15.0),
-              child: Card(
-                elevation: 3,
-                child: Container(
-                  padding: EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    color: AppConfig.backgroundColor,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(10.0),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
-                          children: [
-                            Flexible(
-                              child: Column(
-                                crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${expenseDetail.inDate} | ${expenseDetail.invoiceNo ?? ""}',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                  Text(
-                                      'Amount : ${expenseDetail.amount}'),
-                                  Text(
-                                      'Vat Amount : ${expenseDetail.vatAmount}'),
-                                  Text(
-                                      'Total Amount : ${expenseDetail.totalAmount}'),
-                                  // if (expenseDetail.description == '')
-                                  Text(
-                                    '${expenseDetail.expense.isNotEmpty ? expenseDetail.expense[0].name : ""} ${expenseDetail.description == '' ? '' : '| ${expenseDetail.description}'}',
-                                  ),
-                                  if (expenseDetail.status != 'Pending')
-                                    Row(
-                                      crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                      children: [
-                                        Text("Remarks: "),
-                                        Expanded(
-                                          child: SingleChildScrollView(
-                                            scrollDirection:
-                                            Axis.horizontal,
-                                            child: Text(
-                                              detailText,
-                                              // maxLines: 1,
-                                              overflow: TextOverflow.clip,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                ],
-                              ),
-                            ),
-                            Text(expenseDetail.status),
-                          ],
-                        ),
-                        if (isExpandedList[index])
-                          Padding(
-                            padding: const EdgeInsets.only(top: 10.0),
-                            child: Column(
-                              children: [
-                                Wrap(
-                                  spacing: 10,
-                                  runSpacing: 10,
-                                  children: expenseDetail.documents
-                                      .map((document) {
-                                    return Image.network(
-                                      '${RestDatasource().BASE_URL}/uploads/expense/${document.documentName}',
-                                      height: 100,
-                                      width: 100,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        return Icon(
-                                          Icons.broken_image,
-                                          size: 100,
-                                          color: Colors.grey,
-                                        );
-                                      },
-                                    );
-                                  }).toList(),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
+              child: Shimmer.fromColors(
+                baseColor: AppConfig.buttonDeactiveColor.withOpacity(0.1),
+                highlightColor: AppConfig.backButtonColor,
+                child: ListView.builder(
+                  itemCount: 6,
+                  itemBuilder: (context, index) =>
+                      CommonWidgets.loadingContainers(
+                    height: SizeConfig.blockSizeVertical * 10,
+                    width: SizeConfig.blockSizeHorizontal * 90,
                   ),
                 ),
               ),
-            ),
-          );
-        },
-      ),
+            )
+          : _expenses.isEmpty
+              ? Center(
+                  child: Text(
+                    'No data found',
+                  ),
+                )
+              : ListView.builder(
+                  controller: _scrollController,
+                  itemCount: _expenses.length + (_hasMore ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == _expenses.length) {
+                      return Center(child: CircularProgressIndicator());
+                    }
+                    var expenseDetail = _expenses[index];
+
+                    // Only build remarks text when there is an actual
+                    // reason on record. No placeholder text like "No
+                    // rejection reason provided" — if there's nothing to
+                    // show, the whole Remarks row is skipped below.
+                    String? detailText;
+                    if (expenseDetail.status == 'Approved' &&
+                        (expenseDetail.approvedReason ?? '').isNotEmpty) {
+                      detailText = expenseDetail.approvedReason;
+                    } else if (expenseDetail.status == 'Rejected' &&
+                        (expenseDetail.rejectedReason ?? '').isNotEmpty) {
+                      detailText = expenseDetail.rejectedReason;
+                    }
+
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          isExpandedList[index] = !isExpandedList[index];
+                        });
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 15.0),
+                        child: Card(
+                          elevation: 3,
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppConfig.backgroundColor,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Flexible(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            // Was: '${expenseDetail.inDate} | ...'
+                                            // Now goes through DateHelper so it
+                                            // follows the store's configured
+                                            // date_format, same as
+                                            // TestInvoice / Attendance /
+                                            // Cheque_Receipt / Customerorderdetail.
+                                            '${DateHelper.displayDate(expenseDetail.inDate)} | ${expenseDetail.invoiceNo ?? ""}',
+                                            style: TextStyle(
+                                              fontSize:
+                                                  AppConfig.textCaption3Size,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Amount : ${_formatAmount(expenseDetail.amount)}',
+                                            style: TextStyle(
+                                              fontSize:
+                                                  AppConfig.textCaption3Size,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Vat Amount : ${_formatAmount(expenseDetail.vatAmount)}',
+                                            style: TextStyle(
+                                              fontSize:
+                                                  AppConfig.textCaption3Size,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Total Amount : ${_formatAmount(expenseDetail.totalAmount)}',
+                                            style: TextStyle(
+                                              fontSize:
+                                                  AppConfig.textCaption3Size,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${expenseDetail.expense.isNotEmpty ? expenseDetail.expense[0].name : ""} ${expenseDetail.description == '' ? '' : '| ${expenseDetail.description}'}',
+                                            style: TextStyle(
+                                              fontSize:
+                                                  AppConfig.textCaption3Size,
+                                            ),
+                                          ),
+                                          if (detailText != null)
+                                            Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  "Remarks: ",
+                                                  style: TextStyle(
+                                                    fontSize: AppConfig
+                                                        .textCaption3Size,
+                                                  ),
+                                                ),
+                                                Expanded(
+                                                  child: SingleChildScrollView(
+                                                    scrollDirection:
+                                                        Axis.horizontal,
+                                                    child: Text(
+                                                      detailText,
+                                                      overflow:
+                                                          TextOverflow.clip,
+                                                      style: TextStyle(
+                                                        fontSize: AppConfig
+                                                            .textCaption3Size,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    Text(
+                                      expenseDetail.status,
+                                      style: TextStyle(
+                                        fontSize: AppConfig.textCaption3Size,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (isExpandedList[index])
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 10.0),
+                                    child: Column(
+                                      children: [
+                                        Wrap(
+                                          spacing: 10,
+                                          runSpacing: 10,
+                                          children: expenseDetail.documents
+                                              .map((document) {
+                                            return Image.network(
+                                              '${RestDatasource().BASE_URL}/uploads/expense/${document.documentName}',
+                                              height: 100,
+                                              width: 100,
+                                              errorBuilder:
+                                                  (context, error, stackTrace) {
+                                                return Icon(
+                                                  Icons.broken_image,
+                                                  size: 100,
+                                                  color: Colors.grey,
+                                                );
+                                              },
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }
-
-
 
 class ExpenseResponse {
   final bool success;
@@ -409,9 +421,9 @@ class ExpenseDetailsss {
           ? DateTime.parse(json['deleted_at'])
           : null,
       expense:
-      (json['expense'] as List).map((e) => Expense.fromJson(e)).toList(),
+          (json['expense'] as List).map((e) => Expense.fromJson(e)).toList(),
       documents:
-      (json['documents'] as List).map((e) => Document.fromJson(e)).toList(),
+          (json['documents'] as List).map((e) => Document.fromJson(e)).toList(),
     );
   }
 }
@@ -483,7 +495,6 @@ class Document {
     );
   }
 }
-
 
 class PaginationInfo {
   final int currentPage;

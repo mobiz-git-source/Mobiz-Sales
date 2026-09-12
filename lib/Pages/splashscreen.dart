@@ -42,37 +42,46 @@ class _SplashScreenState extends State<SplashScreen> {
     super.dispose();
   }
 
-  _getAppStateDetails(Map<String, dynamic> json) {
-    appState.loginState = json['login_state'];
-    appState.isExistingUser = json['is_existing_user'];
-    appState.token = json['token'];
-    appState.userType = json['user_type'];
-    appState.name = json['name'];
-    appState.appVersion = json['app_version'];
-    appState.buildNumber = json['build_number'];
-    appState.userId = json['id'];
-    appState.storeId = json['store_id'];
-    appState.vatState = json['vat_no_vat'];
-    appState.discountState = json['discount'];
-    appState.validate_qtySO = json['validate_qty_in_so'];
-    appState.validate_qtySales = json['validate_qty_in_sales'];
-    appState.rolId = json['app_rol_id'];
-    appState.email = json['email'];
-    appState.osType = json['os_type'];
-    appState.imageUrl = json['image_url'];
-    appState.minorVersion = json['minor_version'];
-    appState.username = json['username'];
-    appState.attendanceState = json['attendance'];
-    appState.printer = json['printer'];
-    appState.noOfDecimals = json['no_of_decimals'];
-    appState.code = json['code'];
-    appState.minor = json['minor_unit'];
-    appState.devices = json['devices'];
-    appState.initialConsent = json['initial_consent'];
-    appState.country = json['country'];
-    appState.isEmailVerified = json['is_email_verified'];
-    appState.isMobileVerified = json['is_mobile_verified'];
-  }
+ _getAppStateDetails(Map<String, dynamic> json) {
+  appState.loginState = json['login_state'];
+  appState.isExistingUser = json['is_existing_user'];
+  appState.token = json['token'];
+  appState.userType = json['user_type'];
+  appState.name = json['name'];
+  appState.appVersion = json['app_version'];
+  appState.buildNumber = json['build_number'];
+  appState.userId = json['id'];
+  appState.storeId = json['store_id'];
+  appState.vatState = json['vat_no_vat'];
+  appState.discountState = json['discount'];
+  appState.validate_qtySO = json['validate_qty_in_so'];
+  appState.validate_qtySales = json['validate_qty_in_sales'];
+  appState.rolId = json['app_rol_id'];
+  appState.email = json['email'];
+  appState.osType = json['os_type'];
+  appState.imageUrl = json['image_url'];
+  appState.minorVersion = json['minor_version'];
+  appState.username = json['username'];
+  appState.attendanceState = json['attendance'];
+  appState.printer = json['printer'];
+  appState.noOfDecimals = json['no_of_decimals'];
+  appState.code = json['code'];
+  appState.minor = json['minor_unit'];
+  appState.devices = json['devices'];
+  appState.initialConsent = json['initial_consent'];
+  appState.country = json['country'];
+  appState.isEmailVerified = json['is_email_verified'];
+  appState.isMobileVerified = json['is_mobile_verified'];
+  appState.dateFormat = json['date_format'] ?? 'dd-MM-yyyy';                 // ✅ new — was also missing
+  appState.vanId = json['van_id'];                                          // ✅ new — was also missing
+  appState.routeId = json['route_id'];                                      // ✅ new — was also missing
+  appState.roundOffPositive =                                               // ✅ new
+      double.tryParse(json['round_off_positive']?.toString() ?? '0') ?? 0;  // ✅ new
+  appState.roundOffNegative =                                               // ✅ new
+      double.tryParse(json['round_off_negative']?.toString() ?? '0') ?? 0;  // ✅ new
+  appState.roundOffAllowedInInvoice =                                       // ✅ new
+      json['roundoff_alllowed_in_invoice']?.toString().toLowerCase() != 'no'; // ✅ new
+}
 
   _initAppState() async {
     setState(() {
@@ -86,6 +95,8 @@ class _SplashScreenState extends State<SplashScreen> {
       _getAppStateDetails(resp);
       appState.appVersion = appVersion;
       appState.buildNumber = buildNumber;
+ print("LOGIN STATE = ${appState.loginState}");
+  print("ROLE = ${appState.rolId}");
 
       if (appState.loginState == 'LOGGED_IN') {
         if (mounted)

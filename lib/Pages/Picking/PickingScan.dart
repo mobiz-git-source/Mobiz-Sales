@@ -94,7 +94,7 @@ class _PickingScannerScreenState extends State<PickingScannerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Scan QR / Barcode")),
+      appBar: AppBar(title: const Text("Scan QR / Barcode",)),
       body: Column(
         children: [
           Expanded(

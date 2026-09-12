@@ -26,7 +26,7 @@ class _VantransferOptionState extends State<VantransferOption> {
           titleSpacing: 0,
           title: Text(
             'Van Transfer Option',
-            style: TextStyle(color: Colors.white),
+          style: AppConfig.pageTitleStyle,
           )),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,

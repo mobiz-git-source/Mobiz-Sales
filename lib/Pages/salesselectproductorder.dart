@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:mobizapp/Pages/customerorderdetail.dart';
 import 'package:mobizapp/DashBoardScreen.dart';
+import 'package:mobizapp/confg/apptextsizes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 import '../Components/commonwidgets.dart';
@@ -79,7 +80,8 @@ class _SalesSelectProductsorderScreenState
     final String url =
         '${RestDatasource().BASE_URL}/api/get_product_for_order?store_id=${AppState().storeId}&customer_id=$id&page=$page';
     final response = await http.get(Uri.parse(url));
-
+    print("PRODUCT DETAILS API RESPONSE:");
+    print(response.body);
     if (response.statusCode == 200) {
       print(response.request);
       final data = jsonDecode(response.body);
@@ -186,7 +188,7 @@ class _SalesSelectProductsorderScreenState
           iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
           title: const Text(
             'Select Products',
-            style: TextStyle(color: AppConfig.backgroundColor),
+            style: AppConfig.pageTitleStyle,
           ),
           backgroundColor: AppConfig.colorPrimary,
           actions: [
@@ -205,7 +207,7 @@ class _SalesSelectProductsorderScreenState
                       autofocus: true,
                       style: TextStyle(color: Colors.white),
                       controller: _searchData,
-                      onChanged:_onSearchChanged,
+                      onChanged: _onSearchChanged,
                       decoration: const InputDecoration(
                           contentPadding: EdgeInsets.all(5),
                           hintText: "Search...",
@@ -486,6 +488,16 @@ class _SalesSelectProductsorderScreenState
             : quantityValue > 0;
       }
 
+      bool isAmountValid() {
+        // ✅ ADDED
+        final enteredAmount = // ✅ ADDED
+            double.tryParse(amountController.text.trim()) ?? 0; // ✅ ADDED
+        final minPrice = double.tryParse(// ✅ ADDED
+                selectedUnit?['min_price']?.toString() ?? '0') ?? // ✅ ADDED
+            0; // ✅ ADDED
+        return minPrice == 0 || enteredAmount >= minPrice; // ✅ ADDED
+      } // ✅ ADDED
+
       if (ModalRoute.of(context)!.settings.arguments != null) {
         final Map<String, dynamic>? params =
             ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
@@ -499,287 +511,640 @@ class _SalesSelectProductsorderScreenState
           bool showDescriptionField = false;
           return StatefulBuilder(
             builder: (context, setDialogState) {
-              return AlertDialog(
-                title: Text(
-                  '${product.code} | ${product.name!}',
-                  // overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13.sp),
+              return Dialog(
+                backgroundColor: Colors.white,
+                surfaceTintColor: Colors.white,
+                insetPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 24,
                 ),
-                content: SingleChildScrollView(
-                  child: Form(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(
+                    maxWidth: 520,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(
+                      22,
+                      20,
+                      22,
+                      0,
+                    ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // =========================================================
+                        // HEADER
+                        // =========================================================
+
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Image.network(
-                              '${RestDatasource().Product_URL}/uploads/product/${product.proImage}',
-                              height: 50.h,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Image.asset('Assets/Images/no_image.jpg',
-                                    height: 50.h);
-                              },
+                            Expanded(
+                              child: Text(
+                                '${product.code} | ${product.name}',
+                                style: const TextStyle(
+                                  fontSize: AppFontSizes.dialogTitle,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF222222),
+                                  height: 1.3,
+                                ),
+                              ),
                             ),
-                            lastsale == null || lastsale.isEmpty
-                                ? Text('No last records found')
-                                : Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Last Sale:',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold),
-                                      ),
-                                      Text('Date: ${lastsale['date']}'),
-                                      Text('Unit: ${lastsale['unit']}'),
-                                      Text('Price: ${lastsale['price']}'),
-                                    ],
-                                  ),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(30),
+                              onTap: () {
+                                Navigator.pop(context);
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.all(3),
+                                child: Icon(
+                                  Icons.close,
+                                  size: 30,
+                                  color: Color(0xFF77798A),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
-                        SizedBox(height: 5.h),
+
+                        const SizedBox(height: 20),
+
+                        const Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: Color(0xFFE3E3E3),
+                        ),
+
+                        const SizedBox(height: 22),
+
+                        // =========================================================
+                        // AVAILABLE QTY
+                        // =========================================================
+
                         if (selectedUnit != null) ...[
                           Text(
                             'Available Qty: ${selectedUnit!['stock']}',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                        if (units != null &&
-                            units.any((unit) => unit != null)) ...[
-                          SizedBox(height: 10.h),
-                          DropdownButtonFormField<String>(
-                            decoration: InputDecoration(
-                              labelText: 'Product Type',
-                              labelStyle:
-                                  TextStyle(fontWeight: FontWeight.bold),
-                              contentPadding: EdgeInsets.symmetric(
-                                  vertical: 2.h, horizontal: 10.w),
-                              border: OutlineInputBorder(
-                                  borderSide: BorderSide.none),
-                              filled: true,
-                              fillColor: Colors.grey.shade300,
+                            style: const TextStyle(
+                              fontSize: AppFontSizes.dialogHighlight,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF222222),
                             ),
-                            items: productTypes.map((type) {
-                              return DropdownMenuItem<String>(
-                                value: type['id'].toString(),
-                                child: Text(type['name']),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setDialogState(() {
-                                selectedProductTypeId = value;
-
-                                // Check if the selected product type is not "Normal"
-                                final selectedType = productTypes.firstWhere(
-                                  (type) => type['id'].toString() == value,
-                                  orElse: () => null,
-                                );
-
-                                if (selectedType != null &&
-                                    selectedType['name'] != 'Normal') {
-                                  // Set amount to 0 if type is not "Normal"
-                                  amountController.text = '0';
-                                } else if (selectedUnit != null) {
-                                  // Set amount to the selected unit's price if type is "Normal"
-                                  amountController.text =
-                                      selectedUnit?['price']?.toString() ?? '';
-                                }
-                              });
-                            },
-                            value: selectedProductTypeId,
-                            hint: Text('Select Product Type'),
                           ),
-                          SizedBox(height: 10.h),
-                          DropdownButtonFormField<String>(
-                            decoration: InputDecoration(
-                              labelText: 'Unit',
-                              labelStyle:
-                                  TextStyle(fontWeight: FontWeight.bold),
-                              contentPadding: EdgeInsets.symmetric(
-                                  vertical: 2.h, horizontal: 10.w),
-                              border: OutlineInputBorder(
-                                  borderSide: BorderSide.none),
-                              filled: true,
-                              fillColor: Colors.grey.shade300,
+                          const SizedBox(height: 12),
+                          Text(
+                            'Minimum Rate : ${selectedUnit?['min_price'] ?? '0'}',
+                            style: const TextStyle(
+                              fontSize: AppFontSizes.dialogHighlight,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.red,
                             ),
-                            items:
-                                units.where((unit) => unit != null).map((unit) {
-                              return DropdownMenuItem<String>(
-                                value: unit['id'].toString(),
-                                child: Text(unit['name']),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setDialogState(() {
-                                selectedUnitId = value;
-                                selectedUnit = units.firstWhere(
-                                    (unit) => unit['id'].toString() == value,
-                                    orElse: () => null);
-                                amountController.text =
-                                    selectedUnit?['price']?.toString() ?? '';
-                                availableStock = double.tryParse(
-                                    selectedUnit?['stock']?.toString() ?? '0');
-                              });
-                            },
-                            value: selectedUnitId,
-                            hint: Text('Select Unit'),
                           ),
-                          SizedBox(height: 10.h),
-                          TextFormField(
-                            keyboardType: TextInputType.number,
-                            controller: amountController,
-                            decoration: InputDecoration(
-                                labelText: 'Amount',
-                                labelStyle:
-                                    TextStyle(fontWeight: FontWeight.bold),
-                                contentPadding: EdgeInsets.symmetric(
-                                    vertical: 2.h, horizontal: 10.w),
-                                hintText: 'Amt',
-                                border: OutlineInputBorder(
-                                    borderSide: BorderSide.none),
-                                filled: true,
-                                fillColor: Colors.grey.shade300),
-                          ),
-                          SizedBox(height: 10.h),
-                          TextFormField(
-                            autofocus: true,
-                            keyboardType: TextInputType.number,
-                            onChanged: (value) {
-                              quantity = value;
-                              setDialogState(() {});
-                            },
-                            decoration: InputDecoration(
-                                labelText: 'Quantity',
-                                labelStyle:
-                                    TextStyle(fontWeight: FontWeight.bold),
-                                contentPadding: EdgeInsets.symmetric(
-                                    vertical: 2.h, horizontal: 10.w),
-                                hintText: 'Qty',
-                                border: OutlineInputBorder(
-                                    borderSide: BorderSide.none),
-                                filled: true,
-                                fillColor: Colors.grey.shade300),
-                          ),
-                          SizedBox(height: 10),
-                        ] else ...[
-                          Text('No units available for this product.'),
+                          const SizedBox(height: 24),
                         ],
-                        // SizedBox(height: 10.h),
-                        if (showDescriptionField)
-                          Padding(
-                            padding: EdgeInsets.symmetric(vertical: 10.h),
+
+                        // =========================================================
+                        // PRODUCT TYPE + UNIT
+                        // =========================================================
+
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // PRODUCT TYPE
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Product Type',
+                                    style: TextStyle(
+                                      fontSize: AppFontSizes.dialogLabel,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF222222),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    height: 52,
+                                    alignment: Alignment.center,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      border: Border.all(
+                                        color: const Color(0xFFDCDCE3),
+                                      ),
+                                      borderRadius: BorderRadius.circular(11),
+                                    ),
+                                    child: DropdownButtonHideUnderline(
+                                      child: DropdownButtonFormField<String>(
+                                        isExpanded: true,
+                                        decoration: const InputDecoration(
+                                          border: InputBorder.none,
+                                          isDense: true,
+                                          contentPadding: EdgeInsets.zero,
+                                        ),
+                                        value: selectedProductTypeId,
+                                        icon: const Icon(
+                                          Icons.keyboard_arrow_down_rounded,
+                                          size: 24,
+                                          color: Color(0xFF77798A),
+                                        ),
+                                        style: const TextStyle(
+                                          fontSize: AppFontSizes.dialogInput,
+                                          color: Color(0xFF222222),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        items: productTypes.map((type) {
+                                          return DropdownMenuItem<String>(
+                                            value: type['id'].toString(),
+                                            child: Text(
+                                              type['name'],
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          );
+                                        }).toList(),
+                                        onChanged: (value) {
+                                          setDialogState(() {
+                                            selectedProductTypeId = value;
+
+                                            final selectedType =
+                                                productTypes.firstWhere(
+                                              (type) =>
+                                                  type['id'].toString() ==
+                                                  value,
+                                              orElse: () => {},
+                                            );
+
+                                            if (selectedType.isNotEmpty &&
+                                                selectedType['name'] !=
+                                                    'Normal') {
+                                              amountController.text = '0';
+                                            } else if (selectedUnit != null) {
+                                              amountController.text =
+                                                  selectedUnit?['price']
+                                                          ?.toString() ??
+                                                      '';
+                                            }
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(width: 16),
+
+                            // UNIT
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Unit',
+                                    style: TextStyle(
+                                      fontSize: AppFontSizes.dialogLabel,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF222222),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    height: 52,
+                                    alignment: Alignment.center,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      border: Border.all(
+                                        color: const Color(0xFFDCDCE3),
+                                      ),
+                                      borderRadius: BorderRadius.circular(11),
+                                    ),
+                                    child: DropdownButtonHideUnderline(
+                                      child: DropdownButtonFormField<String>(
+                                        isExpanded: true,
+                                        decoration: const InputDecoration(
+                                          border: InputBorder.none,
+                                          isDense: true,
+                                          contentPadding: EdgeInsets.zero,
+                                        ),
+                                        value: selectedUnitId,
+                                        icon: const Icon(
+                                          Icons.keyboard_arrow_down_rounded,
+                                          size: 24,
+                                          color: Color(0xFF77798A),
+                                        ),
+                                        style: const TextStyle(
+                                          fontSize: AppFontSizes.dialogInput,
+                                          color: Color(0xFF222222),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        items: units!
+                                            .where((unit) => unit != null)
+                                            .map((unit) {
+                                          return DropdownMenuItem<String>(
+                                            value: unit['id'].toString(),
+                                            child: Text(
+                                              unit['name'],
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          );
+                                        }).toList(),
+                                        onChanged: (value) {
+                                          setDialogState(() {
+                                            selectedUnitId = value;
+
+                                            selectedUnit = units.firstWhere(
+                                              (unit) =>
+                                                  unit['id'].toString() ==
+                                                  value,
+                                              orElse: () => null,
+                                            );
+
+                                            amountController.text =
+                                                selectedUnit?['price']
+                                                        ?.toString() ??
+                                                    '';
+
+                                            availableStock = double.tryParse(
+                                              selectedUnit?['stock']
+                                                      ?.toString() ??
+                                                  '0',
+                                            );
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // =========================================================
+                        // AMOUNT + QUANTITY
+                        // =========================================================
+
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // AMOUNT
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Amount',
+                                    style: TextStyle(
+                                      fontSize: AppFontSizes.dialogLabel,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF222222),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    height: 54,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      border: Border.all(
+                                        color: const Color(0xFFDCDCE3),
+                                      ),
+                                      borderRadius: BorderRadius.circular(11),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const SizedBox(width: 14),
+                                        const Icon(
+                                          Icons.calculate_outlined,
+                                          size: 22,
+                                          color: Color(0xFF77798A),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: TextFormField(
+                                            controller: amountController,
+                                            keyboardType: const TextInputType
+                                                .numberWithOptions(
+                                              decimal: true,
+                                            ),
+                                            style: const TextStyle(
+                                              fontSize:
+                                                  AppFontSizes.dialogInput,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF222222),
+                                            ),
+                                            decoration: const InputDecoration(
+                                              border: InputBorder.none,
+                                              isDense: true,
+                                              contentPadding: EdgeInsets.zero,
+                                            ),
+                                            onChanged: (_) {
+                                              setDialogState(() {});
+                                            },
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                      ],
+                                    ),
+                                  ),
+                                  if (!isAmountValid())
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 5),
+                                      child: Text(
+                                        'Amount cannot be below Minimum Rate',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(width: 16),
+
+                            // QUANTITY
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Quantity *',
+                                    style: TextStyle(
+                                      fontSize: AppFontSizes.dialogLabel,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF222222),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    height: 54,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      border: Border.all(
+                                        color: AppConfig.colorPrimary,
+                                        width: 1.5,
+                                      ),
+                                      borderRadius: BorderRadius.circular(11),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const SizedBox(width: 12),
+                                        Icon(
+                                          Icons.swap_vert,
+                                          size: 21,
+                                          color: AppConfig.colorPrimary,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: TextFormField(
+                                            autofocus: true,
+                                            keyboardType: TextInputType.number,
+                                            onChanged: (value) {
+                                              quantity = value;
+                                              setDialogState(() {});
+                                            },
+                                            style: const TextStyle(
+                                              fontSize:
+                                                  AppFontSizes.dialogInput,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF222222),
+                                            ),
+                                            decoration: const InputDecoration(
+                                              border: InputBorder.none,
+                                              isDense: true,
+                                              contentPadding: EdgeInsets.zero,
+                                              hintText: 'Qty',
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // =========================================================
+                        // DESCRIPTION
+                        // =========================================================
+
+                        if (showDescriptionField) ...[
+                          const Text(
+                            'Description',
+                            style: TextStyle(
+                              fontSize: AppFontSizes.dialogLabel,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF222222),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              border: Border.all(
+                                color: const Color(0xFFDCDCE3),
+                              ),
+                              borderRadius: BorderRadius.circular(11),
+                            ),
                             child: TextFormField(
                               controller: descriptionController,
-                              decoration: InputDecoration(
-                                labelText: 'Description',
-                                labelStyle: TextStyle(fontWeight: FontWeight.bold),
-                                contentPadding: EdgeInsets.symmetric(
-                                    vertical: 2.h, horizontal: 10.w),
-                                border: OutlineInputBorder(
-                                    borderSide: BorderSide.none),
-                                filled: true,
-                                fillColor: Colors.grey.shade300,
+                              maxLines: 4,
+                              style: const TextStyle(
+                                fontSize: AppFontSizes.dialogInput,
+                                color: Color(0xFF222222),
+                              ),
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.all(14),
+                                hintText: 'Enter description (optional)',
+                                hintStyle: TextStyle(
+                                  color: Color(0xFF999999),
+                                ),
                               ),
                             ),
                           ),
-                        SizedBox(height: 10.h),
+                          const SizedBox(height: 20),
+                        ],
+
+                        // =========================================================
+                        // BUTTONS
+                        // =========================================================
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  side: BorderSide(
+                                    color: AppConfig.colorPrimary,
+                                    width: 1.5,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  setDialogState(() {
+                                    showDescriptionField = true;
+                                  });
+                                },
+                                child: Text(
+                                  'Description',
+                                  style: TextStyle(
+                                    fontSize: AppFontSizes.dialogInput,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppConfig.colorPrimary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  side: BorderSide(
+                                    color: AppConfig.colorPrimary,
+                                    width: 1.5,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                },
+                                child: Text(
+                                  'Close',
+                                  style: TextStyle(
+                                    fontSize: AppFontSizes.dialogInput,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppConfig.colorPrimary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppConfig.colorPrimary,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                ),
+                                onPressed: isQuantityValid(quantity) &&
+                                        isAmountValid()
+                                    ? () async {
+                                        final newProduct = {
+                                          'id': product.id,
+                                          'serial_number': DateTime.now()
+                                              .millisecondsSinceEpoch
+                                              .toString(),
+                                          'code': product.code,
+                                          'name': product.name,
+                                          'unit_id': selectedUnitId,
+                                          'unit_name': selectedUnit?['name'],
+                                          'type_id': selectedProductTypeId,
+                                          'type_name': productTypes.firstWhere(
+                                            (type) =>
+                                                type['id'].toString() ==
+                                                selectedProductTypeId,
+                                          )['name'],
+                                          'quantity': quantity,
+                                          'amount': amountController.text,
+                                          'description':
+                                              descriptionController.text,
+                                        };
+
+                                        final prefs = await SharedPreferences
+                                            .getInstance();
+
+                                        final existingList =
+                                            prefs.getStringList(
+                                                    'selected_products') ??
+                                                [];
+
+                                        existingList
+                                            .add(jsonEncode(newProduct));
+
+                                        await prefs.setStringList(
+                                          'selected_products',
+                                          existingList,
+                                        );
+
+// Directly go to Order page
+                                        Navigator.pushReplacementNamed(
+                                          context,
+                                          Customerorderdetail.routeName,
+                                        );
+                                      }
+                                    : null,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.save_outlined,
+                                      size: 20,
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 7),
+                                    Text(
+                                      'Save',
+                                      style: const TextStyle(
+                                        fontSize: AppFontSizes.dialogInput,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 18),
                       ],
                     ),
                   ),
                 ),
-                actions: <Widget>[
-                  TextButton(
-                    style: TextButton.styleFrom(
-                        backgroundColor: AppConfig.colorPrimary,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(5.r))),
-                    child: Text(
-                      'Description',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    onPressed: () {
-                      setDialogState(() {
-                        showDescriptionField = true; // Show text field when tapped
-                      });
-                    },
-                  ),
-                  TextButton(
-                    style: TextButton.styleFrom(
-                        backgroundColor: AppConfig.colorPrimary,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(5.r))),
-                    child: Text(
-                      'Close',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                  if (units != null && units.any((unit) => unit != null)) ...[
-                    TextButton(
-                      style: TextButton.styleFrom(
-                          backgroundColor: isQuantityValid(quantity)
-                              ? AppConfig.colorPrimary
-                              : Colors.grey,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(5.r))),
-                      child: Text(
-                        'Save',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      onPressed: isQuantityValid(quantity)
-                          ? () async {
-                              final prefs =
-                                  await SharedPreferences.getInstance();
-                              List<String>? selectedProducts =
-                                  prefs.getStringList('selected_products');
-                              selectedProducts ??= [];
-                              final serialNumber = DateTime.now()
-                                      .millisecondsSinceEpoch
-                                      .toString() +
-                                  '-' +
-                                  (1000 + (DateTime.now().microsecond % 9000))
-                                      .toString();
-                              final selectedProduct = {
-                                'serial_number': serialNumber,
-                                'id': product.id,
-                                'code': product.code,
-                                'name': product.name,
-                                'pro_image': product.proImage,
-                                'type_id': selectedProductTypeId,
-                                'type_name': productTypes.firstWhere((type) =>
-                                    type['id'].toString() ==
-                                    selectedProductTypeId)['name'],
-                                'unit_id': selectedUnitId,
-                                'unit_name': selectedUnit?['name'],
-                                'quantity': quantity ?? '',
-                                'amount': amountController.text ?? '',
-                                'description':descriptionController.text??'',
-                              };
-                              selectedProducts.add(jsonEncode(selectedProduct));
-                              await prefs.setStringList(
-                                  'selected_products', selectedProducts);
-                              Navigator.pop(context);
-                              Navigator.pushReplacementNamed(
-                                  context, Customerorderdetail.routeName,
-                                  arguments: {
-                                    'name': name,
-                                    'customerId': id
-                                  }).then((value) {
-                                // _initDone = false;
-                                // _getTypes();
-                              });
-                            }
-                          : null,
-                    ),
-                  ] else ...[
-                    SizedBox.shrink(),
-                  ],
-                ],
               );
             },
           );

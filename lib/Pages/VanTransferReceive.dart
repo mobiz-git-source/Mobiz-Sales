@@ -10,6 +10,7 @@ import '../Models/appstate.dart';
 import '../Models/requestmodelclass.dart';
 import '../Models/stockdata.dart';
 import '../Utilities/rest_ds.dart';
+import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
 
@@ -42,7 +43,7 @@ class _VanStockReceiveState extends State<VanStockReceive> {
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
         title: const Text(
           'Van Transfer Receive',
-          style: TextStyle(color: AppConfig.backgroundColor),
+          style: AppConfig.pageTitleStyle,
         ),
       ),
       body: Padding(
@@ -166,12 +167,12 @@ class _VanStockReceiveState extends State<VanStockReceive> {
                       ],
                     ),
                   ),
-                  Text(
-                    data.inDate!.substring(0, 10),
-                    style: TextStyle(
-                        fontSize: AppConfig.textCaption3Size * 0.9,
-                        fontWeight: AppConfig.headLineWeight),
-                  ),
+                Text(
+  DateHelper.displayDate(data.inDate),
+  style: TextStyle(
+      fontSize: AppConfig.textCaption3Size * 0.9,
+      fontWeight: AppConfig.headLineWeight),
+),
                 ],
               ),
             ],
@@ -257,34 +258,37 @@ class _VanStockReceiveState extends State<VanStockReceive> {
                         // ),
                         // const Divider(),
                         // CommonWidgets.verticalSpace(2),
-                        Center(
-                          child: SizedBox(
-                            width: SizeConfig.blockSizeHorizontal * 25,
-                            height: SizeConfig.blockSizeVertical * 5,
-                            child: ElevatedButton(
-                              style: ButtonStyle(
-                                shape: MaterialStateProperty.all<
-                                    RoundedRectangleBorder>(
-                                  RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20.0),
-                                  ),
-                                ),
-                                backgroundColor: const MaterialStatePropertyAll(
-                                    AppConfig.colorPrimary),
-                              ),
-                              onPressed: () {
-                                _conformrequest(data.id!);
-                              },
-                              child: Text(
-                                'Confirm',
-                                style: TextStyle(
-                                    fontSize: AppConfig.textCaption3Size,
-                                    color: AppConfig.backgroundColor,
-                                    fontWeight: AppConfig.headLineWeight),
-                              ),
-                            ),
-                          ),
-                        ),
+                       Center(
+  child: SizedBox(
+    height: SizeConfig.blockSizeVertical * 5,
+    child: ElevatedButton(
+      style: ButtonStyle(
+        shape: MaterialStateProperty.all<RoundedRectangleBorder>(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+        ),
+        backgroundColor: const MaterialStatePropertyAll(
+          AppConfig.colorPrimary,
+        ),
+      ),
+      onPressed: () {
+        _conformrequest(data.id!);
+      },
+      child: Text(
+        'Confirm',
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.visible,
+        style: TextStyle(
+          fontSize: AppConfig.textCaption3Size,
+          color: AppConfig.backgroundColor,
+          fontWeight: AppConfig.headLineWeight,
+        ),
+      ),
+    ),
+  ),
+),
                         CommonWidgets.verticalSpace(2),
                       ],
                     ),

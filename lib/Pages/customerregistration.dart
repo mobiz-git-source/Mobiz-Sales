@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mobizapp/Components/commonwidgets.dart';
 import 'package:mobizapp/Models/appstate.dart';
+import 'package:mobizapp/Pages/customerscreen.dart';
 import 'package:mobizapp/Pages/homepage.dart';
 import 'package:mobizapp/Utilities/rest_ds.dart';
 import 'package:mobizapp/confg/appconfig.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:http/http.dart' as http;
 import '../Models/Store_model.dart';
@@ -30,6 +32,18 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
   bool _initDone = false;
   int cud = 0;
   bool _isLoading = false;
+  String vatLabel = "VAT";
+
+  Future<void> loadVatLabel() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    setState(() {
+      vatLabel = prefs.getString("vat_label") ?? "VAT";
+    });
+
+    print("Loaded VAT LABEL: $vatLabel");
+  }
+
   Future<void> _pickImage() async {
     final pickedFile =
         await ImagePicker().pickImage(source: ImageSource.gallery);
@@ -43,25 +57,31 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
     });
   }
 
-  Future<String> _loadImage(String img) async {
-    String productUrl = '${RestDatasource().Product_URL}/uploads/customer/$img';
-    String baseUrl = '${RestDatasource().BASE_URL}/uploads/customer/$img';
+ Future<String> _loadImage(String img) async {
+  // 🆕 cache-buster ചേർക്കുന്നു, browser/CDN/flutter cache-നെ bypass ചെയ്യാൻ
+  final cacheBuster = DateTime.now().millisecondsSinceEpoch;
+  String productUrl = '${RestDatasource().Product_URL}/uploads/customer/$img?v=$cacheBuster';
+  String baseUrl = '${RestDatasource().BASE_URL}/uploads/customer/$img?v=$cacheBuster';
+  
+  try {
+    final response = await http
+        .head(Uri.parse(productUrl))
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode == 200) {
+      return productUrl;
+    }
+  } catch (e) {}
 
-    try {
-      final response = await http.head(Uri.parse(productUrl));
-      if (response.statusCode == 200) {
-        return productUrl;
-      }
-    } catch (e) {}
-
-    try {
-      final response = await http.head(Uri.parse(baseUrl));
-      if (response.statusCode == 200) {
-        return baseUrl;
-      }
-    } catch (e) {}
-    throw Exception('Image not found');
-  }
+  try {
+    final response = await http
+        .head(Uri.parse(baseUrl))
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode == 200) {
+      return baseUrl;
+    }
+  } catch (e) {}
+  throw Exception('Image not found');
+}
 
   void _getLocation() async {
     Position position = await Geolocator.getCurrentPosition(
@@ -81,6 +101,9 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
   double? _longitude;
 
   bool _isUpdate = false;
+  List<dynamic>? _passedCustomerList;
+  bool _isDuplicateError = false;
+  final ScrollController _scrollController = ScrollController();
 
   final _formKey = GlobalKey<FormState>();
   var _nameController = TextEditingController();
@@ -121,7 +144,6 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
 
   final List<String> paymentTerms = ['CASH', 'CREDIT', 'BILLTOBILL'];
 
-  // ✅ Removed hardcoded initial data
   final List<Map<String, dynamic>> routes = [];
   final List<Map<String, dynamic>> provinces = [];
   final List<String> cuCodeData = [];
@@ -132,30 +154,35 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
       final Map<String, dynamic>? params =
           ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
       if (params != null) {
-        _nameController.text = params['name'] ?? '';
-        _customercode = params['code'];
-        _addressController.text = params['address'] ?? '';
-        _buildingController.text = params['building'] ?? '';
-        _flatNumberController.text = params['flat_no'] ?? '';
-        _contactNumberController.text = params['phone'] ?? '';
-        _whatsappNumberController.text = params['whatsappNumber'] ?? '';
-        _trnController.text = params['trn'] ?? '';
-        img = params['cust_image'];
-        _location = params['location'] ?? 'Click the icon to fetch the data';
-        _selectPaymentTerms =
-            params['paymentTerms'] == '' ? null : params['paymentTerms'];
-        _selectedProvinceid =
-            params['provinceId'] == 0 ? null : params['provinceId'];
-        _selectedrouteid = params['routeId'];
-        id = params['id'];
-        if (params['credit_days'] != null && params['credit_days'] != '') {
-          _creditDays.text = params['credit_days'].toString();
+        if (params['customerList'] != null && params['customerList'] is List) {
+          _passedCustomerList = params['customerList'];
         }
-        if (params['credit_limit'] != null && params['credit_limit'] != '') {
-          _creditLimit.text = params['credit_limit'].toString();
+        if (params['id'] != null || (params['name'] != null && params['name'].toString().isNotEmpty)) {
+          _nameController.text = params['name'] ?? '';
+          _customercode = params['code'];
+          _addressController.text = params['address'] ?? '';
+          _buildingController.text = params['building'] ?? '';
+          _flatNumberController.text = params['flat_no'] ?? '';
+          _contactNumberController.text = params['phone'] ?? '';
+          _whatsappNumberController.text = params['whatsappNumber'] ?? '';
+          _trnController.text = params['trn'] ?? '';
+          img = params['cust_image'];
+          _location = params['location'] ?? 'Click the icon to fetch the data';
+          _selectPaymentTerms =
+              params['paymentTerms'] == '' ? null : params['paymentTerms'];
+          _selectedProvinceid =
+              params['provinceId'] == 0 ? null : params['provinceId'];
+          _selectedrouteid = params['routeId'];
+          id = params['id'];
+          if (params['credit_days'] != null && params['credit_days'] != '') {
+            _creditDays.text = params['credit_days'].toString();
+          }
+          if (params['credit_limit'] != null && params['credit_limit'] != '') {
+            _creditLimit.text = params['credit_limit'].toString();
+          }
+          _emailController.text = params['email'] ?? '';
+          _isUpdate = true;
         }
-        _emailController.text = params['email'] ?? '';
-        _isUpdate = true;
       }
     });
     namefocus = FocusNode();
@@ -168,6 +195,7 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
     trnfocus = FocusNode();
 
     super.initState();
+    loadVatLabel();
     _getRoutes()
         .then((value) => _getProvince())
         .then((value) => _getCodeData())
@@ -214,12 +242,13 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
   Widget build(BuildContext context) {
     return Scaffold(
         appBar: AppBar(
-            title: const Text(
-              'Registration',
-              style: TextStyle(color: AppConfig.backButtonColor),
-            ),
-            backgroundColor: AppConfig.colorPrimary,
-            iconTheme: const IconThemeData(color: AppConfig.backButtonColor)),
+          title: const Text(
+            'Registration',
+            style: AppConfig.pageTitleStyle,
+          ),
+          backgroundColor: AppConfig.colorPrimary,
+          iconTheme: const IconThemeData(color: AppConfig.backButtonColor),
+        ),
         body: Padding(
           padding: const EdgeInsets.all(10.0),
           child: SingleChildScrollView(
@@ -351,6 +380,7 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
                       Form(
                         key: _formKey,
                         child: SingleChildScrollView(
+                          controller: _scrollController,
                           child: Padding(
                             padding: const EdgeInsets.all(10.0),
                             child: Column(
@@ -360,43 +390,101 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
                                   onEditingComplete: () {
                                     addressfocus.requestFocus();
                                   },
+                                  onChanged: (val) {
+                                    if (_isDuplicateError) {
+                                      setState(() {
+                                        _isDuplicateError = false;
+                                      });
+                                    }
+                                  },
                                   controller: _nameController,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     focusedBorder: OutlineInputBorder(
-                                        borderSide: BorderSide(
-                                            color: AppConfig.colorPrimary)),
+                                      borderSide: BorderSide(
+                                        color: _isDuplicateError
+                                            ? Colors.black
+                                            : AppConfig.colorPrimary,
+                                        width: _isDuplicateError ? 2.0 : 1.0,
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: _isDuplicateError
+                                            ? Colors.black
+                                            : Colors.grey,
+                                        width: _isDuplicateError ? 2.0 : 1.0,
+                                      ),
+                                    ),
                                     labelText: 'Name',
-                                    border: OutlineInputBorder(),
+                                    border: const OutlineInputBorder(),
                                   ),
                                   validator: (value) =>
                                       _validateNotEmpty(value, 'Name'),
                                 ),
+                                if (_isDuplicateError) ...[
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(10.0),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade50,
+                                      border: Border.all(color: Colors.red.shade300),
+                                      borderRadius: BorderRadius.circular(8.0),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Duplicate record exists. Do you want to proceed?',
+                                          style: TextStyle(
+                                            color: Colors.black,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: AppConfig.colorPrimary,
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(
+                                                    horizontal: 16, vertical: 8),
+                                              ),
+                                              onPressed: () {
+                                                setState(() {
+                                                  _isDuplicateError = false;
+                                                });
+                                                _postRecord();
+                                              },
+                                              child: const Text('YES',
+                                                  style: TextStyle(
+                                                      fontWeight: FontWeight.bold)),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: AppConfig.colorPrimary,
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(
+                                                    horizontal: 16, vertical: 8),
+                                              ),
+                                              onPressed: () {
+                                                FocusScope.of(context)
+                                                    .requestFocus(namefocus);
+                                              },
+                                              child: const Text('NO',
+                                                  style: TextStyle(
+                                                      fontWeight: FontWeight.bold)),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                                 CommonWidgets.verticalSpace(2),
-                                // TextFormField(
-                                //   style: const TextStyle(color: Colors.black),
-                                //   enabled: false,
-                                //   controller: TextEditingController(
-                                //     text: _isUpdate
-                                //         ? _customercode
-                                //         : cuCodeData.isNotEmpty
-                                //             ? cuCodeData.join(', ')
-                                //             : '',
-                                //   ),
-                                //   decoration: const InputDecoration(
-                                //     focusedBorder: OutlineInputBorder(
-                                //       borderSide: BorderSide(
-                                //           color: AppConfig.colorPrimary),
-                                //     ),
-                                //     disabledBorder: OutlineInputBorder(
-                                //         borderSide:
-                                //             BorderSide(color: Colors.grey)),
-                                //     labelText: 'Code',
-                                //     border: OutlineInputBorder(),
-                                //     labelStyle: TextStyle(color: Colors.black),
-                                //     hintStyle: TextStyle(color: Colors.black),
-                                //   ),
-                                // ),
-                                // CommonWidgets.verticalSpace(2),
                                 TextFormField(
                                   focusNode: addressfocus,
                                   onEditingComplete: () {
@@ -490,12 +578,23 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
                                   controller: _emailController,
                                   decoration: const InputDecoration(
                                     focusedBorder: OutlineInputBorder(
-                                        borderSide: BorderSide(
-                                            color: AppConfig.colorPrimary)),
+                                      borderSide: BorderSide(color: AppConfig.colorPrimary),
+                                    ),
                                     labelText: 'Email',
                                     border: OutlineInputBorder(),
                                   ),
-                                  validator: _validateEmail,
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return null; // Email is optional
+                                    }
+
+                                    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+                                    if (!emailRegex.hasMatch(value.trim())) {
+                                      return 'Please enter a valid email';
+                                    }
+
+                                    return null;
+                                  },
                                 ),
                                 CommonWidgets.verticalSpace(2),
                                 TextField(
@@ -519,15 +618,23 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
                                 TextFormField(
                                   focusNode: trnfocus,
                                   controller: _trnController,
-                                  decoration: const InputDecoration(
-                                    focusedBorder: OutlineInputBorder(
-                                        borderSide: BorderSide(
-                                            color: AppConfig.colorPrimary)),
-                                    labelText: 'TRN',
-                                    border: OutlineInputBorder(),
+                                  decoration: InputDecoration(
+                                    focusedBorder: const OutlineInputBorder(
+                                      borderSide: BorderSide(color: AppConfig.colorPrimary),
+                                    ),
+                                    labelText: (AppState().vatLabel != null &&
+                                            AppState().vatLabel!.trim().isNotEmpty)
+                                        ? AppState().vatLabel!
+                                        : "VAT",
+                                    border: const OutlineInputBorder(),
                                   ),
-                                  validator: (value) =>
-                                      _validateNotEmpty(value, 'TRN'),
+                                  validator: (value) => _validateNotEmpty(
+                                    value,
+                                    (AppState().vatLabel != null &&
+                                            AppState().vatLabel!.trim().isNotEmpty)
+                                        ? AppState().vatLabel!
+                                        : "VAT",
+                                  ),
                                 ),
                                 CommonWidgets.verticalSpace(2),
                                 _buildDropdownField(
@@ -659,9 +766,56 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
         ));
   }
 
-  void _submitForm() {
+  bool _checkDuplicateInLoadedList(String name) {
+    final cleanInput = name.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+    if (cleanInput.isEmpty) return false;
+
+    List<dynamic> listToCheck = [];
+    if (_passedCustomerList != null && _passedCustomerList!.isNotEmpty) {
+      listToCheck = _passedCustomerList!;
+    } else if (CustomersDataScreen.loadedCustomerList.isNotEmpty) {
+      listToCheck = CustomersDataScreen.loadedCustomerList;
+    }
+
+    for (var item in listToCheck) {
+      String? existingName;
+      if (item is Map) {
+        existingName = item['name']?.toString();
+      } else {
+        try {
+          existingName = (item as dynamic).name?.toString();
+        } catch (_) {}
+      }
+
+      if (existingName != null) {
+        final cleanExisting = existingName.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+        if (cleanExisting == cleanInput) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  void _submitForm() async {
     if (_isLoading) return;
     if (_formKey.currentState!.validate()) {
+      if (!_isUpdate) {
+        if (_checkDuplicateInLoadedList(_nameController.text)) {
+          setState(() {
+            _isDuplicateError = true;
+          });
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              0.0,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
+          }
+          FocusScope.of(context).requestFocus(namefocus);
+          return; // Stay on Registration screen with inline warning, do NOT call create API
+        }
+      }
       _postRecord();
     }
   }
@@ -873,20 +1027,24 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
         context,
         _isUpdate,
       );
-
       if (!mounted) return;
 
-      await CommonWidgets.showDialogueBox(
-        context: context,
-        title: "Success",
-        msg: _isUpdate
-            ? "Data Updated Successfully"
-            : "Data Inserted Successfully",
-      );
+    
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
 
-      _clearForm(); // 🧹 clear everything before navigating
+   await CommonWidgets.showDialogueBox(
+  context: context,
+  title: "Success",
+  msg: _isUpdate
+      ? "Data Updated Successfully"
+      : "Data Inserted Successfully",
+);
 
-      Navigator.pushReplacementNamed(context, HomeScreen.routeName);
+_clearForm();
+
+
+Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
 
@@ -897,11 +1055,10 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
       );
 
       setState(() {
-        _isLoading = false; // 🔓 re-enable only on failure
+        _isLoading = false;
       });
     }
   }
-
 }
 
 class CustomDropdown extends StatefulWidget {
@@ -911,7 +1068,8 @@ class CustomDropdown extends StatefulWidget {
   final String hint;
   final String label;
 
-  CustomDropdown({
+  const CustomDropdown({
+    super.key,
     required this.items,
     required this.onChanged,
     this.selectedValue,
@@ -920,54 +1078,275 @@ class CustomDropdown extends StatefulWidget {
   });
 
   @override
-  _CustomDropdownState createState() => _CustomDropdownState();
+  State<CustomDropdown> createState() => _CustomDropdownState();
 }
 
 class _CustomDropdownState extends State<CustomDropdown> {
-  Map<String, dynamic>? selectedItem;
+  final LayerLink _layerLink = LayerLink();
+  final GlobalKey _fieldKey = GlobalKey();
+  late TextEditingController _controller;
+  final FocusNode _focusNode = FocusNode();
+
+  OverlayEntry? _overlayEntry;
+  Map<String, dynamic>? _selected;
+  List<Map<String, dynamic>> _filteredItems = [];
+
+  static const Map<String, dynamic> _notFoundItem = {
+    'id': '__not_found__',
+    'name': 'Result not found',
+  };
 
   @override
   void initState() {
     super.initState();
-    selectedItem = widget.selectedValue;
+    _selected = widget.selectedValue;
+    _controller = TextEditingController(text: _selected?['name'] ?? '');
+    _filteredItems = widget.items;
+
+    _focusNode.addListener(() {
+      if (_focusNode.hasFocus) {
+        _filterItems(_controller.text);
+        _showOverlay();
+      } else {
+        _removeOverlay();
+      }
+    });
+  }
+
+ @override
+void didUpdateWidget(covariant CustomDropdown oldWidget) {
+  super.didUpdateWidget(oldWidget);
+  if (widget.selectedValue != oldWidget.selectedValue) {
+    _selected = widget.selectedValue;
+    final newText = _selected?['name'] ?? '';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _controller.text = newText;   // ✅ build finish ആയ ശേഷം next frame-ൽ set ചെയ്യുന്നു
+      }
+    });
+  }
+}
+
+  void _filterItems(String query) {
+    if (query.isEmpty) {
+      _filteredItems = widget.items;
+    } else {
+      final q = query.toLowerCase().trim();
+
+      final startsWithMatches = widget.items.where((item) {
+        final name = (item['name'] ?? '').toString().toLowerCase();
+        final words = name.split(RegExp(r'\s+'));
+        return words.any((word) => word.startsWith(q));
+      }).toList();
+
+      final containsMatches = widget.items.where((item) {
+        final name = (item['name'] ?? '').toString().toLowerCase();
+        final words = name.split(RegExp(r'\s+'));
+        final alreadyMatched = words.any((word) => word.startsWith(q));
+        return !alreadyMatched && name.contains(q);
+      }).toList();
+
+      final filtered = [...startsWithMatches, ...containsMatches];
+      _filteredItems = filtered.isEmpty ? [_notFoundItem] : filtered;
+    }
+    _overlayEntry?.markNeedsBuild();
+  }
+
+  void _selectItem(Map<String, dynamic> item) {
+    if (item['id'] == '__not_found__') return;
+    setState(() {
+      _selected = item;
+      _controller.text = item['name']?.toString() ?? '';
+    });
+    widget.onChanged(item);
+    _focusNode.unfocus();
+  }
+
+  void _clearSelection() {
+    setState(() {
+      _selected = null;
+      _controller.clear();
+    });
+    widget.onChanged(null);
+    _filterItems('');
+  }
+
+  void _showOverlay() {
+    _removeOverlay();
+    _overlayEntry = _createOverlayEntry();
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  OverlayEntry _createOverlayEntry() {
+    return OverlayEntry(
+      builder: (context) {
+        final RenderBox? fieldBox =
+            _fieldKey.currentContext?.findRenderObject() as RenderBox?;
+        if (fieldBox == null) return const SizedBox.shrink();
+
+        final fieldSize = fieldBox.size;
+        final fieldPosition = fieldBox.localToGlobal(Offset.zero);
+        final screenHeight = MediaQuery.of(context).size.height;
+        final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+        final visibleBottom = screenHeight - keyboardHeight;
+
+        final double spaceBelow =
+            visibleBottom - (fieldPosition.dy + fieldSize.height) - 8;
+        final double spaceAbove = fieldPosition.dy - 8;
+
+        final bool openAbove = spaceBelow < 150 && spaceAbove > spaceBelow;
+
+        final double maxListHeight =
+            (openAbove ? spaceAbove : spaceBelow).clamp(120, 260);
+
+        return Positioned(
+          width: fieldSize.width,
+          child: CompositedTransformFollower(
+            link: _layerLink,
+            showWhenUnlinked: false,
+            targetAnchor: openAbove ? Alignment.topLeft : Alignment.bottomLeft,
+            followerAnchor: openAbove ? Alignment.bottomLeft : Alignment.topLeft,
+            offset: Offset(0, openAbove ? -6 : 6),
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                constraints: BoxConstraints(maxHeight: maxListHeight),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300, width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.12),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Scrollbar(
+                    thumbVisibility: true,
+                    radius: const Radius.circular(8),
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      shrinkWrap: true,
+                      physics: const ClampingScrollPhysics(),
+                      itemCount: _filteredItems.length,
+                      separatorBuilder: (context, index) => Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Colors.grey.shade200,
+                        indent: 16,
+                        endIndent: 16,
+                      ),
+                      itemBuilder: (context, index) {
+                        final item = _filteredItems[index];
+                        final isNotFound = item['id'] == '__not_found__';
+                        final isSelected = !isNotFound &&
+                            _selected != null &&
+                            _selected!['id'] == item['id'];
+
+                        return InkWell(
+                          onTap: isNotFound ? null : () => _selectItem(item),
+                          child: Container(
+                            color: isSelected
+                                ? Theme.of(context)
+                                    .primaryColor
+                                    .withOpacity(0.08)
+                                : Colors.transparent,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item['name']?.toString() ?? '',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      color: isNotFound
+                                          ? Colors.grey
+                                          : (isSelected
+                                              ? Theme.of(context).primaryColor
+                                              : Colors.black87),
+                                      fontStyle: isNotFound
+                                          ? FontStyle.italic
+                                          : FontStyle.normal,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Icon(Icons.check,
+                                      size: 18,
+                                      color: Theme.of(context).primaryColor),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
-  void didUpdateWidget(covariant CustomDropdown oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.selectedValue != selectedItem) {
-      setState(() {
-        selectedItem = widget.selectedValue;
-      });
-    }
+  void dispose() {
+    _removeOverlay();
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<Map<String, dynamic>>(
-      hint: Text(widget.hint),
-      value: widget.items.contains(selectedItem) ? selectedItem : null,
-      onChanged: (Map<String, dynamic>? newValue) {
-        setState(() {
-          selectedItem = newValue;
-        });
-        widget.onChanged(newValue);
-      },
-      items: widget.items.map((item) {
-        return DropdownMenuItem<Map<String, dynamic>>(
-          value: item,
-          child: Text(item['name']),
-        );
-      }).toList(),
-      decoration: InputDecoration(
-        labelText: widget.label,
-        focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Theme.of(context).primaryColor),
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: TextFormField(
+        key: _fieldKey,
+        controller: _controller,
+        focusNode: _focusNode,
+        decoration: InputDecoration(
+          labelText: widget.label,
+          hintText: widget.hint,
+          focusedBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: Theme.of(context).primaryColor),
+          ),
+          border: const OutlineInputBorder(),
+          suffixIcon: _selected != null
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: _clearSelection,
+                )
+              : const Icon(Icons.arrow_drop_down),
         ),
-        border: const OutlineInputBorder(),
+        onChanged: (text) {
+          if (_selected != null && text != _selected!['name']) {
+            _selected = null;
+            widget.onChanged(null);
+          }
+          _filterItems(text);
+        },
+        validator: (value) {
+          if (_selected == null) {
+            return 'Please select ${widget.label}';
+          }
+          return null;
+        },
       ),
-      validator: (value) =>
-      value == null ? 'Please select ${widget.label}' : null,
     );
   }
 }

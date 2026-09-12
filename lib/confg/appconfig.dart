@@ -41,6 +41,12 @@ class AppConfig {
   static const Color containerBackground = Color(0xFFffffff);
 
   static const Color backButtonColor = Colors.white;
+  
+ static const TextStyle pageTitleStyle = TextStyle(
+  color: backgroundColor,
+  fontSize: 20,
+  fontWeight: FontWeight.w400,
+);
 
   ///Fonts
   ///New definitions

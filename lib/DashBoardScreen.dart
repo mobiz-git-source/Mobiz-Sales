@@ -115,6 +115,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   late Future<DashboardData> dashboardData;
   late TabController _tabController1;
   late TabController _tabController2;
+  // ── FIX: PageController now lives on the State, created once in
+  // initState() and disposed in dispose() — previously it was created
+  // fresh inside build() on every rebuild (e.g. every setState from
+  // onRefreshHandler / onTimePeriodChanged), which reset page position
+  // and leaked a new controller each time. ──
+  late PageController _pageController;
   String _appVersion = 'Loading...';
   bool isDailySelected = true;
   int selectedIndex = 0;
@@ -132,6 +138,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     _tabController2.addListener(() {
       setState(() {});
     });
+    _pageController = PageController();
     _fetchAppVersion();
   }
 
@@ -139,6 +146,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   void dispose() {
     _tabController1.dispose();
     _tabController2.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -187,7 +195,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         backgroundColor: AppConfig.colorPrimary,
         title: Text(
           "Hello ${AppState().name}",
-          style: TextStyle(color: Colors.white),
+          style: AppConfig.pageTitleStyle,
         ),
         iconTheme: IconThemeData(color: Colors.white),
       ),
@@ -291,7 +299,19 @@ class _DashboardScreenState extends State<DashboardScreen>
                 // }
               }
 
-              final PageController _pageController = PageController();
+              // ── FIX: current active dataset for each chart, used to
+              // decide the visible-window size on the X-axis, and whether
+              // to show the "swipe to see more" hint below. ──
+              final currentSalesGraph =
+                  isDailySelected ? data.todaySalesGraph : data.monthSalesGraph;
+              final currentSalesOrderGraph =
+                  isDailySelected ? todaySalesOrderGraph : monthSalesOrderGraph;
+
+              // Which dataset is currently visible on screen (Sales tab vs
+              // Sales Order tab) — decides whether the hint text shows.
+              final currentVisibleGraphLength = selectedIndex == 0
+                  ? currentSalesGraph.length
+                  : currentSalesOrderGraph.length;
 
               return Container(
                 child: SingleChildScrollView(
@@ -306,151 +326,164 @@ class _DashboardScreenState extends State<DashboardScreen>
                         child: Column(
                           children: [
                             SizedBox(
-                        height: MediaQuery.of(context).size.height *.37,
+                              height: MediaQuery.of(context).size.height * .37,
                               child: PageView.builder(
                                 controller: _pageController,
                                 itemCount: 2, // Three pages for your three rows
                                 itemBuilder: (context, pageIndex) {
-                                  return Container(
+                                  return SingleChildScrollView(
+                                    // ── FIX: prevents "BOTTOM OVERFLOWED BY
+                                    // n PIXELS" on shorter screens, since the
+                                    // parent SizedBox has a fixed height. ──
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    child: Container(
                                     child: Column(
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
                                         // if (pageIndex == 0) ...[
-                                          Column(
-                                            children: [
-                                              // Row(
-                                              //   mainAxisAlignment:
-                                              //       MainAxisAlignment.spaceBetween,
-                                              //   children: [
-                                              //     GestureDetector(
-                                              //       onTap: () {
-                                              //         Navigator.pushNamed(
-                                              //             context,
-                                              //             HomeorderScreen
-                                              //                 .routeName);
-                                              //       },
-                                              //       child: buildCard(
-                                              //           'Today\'s Order',
-                                              //           formatToMillion(
-                                              //               data.todayOrderTotal)),
-                                              //     ),
-                                              //     GestureDetector(
-                                              //       onTap: () {
-                                              //         Navigator.pushNamed(
-                                              //             context,
-                                              //             HomeorderScreen
-                                              //                 .routeName);
-                                              //       },
-                                              //       child: buildCard(
-                                              //           'This Month Order',
-                                              //           formatToMillion(
-                                              //               data.monthOrderTotal)),
-                                              //     ),
-                                              //   ],
-                                              // ),
-                                              Row(
-                                                mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                                children: [
-                                                  GestureDetector(
-                                                    onTap: () {
-                                                      Navigator.pushNamed(
-                                                          context,
-                                                          SaleInvoiceScrreen
-                                                              .routeName);
-                                                    },
-                                                    child: buildCard(
-                                                        'Today\'s Sale',
-                                                        formatToMillion(
-                                                            data.todaySalesTotal)
-                                                    ),
+                                        Column(
+                                          children: [
+                                            // Row(
+                                            //   mainAxisAlignment:
+                                            //       MainAxisAlignment.spaceBetween,
+                                            //   children: [
+                                            //     GestureDetector(
+                                            //       onTap: () {
+                                            //         Navigator.pushNamed(
+                                            //             context,
+                                            //             HomeorderScreen
+                                            //                 .routeName);
+                                            //       },
+                                            //       child: buildCard(
+                                            //           'Today\'s Order',
+                                            //           formatToMillion(
+                                            //               data.todayOrderTotal)),
+                                            //     ),
+                                            //     GestureDetector(
+                                            //       onTap: () {
+                                            //         Navigator.pushNamed(
+                                            //             context,
+                                            //             HomeorderScreen
+                                            //                 .routeName);
+                                            //       },
+                                            //       child: buildCard(
+                                            //           'This Month Order',
+                                            //           formatToMillion(
+                                            //               data.monthOrderTotal)),
+                                            //     ),
+                                            //   ],
+                                            // ),
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    Navigator.pushNamed(
+                                                        context,
+                                                        SaleInvoiceScrreen
+                                                            .routeName);
+                                                  },
+                                                  child: buildCard(
+                                                      'Today\'s Sale',
+                                                      formatToMillion(data
+                                                          .todaySalesTotal)),
+                                                ),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    Navigator.pushNamed(
+                                                        context,
+                                                        SaleInvoiceScrreen
+                                                            .routeName);
+                                                  },
+                                                  child: buildCard(
+                                                      'This Month Sale',
+                                                      formatToMillion(data
+                                                          .monthSalesTotal)),
+                                                ),
+                                              ],
+                                            ),
+                                            SizedBox(
+                                              height: SizeConfig
+                                                      .safeBlockVertical! *
+                                                  2,
+                                            ),
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    Navigator.pushNamed(
+                                                        context,
+                                                        ReceiptScreen
+                                                            .receiptScreen);
+                                                  },
+                                                  child: colorCard(
+                                                      'Today\'s Collection',
+                                                      formatToMillion(data
+                                                          .todayCollectionTotal)),
+                                                ),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    Navigator.pushNamed(
+                                                        context,
+                                                        ReceiptScreen
+                                                            .receiptScreen);
+                                                  },
+                                                  child: colorCard(
+                                                      'This Month Collection',
+                                                      formatToMillion(data
+                                                          .monthCollectionTotal)),
+                                                ),
+                                              ],
+                                            ),
+                                            SizedBox(
+                                              height: SizeConfig
+                                                      .safeBlockVertical! *
+                                                  2,
+                                            ),
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                GestureDetector(
+                                                  // onTap: () {
+                                                  //   Navigator.pushNamed(
+                                                  //       context,
+                                                  //       ReceiptScreen
+                                                  //           .receiptScreen);
+                                                  // },
+                                                  child: buildCard(
+                                                    'PDC',
+                                                    // formatToMillion(0.0)
                                                   ),
-                                                  GestureDetector(
-                                                    onTap: () {
-                                                      Navigator.pushNamed(
-                                                          context,
-                                                          SaleInvoiceScrreen
-                                                              .routeName);
-                                                    },
-                                                    child: buildCard(
-                                                        'This Month Sale',
-                                                        formatToMillion(
-                                                            data.monthSalesTotal)),
+                                                ),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    Navigator.pushNamed(
+                                                        context,
+                                                        OverdueCustomerPage
+                                                            .routeName);
+                                                  },
+                                                  child: buildCard(
+                                                    'All Dues',
+                                                    // formatToMillion(0.0)
                                                   ),
-                                                ],
-                                              ),
-                                              SizedBox(
-                                                height: SizeConfig.safeBlockVertical! * 2,
-                                              ),
-                                              Row(
-                                                mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                                children: [
-                                                  GestureDetector(
-                                                    onTap: () {
-                                                      Navigator.pushNamed(
-                                                          context,
-                                                          ReceiptScreen
-                                                              .receiptScreen);
-                                                    },
-                                                    child: colorCard(
-                                                        'Today\'s Collection',
-                                                        formatToMillion(data
-                                                            .todayCollectionTotal)),
-                                                  ),
-                                                  GestureDetector(
-                                                    onTap: () {
-                                                      Navigator.pushNamed(
-                                                          context,
-                                                          ReceiptScreen
-                                                              .receiptScreen);
-                                                    },
-                                                    child: colorCard(
-                                                        'This Month Collection',
-                                                        formatToMillion(data
-                                                            .monthCollectionTotal)),
-                                                  ),
-                                                ],
-                                              ),
-                                              SizedBox(
-                                                height: SizeConfig.safeBlockVertical! * 2,
-                                              ),
-                                              Row(
-                                                mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                                children: [
-                                                  GestureDetector(
-                                                    // onTap: () {
-                                                    //   Navigator.pushNamed(
-                                                    //       context,
-                                                    //       ReceiptScreen
-                                                    //           .receiptScreen);
-                                                    // },
-                                                    child: buildCard(
-                                                        'PDC',
-                                                        // formatToMillion(0.0)
-                                                    ),
-                                                  ),
-                                                  GestureDetector(
-                                                    onTap: () {
-                                                      Navigator.pushNamed(
-                                                          context,
-                                                          OverdueCustomerPage
-                                                              .routeName);
-                                                    },
-                                                    child: buildCard(
-                                                        'All Dues',
-                                                        // formatToMillion(0.0)
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              SizedBox(
-                                                height: SizeConfig.safeBlockVertical! * 2,
-                                              ),
-                                            ],
-                                          ),
+                                                ),
+                                              ],
+                                            ),
+                                            SizedBox(
+                                              height: SizeConfig
+                                                      .safeBlockVertical! *
+                                                  2,
+                                            ),
+                                          ],
+                                        ),
                                         // ] else if (pageIndex == 1) ...[
                                         //   Column(
                                         //     crossAxisAlignment: CrossAxisAlignment.start,
@@ -482,6 +515,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                         // ]
                                       ],
                                     ),
+                                    ),
                                   );
                                 },
                               ),
@@ -492,238 +526,141 @@ class _DashboardScreenState extends State<DashboardScreen>
                             Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                // Row(
-                                //   mainAxisAlignment: MainAxisAlignment.center,
-                                //   children: [
-                                //     InkWell(
-                                //       onTap: () {
-                                //         setState(() {
-                                //           selectedIndex = 0;
-                                //         });
-                                //       },
-                                //       child: Container(
-                                //         decoration: BoxDecoration(
-                                //           border:
-                                //               Border.all(color: Colors.black),
-                                //           color: selectedIndex == 0
-                                //               ? AppConfig
-                                //                   .colorPrimary // Background color when selected
-                                //               : AppConfig
-                                //                   .backButtonColor, // Background color when not selected
-                                //           borderRadius: BorderRadius.circular(
-                                //               10), // Rounded corners
-                                //         ),
-                                //         width: 100, // Custom width
-                                //         height: 30,
-                                //         child: Center(
-                                //           child: Text(
-                                //             'Sales',
-                                //             style: TextStyle(
-                                //               color: selectedIndex == 0
-                                //                   ? Colors.white
-                                //                   : Colors
-                                //                       .black, // Text color based on selection
-                                //             ),
-                                //           ),
-                                //         ),
-                                //       ),
-                                //     ),
-                                //     SizedBox(width: 10),
-                                //     InkWell(
-                                //       onTap: () {
-                                //         setState(() {
-                                //           selectedIndex =
-                                //               1; // Set index to 1 for 'Sales Order'
-                                //         });
-                                //       },
-                                //       child: Container(
-                                //         decoration: BoxDecoration(
-                                //           border:
-                                //               Border.all(color: Colors.black),
-                                //           color: selectedIndex == 1
-                                //               ? AppConfig
-                                //                   .colorPrimary // Background color when selected
-                                //               : AppConfig
-                                //                   .backButtonColor, // Background color when not selected
-                                //           borderRadius: BorderRadius.circular(
-                                //               10), // Rounded corners
-                                //         ),
-                                //         width: 100, // Custom width
-                                //         height: 30,
-                                //         child: Center(
-                                //           child: Text(
-                                //             'Sales Order',
-                                //             style: TextStyle(
-                                //               color: selectedIndex == 1
-                                //                   ? Colors.white
-                                //                   : Colors
-                                //                       .black, // Text color based on selection
-                                //             ),
-                                //           ),
-                                //         ),
-                                //       ),
-                                //     ),
-                                //   ],
-                                // ),
                                 SizedBox(height: 10),
-                                IndexedStack(
-                                  index: selectedIndex,
-                                  children: [
-                                    SfCartesianChart(
-                                      primaryXAxis: const CategoryAxis(
-                                        arrangeByIndex: true,
-                                        edgeLabelPlacement:
-                                            EdgeLabelPlacement.shift,
-                                      ),
-                                      zoomPanBehavior: ZoomPanBehavior(
-                                          enablePanning: true,
-                                          zoomMode: ZoomMode.x),
-                                      tooltipBehavior:
-                                          TooltipBehavior(enable: true),
-                                      trackballBehavior: TrackballBehavior(
-                                        enable: true,
-                                        activationMode:
-                                            ActivationMode.singleTap,
-                                        tooltipSettings:
-                                            const InteractiveTooltip(
-                                          enable: true,
-                                          color: Colors.black,
-                                          textStyle: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                // ── NEW: swipe hint, shown only when the
+                                // currently-visible chart has more than 6
+                                // salesmen (i.e. some are hidden and reachable
+                                // via swipe/pan). ──
+                                if (currentVisibleGraphLength > 6)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 6),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.swipe,
+                                          size: 14,
+                                          color: Colors.grey.shade600,
                                         ),
-                                        builder: (BuildContext context,
-                                            TrackballDetails details) {
-                                          final int index = details.pointIndex!;
-                                          final SalesData salesData =
-                                              isDailySelected
-                                                  ? data.todaySalesGraph[index]
-                                                  : data.monthSalesGraph[index];
-                                          return Container(
-                                            padding: EdgeInsets.all(8),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black,
-                                              borderRadius:
-                                                  BorderRadius.circular(5),
-                                            ),
-                                            child: Text(
-                                              salesData.name,
-                                              style: TextStyle(
-                                                  color: Colors.white),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                      series: <CartesianSeries>[
-                                        StackedColumnSeries<SalesData, String>(
-                                          dataSource: isDailySelected
-                                              ? data.todaySalesGraph
-                                              : data.monthSalesGraph,
-                                          xValueMapper: (SalesData sales, _) =>
-                                              sales.name.length > 3
-                                                  ? sales.name.substring(0, 3)
-                                                  : sales.name,
-                                          yValueMapper: (SalesData sales, _) =>
-                                              sales.sales,
-                                          name: 'Sales',
-                                          // color: Colors.blue,
-                                          enableTooltip: true,
-                                          // dataLabelSettings: DataLabelSettings(
-                                          //   isVisible: true,
-                                          //   textStyle: TextStyle(color: Colors.black,
-                                          //   ),
-                                          // ),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          "Swipe chart to see more",
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey.shade600,
+                                          ),
                                         ),
                                       ],
                                     ),
-                                    SfCartesianChart(
-                                      primaryXAxis: CategoryAxis(
-                                        labelRotation: 0,
-                                        edgeLabelPlacement:
-                                            EdgeLabelPlacement.shift,
-                                        arrangeByIndex: true,
-                                        interval:
-                                            1, // Ensures each label appears properly
-                                        // enableScrolling: true, // ✅ Enables horizontal scrolling
-                                      ),
-                                      primaryYAxis: NumericAxis(
-                                        labelStyle: TextStyle(
-                                          color: Colors
-                                              .black, // ✅ Make Y-axis numbers black
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      zoomPanBehavior: ZoomPanBehavior(
-                                        enablePanning:
-                                            true, // ✅ Allows dragging (panning)
-                                        enablePinching:
-                                            true, // ✅ Allows pinch zooming
-                                      ),
-                                      tooltipBehavior:
-                                          TooltipBehavior(enable: true),
-                                      trackballBehavior: TrackballBehavior(
-                                        enable: true,
-                                        activationMode:
-                                            ActivationMode.singleTap,
-                                        tooltipSettings:
-                                            const InteractiveTooltip(
-                                          enable: true,
-                                          color: Colors.black,
-                                          textStyle: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        builder: (BuildContext context,
-                                            TrackballDetails details) {
-                                          final int index = details.pointIndex!;
-                                          final SalesData salesData =
-                                              isDailySelected
-                                                  ? data.todaySalesOrderGraph[
-                                                      index]
-                                                  : data.monthSalesOrderGraph[
-                                                      index];
-                                          return Container(
-                                            padding: EdgeInsets.all(8),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black,
-                                              borderRadius:
-                                                  BorderRadius.circular(5),
-                                            ),
-                                            child: Text(
-                                              salesData.name,
-                                              style: TextStyle(
-                                                  color: Colors.white),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                      series: <CartesianSeries>[
-                                        StackedColumnSeries<SalesData, String>(
-                                          dataSource: isDailySelected
-                                              ? todaySalesOrderGraph
-                                              : monthSalesOrderGraph,
-                                          xValueMapper: (SalesData sales, _) =>
-                                              sales.name.length > 3
-                                                  ? sales.name.substring(0, 3)
-                                                  : sales.name,
-                                          yValueMapper: (SalesData sales, _) =>
-                                              sales.sales,
-                                          name: 'Sales Order',
-                                          enableTooltip:
-                                              true, // ✅ Show tooltip with full name
-                                          // dataLabelSettings: DataLabelSettings(
-                                          //   isVisible: true,
-                                          //   textStyle: TextStyle(
-                                          //     color: Colors.black, // ✅ Change data label color to black
-                                          //   ),
-                                          // ),
-                                        ),
-                                      ],
-                                    )
+                                  ),
+                                IndexedStack(
+                                  index: selectedIndex,
+                                  children: [
+                                    // Sales Chart — wrapped in a horizontal
+                                    // scroll view so more than 6 salesmen can
+                                    // be swiped through instead of squeezed.
+                    SizedBox(
+  width: MediaQuery.of(context).size.width,
+  height: 300,
+  child: SfCartesianChart(
+    primaryXAxis: CategoryAxis(
+      arrangeByIndex: true,
+      edgeLabelPlacement: EdgeLabelPlacement.shift,
+      autoScrollingDelta: 6,
+      autoScrollingMode: AutoScrollingMode.start,
+    ),
+    zoomPanBehavior: ZoomPanBehavior(
+      enablePanning: true,
+      zoomMode: ZoomMode.x,
+    ),
+    tooltipBehavior: TooltipBehavior(enable: true),
+    trackballBehavior: TrackballBehavior(
+      enable: true,
+      activationMode: ActivationMode.singleTap,
+      tooltipSettings: const InteractiveTooltip(
+        enable: true,
+        color: Colors.black,
+        textStyle: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+      ),
+      builder: (BuildContext context, TrackballDetails details) {
+        final int index = details.pointIndex!;
+        final SalesData salesData = isDailySelected
+            ? data.todaySalesGraph[index]
+            : data.monthSalesGraph[index];
+        return Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(5)),
+          child: Text(salesData.name, style: const TextStyle(color: Colors.white)),
+        );
+      },
+    ),
+    series: <CartesianSeries>[
+      StackedColumnSeries<SalesData, String>(
+        dataSource: isDailySelected ? data.todaySalesGraph : data.monthSalesGraph,
+        xValueMapper: (SalesData sales, _) =>
+            sales.name.length > 3 ? sales.name.substring(0, 3) : sales.name,
+        yValueMapper: (SalesData sales, _) => sales.sales,
+        name: 'Sales',
+        enableTooltip: true,
+      ),
+    ],
+  ),
+),
+                                    // Sales Order Chart — same horizontal
+                                    // scroll fix applied.
+                              SizedBox(
+  width: MediaQuery.of(context).size.width,
+  height: 300,
+  child: SfCartesianChart(
+    primaryXAxis: CategoryAxis(
+      labelRotation: 0,
+      edgeLabelPlacement: EdgeLabelPlacement.shift,
+      arrangeByIndex: true,
+      interval: 1,
+      autoScrollingDelta: 6,
+      autoScrollingMode: AutoScrollingMode.start,
+    ),
+    primaryYAxis: const NumericAxis(
+      labelStyle: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+    ),
+    zoomPanBehavior: ZoomPanBehavior(
+      enablePanning: true,
+      zoomMode: ZoomMode.x,
+    ),
+    tooltipBehavior: TooltipBehavior(enable: true),
+    trackballBehavior: TrackballBehavior(
+      enable: true,
+      activationMode: ActivationMode.singleTap,
+      tooltipSettings: const InteractiveTooltip(
+        enable: true,
+        color: Colors.black,
+        textStyle: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+      ),
+      builder: (BuildContext context, TrackballDetails details) {
+        final int index = details.pointIndex!;
+        final SalesData salesData = isDailySelected
+            ? data.todaySalesOrderGraph[index]
+            : data.monthSalesOrderGraph[index];
+        return Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(5)),
+          child: Text(salesData.name, style: const TextStyle(color: Colors.white)),
+        );
+      },
+    ),
+    series: <CartesianSeries>[
+      StackedColumnSeries<SalesData, String>(
+        dataSource: isDailySelected ? data.todaySalesOrderGraph : data.monthSalesOrderGraph,
+        xValueMapper: (SalesData sales, _) =>
+            sales.name.length > 3 ? sales.name.substring(0, 3) : sales.name,
+        yValueMapper: (SalesData sales, _) => sales.sales,
+        name: 'Sales Order',
+        enableTooltip: true,
+      ),
+    ],
+  ),
+),
                                   ],
                                 ),
                                 Row(
@@ -840,7 +777,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     );
   }
-
 
   Widget colorCard(String title, String amount) {
     return Container(

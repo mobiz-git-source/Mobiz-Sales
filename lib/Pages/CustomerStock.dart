@@ -50,7 +50,7 @@ class _CustomerStockState extends State<CustomerStock> {
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
         title: const Text(
           'Customer Stock',
-          style: TextStyle(color: AppConfig.backgroundColor),
+           style: AppConfig.pageTitleStyle,
         ),
         backgroundColor: AppConfig.colorPrimary,
       ),
