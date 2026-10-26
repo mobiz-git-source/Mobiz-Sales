@@ -501,6 +501,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:mobizapp/Models/appstate.dart';
+import 'package:mobizapp/Utilities/cpcl_helper.dart';
 import 'package:mobizapp/Utilities/rest_ds.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -511,6 +512,8 @@ import 'dart:typed_data';
 import '../Models/DayReport.dart';
 import '../Models/Store_model.dart';
 import '../Utilities/date_helper.dart';
+import '../Utilities/report_printer.dart';
+import '../Reports/day_close_summary_report.dart';
 import '../Models/routedatamodelclass.dart';
 import '../confg/appconfig.dart';
 
@@ -1002,6 +1005,7 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
   bool _noData = false;
 
   void _initPrinter() async {
+    await loadPrinterTypeCache();
     bool? isConnected = await printer.isConnected;
     if (isConnected!) {
       setState(() {
@@ -1666,368 +1670,868 @@ class _DayClosePagessssState extends State<DayClosePagessss> {
     }
   }
 
-  void _print(DayCloseResponse123 report) async {
-    if (_connected) {
-      double totalSales = report.sales != null && report.sales!.isNotEmpty
-          ? report.sales!.map((sales) {
-              return double.tryParse(sales.grandTotal.toString()) ?? 0.0;
-            }).reduce((a, b) => a + b)
-          : 0.0;
+  // void _print(DayCloseResponse123 report) async {
+  //   if (_connected) {
+  //     double totalSales = report.sales != null && report.sales!.isNotEmpty
+  //         ? report.sales!.map((sales) {
+  //             return double.tryParse(sales.grandTotal.toString()) ?? 0.0;
+  //           }).reduce((a, b) => a + b)
+  //         : 0.0;
 
-      double totalSalesreturn = report.salesReturn != null &&
-              report.salesReturn!.isNotEmpty
-          ? report.salesReturn!.map((salesReturn) {
-              return double.tryParse(salesReturn.grandTotal.toString()) ?? 0.0;
-            }).reduce((a, b) => a + b)
-          : 0.0;
+  //     double totalSalesreturn = report.salesReturn != null &&
+  //             report.salesReturn!.isNotEmpty
+  //         ? report.salesReturn!.map((salesReturn) {
+  //             return double.tryParse(salesReturn.grandTotal.toString()) ?? 0.0;
+  //           }).reduce((a, b) => a + b)
+  //         : 0.0;
 
-      double totalCollections = report.collection != null &&
-              report.collection!.isNotEmpty
-          ? report.collection!.map((collection) {
-              return double.tryParse(collection.totalAmount.toString()) ?? 0.0;
-            }).reduce((a, b) => a + b)
-          : 0.0;
+  //     double totalCollections = report.collection != null &&
+  //             report.collection!.isNotEmpty
+  //         ? report.collection!.map((collection) {
+  //             return double.tryParse(collection.totalAmount.toString()) ?? 0.0;
+  //           }).reduce((a, b) => a + b)
+  //         : 0.0;
 
-      double totalExpenses =
-          report.expense != null && report.expense!.isNotEmpty
-              ? report.expense!.map((expense) {
-                  return double.tryParse(expense.totalAmount.toString()) ?? 0.0;
-                }).reduce((a, b) => a + b)
-              : 0.0;
+  //     double totalExpenses =
+  //         report.expense != null && report.expense!.isNotEmpty
+  //             ? report.expense!.map((expense) {
+  //                 return double.tryParse(expense.totalAmount.toString()) ?? 0.0;
+  //               }).reduce((a, b) => a + b)
+  //             : 0.0;
 
-      final vanName = (report.data!.van != null && report.data!.van.isNotEmpty)
-          ? report.data!.van[0].name
-          : 'N/A';
+  //     final vanName = (report.data!.van != null && report.data!.van.isNotEmpty)
+  //         ? report.data!.van[0].name
+  //         : 'N/A';
 
-      // Printing section headers and key info
-      // printer.printCustom('Salesman: ${report.data!.user}', 1, 0);
-      // printer.printCustom(
-      //     'Date: ${report.data?.inDate != null ? DateFormat('dd-MMM-yyyy').format(DateTime.parse(report.data!.inDate!)) : 'No Date'}',
-      //     1,
-      //     0);
-      printer.printCustom(
-          'Date ${DateHelper.displayDate(report.data!.inDate)}', 1, 0);
-      printer.printCustom('Time ${report.data!.inTime}', 1, 0);
-      printer.printCustom('SalesMan: ${AppState().name}', 1, 0);
-      if (routeName != null && routeName!.isNotEmpty) {
-        printer.printCustom('Route: $routeName', 1, 0);
-      }
-      printer.printCustom('VAN:$vanName', 1, 0);
-      printer.printCustom('Petty Cash:${report.data!.pettyCash}', 1, 0);
-      printer.printCustom('Invoice No: ${report.data!.invoiceNo}', 1, 0);
-      printer.printCustom(
-          'Sales: ${report.data!.noOfSales} | ${report.data!.amountOfSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
-          1,
-          0);
-      printer.printCustom(
-          'Returns: ${report.data!.noOfReturns} | ${report.data!.amountOfReturns}',
-          1,
-          0);
-      printer.printCustom('Collection', 1, 0);
-      printer.printCustom('Cash: ${report.data!.collectionCashAmount}', 1, 0);
-      printer.printCustom(
-          'Cheque: ${report.data!.collectionChequeAmount} | ${report.data!.collectionNoOfCheque}',
-          1,
-          0);
-      printer.printCustom('Last Day Balance', 1, 0);
-      printer.printCustom('Cash: ${report.data!.lastDayBalanceAmount}', 1, 0);
-      printer.printCustom(
-          'Cheque: ${report.data!.lastDayBalanceChequeAmount} | ${report.data!.lastDayBalanceNoOfCheque}',
-          1,
-          0);
-      printer.printNewLine();
-      void printAlignedText(String leftText, String rightText) {
-        const int maxLineLength =
-            68; // Adjust the maximum line length as per your printer's character limit
-        int leftTextLength = leftText.length;
-        int rightTextLength = rightText.length;
+  //     // Printing section headers and key info
+  //     // printer.printCustom('Salesman: ${report.data!.user}', 1, 0);
+  //     // printer.printCustom(
+  //     //     'Date: ${report.data?.inDate != null ? DateFormat('dd-MMM-yyyy').format(DateTime.parse(report.data!.inDate!)) : 'No Date'}',
+  //     //     1,
+  //     //     0);
+  //     printer.printCustom(
+  //         'Date ${DateHelper.displayDate(report.data!.inDate)}', 1, 0);
+  //     printer.printCustom('Time ${report.data!.inTime}', 1, 0);
+  //     printer.printCustom('SalesMan: ${AppState().name}', 1, 0);
+  //     if (routeName != null && routeName!.isNotEmpty) {
+  //       printer.printCustom('Route: $routeName', 1, 0);
+  //     }
+  //     printer.printCustom('VAN:$vanName', 1, 0);
+  //     printer.printCustom('Petty Cash:${report.data!.pettyCash}', 1, 0);
+  //     printer.printCustom('Invoice No: ${report.data!.invoiceNo}', 1, 0);
+  //     printer.printCustom(
+  //         'Sales: ${report.data!.noOfSales} | ${report.data!.amountOfSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
+  //         1,
+  //         0);
+  //     printer.printCustom(
+  //         'Returns: ${report.data!.noOfReturns} | ${report.data!.amountOfReturns}',
+  //         1,
+  //         0);
+  //     printer.printCustom('Collection', 1, 0);
+  //     printer.printCustom('Cash: ${report.data!.collectionCashAmount}', 1, 0);
+  //     printer.printCustom(
+  //         'Cheque: ${report.data!.collectionChequeAmount} | ${report.data!.collectionNoOfCheque}',
+  //         1,
+  //         0);
+  //     printer.printCustom('Last Day Balance', 1, 0);
+  //     printer.printCustom('Cash: ${report.data!.lastDayBalanceAmount}', 1, 0);
+  //     printer.printCustom(
+  //         'Cheque: ${report.data!.lastDayBalanceChequeAmount} | ${report.data!.lastDayBalanceNoOfCheque}',
+  //         1,
+  //         0);
+  //     printer.printNewLine();
+  //     void printAlignedText(String leftText, String rightText) {
+  //       const int maxLineLength =
+  //           68; // Adjust the maximum line length as per your printer's character limit
+  //       int leftTextLength = leftText.length;
+  //       int rightTextLength = rightText.length;
 
-        // Calculate padding to ensure rightText is right-aligned
-        int spaceLength = maxLineLength - (leftTextLength + rightTextLength);
-        String spaces = ' ' * spaceLength;
+  //       // Calculate padding to ensure rightText is right-aligned
+  //       int spaceLength = maxLineLength - (leftTextLength + rightTextLength);
+  //       String spaces = ' ' * spaceLength;
 
-        printer.printCustom(
-            '$leftText$spaces$rightText', 1, 0); // Print with left-aligned text
-      }
+  //       printer.printCustom(
+  //           '$leftText$spaces$rightText', 1, 0); // Print with left-aligned text
+  //     }
 
-      // Printing Sales Section
-      if (report.sales != null && report.sales!.isNotEmpty) {
-        // Define column widths
-        const int columnWidth1 = 10; // S.No
-        const int columnWidth2 = 30; // Shop Name
-        const int columnWidth3 = 12; // Invoice No
-        const int columnWidth4 = 8; // Amount
+  //     // Printing Sales Section
+  //     if (report.sales != null && report.sales!.isNotEmpty) {
+  //       // Define column widths
+  //       const int columnWidth1 = 10; // S.No
+  //       const int columnWidth2 = 30; // Shop Name
+  //       const int columnWidth3 = 12; // Invoice No
+  //       const int columnWidth4 = 8; // Amount
 
-        // Print the table header
-        String headers = "${'SI NO'.padRight(columnWidth1)}"
-            "${'SHOP NAME'.padRight(columnWidth2)}"
-            "${'INVOICE NO'.padRight(columnWidth3)}"
-            "${'Amount'.padLeft(columnWidth4)}";
-        printer.printCustom('Sales', 1, 0); // Section title
-        printer.printCustom(headers, 1, 0); // Print table headers
+  //       // Print the table header
+  //       String headers = "${'SI NO'.padRight(columnWidth1)}"
+  //           "${'SHOP NAME'.padRight(columnWidth2)}"
+  //           "${'INVOICE NO'.padRight(columnWidth3)}"
+  //           "${'Amount'.padLeft(columnWidth4)}";
+  //       printer.printCustom('Sales', 1, 0); // Section title
+  //       printer.printCustom(headers, 1, 0); // Print table headers
 
-        // Helper function to split text by word count
-        List<String> splitByWords(String text, int maxWords) {
-          List<String> words = text.split(' ');
-          List<String> lines = [];
-          for (int i = 0; i < words.length; i += maxWords) {
-            lines.add(words
-                .sublist(i,
-                    i + maxWords > words.length ? words.length : i + maxWords)
-                .join(' '));
-          }
-          return lines;
-        }
+  //       // Helper function to split text by word count
+  //       List<String> splitByWords(String text, int maxWords) {
+  //         List<String> words = text.split(' ');
+  //         List<String> lines = [];
+  //         for (int i = 0; i < words.length; i += maxWords) {
+  //           lines.add(words
+  //               .sublist(i,
+  //                   i + maxWords > words.length ? words.length : i + maxWords)
+  //               .join(' '));
+  //         }
+  //         return lines;
+  //       }
 
-        // Print each sale row
-        for (var sale in report.sales!) {
-          String customerNames =
-              sale.customer!.map((customer) => customer.name).join(", ");
+  //       // Print each sale row
+  //       for (var sale in report.sales!) {
+  //         String customerNames =
+  //             sale.customer!.map((customer) => customer.name).join(", ");
 
-          List<String> customerNameLines = splitByWords(customerNames, 4);
-          String firstLine =
-              "${(report.sales!.indexOf(sale) + 1).toString().padRight(columnWidth1)}"
-              "${customerNameLines[0].padRight(columnWidth2)}"
-              "${sale.invoiceNo!.padRight(columnWidth3)}"
-              "${sale.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(columnWidth4)}";
+  //         List<String> customerNameLines = splitByWords(customerNames, 4);
+  //         String firstLine =
+  //             "${(report.sales!.indexOf(sale) + 1).toString().padRight(columnWidth1)}"
+  //             "${customerNameLines[0].padRight(columnWidth2)}"
+  //             "${sale.invoiceNo!.padRight(columnWidth3)}"
+  //             "${sale.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(columnWidth4)}";
 
-          printer.printCustom(firstLine, 1, 0);
+  //         printer.printCustom(firstLine, 1, 0);
 
-          for (int i = 1; i < customerNameLines.length; i++) {
-            String subsequentLine =
-                "${''.padRight(columnWidth1)}" // Empty space for SI NO
-                "${customerNameLines[i].padRight(columnWidth2)}"; // Print remaining shop name lines
-            printer.printCustom(subsequentLine, 1, 0);
-          }
-        }
-        printer.printNewLine();
-        printAlignedText('',
-            'Total Sales: ${totalSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
-        printer.printNewLine();
-      }
+  //         for (int i = 1; i < customerNameLines.length; i++) {
+  //           String subsequentLine =
+  //               "${''.padRight(columnWidth1)}" // Empty space for SI NO
+  //               "${customerNameLines[i].padRight(columnWidth2)}"; // Print remaining shop name lines
+  //           printer.printCustom(subsequentLine, 1, 0);
+  //         }
+  //       }
+  //       printer.printNewLine();
+  //       printAlignedText('',
+  //           'Total Sales: ${totalSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
+  //       printer.printNewLine();
+  //     }
 
-      // Printing Return Section
-      if (report.salesReturn != null && report.salesReturn!.isNotEmpty) {
-        const int columnWidth1 = 10; // S.No
-        const int columnWidth2 = 30; // Shop Name
-        const int columnWidth3 = 12; // Invoice No
-        const int columnWidth4 = 8; // Amount
+  //     // Printing Return Section
+  //     if (report.salesReturn != null && report.salesReturn!.isNotEmpty) {
+  //       const int columnWidth1 = 10; // S.No
+  //       const int columnWidth2 = 30; // Shop Name
+  //       const int columnWidth3 = 12; // Invoice No
+  //       const int columnWidth4 = 8; // Amount
 
-        // Print the table header
-        String headers = "${'SI NO'.padRight(columnWidth1)}"
-            "${'SHOP NAME'.padRight(columnWidth2)}"
-            "${'TYPE'.padRight(columnWidth3)}"
-            "${'Amount'.padLeft(columnWidth4)}";
-        printer.printCustom('Sales Return', 1, 0); // Section title
-        printer.printCustom(headers, 1, 0); // Print table headers
+  //       // Print the table header
+  //       String headers = "${'SI NO'.padRight(columnWidth1)}"
+  //           "${'SHOP NAME'.padRight(columnWidth2)}"
+  //           "${'TYPE'.padRight(columnWidth3)}"
+  //           "${'Amount'.padLeft(columnWidth4)}";
+  //       printer.printCustom('Sales Return', 1, 0); // Section title
+  //       printer.printCustom(headers, 1, 0); // Print table headers
 
-        // Helper function to split text by word count
-        List<String> splitByWords(String text, int maxWords) {
-          List<String> words = text.split(' ');
-          List<String> lines = [];
-          for (int i = 0; i < words.length; i += maxWords) {
-            lines.add(words
-                .sublist(i,
-                    i + maxWords > words.length ? words.length : i + maxWords)
-                .join(' '));
-          }
-          return lines;
-        }
+  //       // Helper function to split text by word count
+  //       List<String> splitByWords(String text, int maxWords) {
+  //         List<String> words = text.split(' ');
+  //         List<String> lines = [];
+  //         for (int i = 0; i < words.length; i += maxWords) {
+  //           lines.add(words
+  //               .sublist(i,
+  //                   i + maxWords > words.length ? words.length : i + maxWords)
+  //               .join(' '));
+  //         }
+  //         return lines;
+  //       }
 
-        for (var salesReturn in report.salesReturn!) {
-          String customerNames =
-              salesReturn.customer!.map((customer) => customer.name).join(", ");
-          List<String> customerNameLines = splitByWords(customerNames, 4);
-          String firstLine =
-              "${(report.salesReturn!.indexOf(salesReturn) + 1).toString().padRight(columnWidth1)}"
-              "${customerNameLines[0].padRight(columnWidth2)}"
-              "${(salesReturn.invoiceNo ?? 'No Type').padRight(columnWidth3)}"
-              "${salesReturn.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(columnWidth4)}";
+  //       for (var salesReturn in report.salesReturn!) {
+  //         String customerNames =
+  //             salesReturn.customer!.map((customer) => customer.name).join(", ");
+  //         List<String> customerNameLines = splitByWords(customerNames, 4);
+  //         String firstLine =
+  //             "${(report.salesReturn!.indexOf(salesReturn) + 1).toString().padRight(columnWidth1)}"
+  //             "${customerNameLines[0].padRight(columnWidth2)}"
+  //             "${(salesReturn.invoiceNo ?? 'No Type').padRight(columnWidth3)}"
+  //             "${salesReturn.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(columnWidth4)}";
 
-          printer.printCustom(firstLine, 1, 0);
-          for (int i = 1; i < customerNameLines.length; i++) {
-            String subsequentLine = "${''.padRight(columnWidth1)}"
-                "${customerNameLines[i].padRight(columnWidth2)}";
-            printer.printCustom(subsequentLine, 1, 0);
-          }
-        }
-        printer.printNewLine();
-        printAlignedText('',
-            'Total Sales Return: ${totalSalesreturn.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
-        // printer.printCustom('Total Collections: $totalCollections', 1, 0);
-        printer.printNewLine();
-        // printer.printCustom('Return', 1, 0);
-        // printer.printCustom('SI NO  SHOP NAME        Reference    Amount', 1, 0);
-        // for (var returns in report.salesReturn!) {
-        //   String customerNames = returns.customer!.map((customer) => customer.name).join(", ");
-        //   String formattedShopName = customerNames.length > 12
-        //       ? '${customerNames.substring(0, 12)}...' // Shorten long names
-        //       : customerNames;
-        //   printer.printCustom(
-        //       '${(report.salesReturn!.indexOf(returns) + 1).toString().padRight(6)}'
-        //           '${formattedShopName.padRight(16)}'
-        //           '${returns.invoiceNo?.padRight(12) ?? 'No Invoice'.padRight(12)}'
-        //           '${returns.grandTotal.toString().padLeft(8)}',
-        //       1, 0);
-        // }
-        // printer.printCustom('Total Sales Return: $totalSalesreturn', 1, 0);
-        // printer.printNewLine();
-      }
+  //         printer.printCustom(firstLine, 1, 0);
+  //         for (int i = 1; i < customerNameLines.length; i++) {
+  //           String subsequentLine = "${''.padRight(columnWidth1)}"
+  //               "${customerNameLines[i].padRight(columnWidth2)}";
+  //           printer.printCustom(subsequentLine, 1, 0);
+  //         }
+  //       }
+  //       printer.printNewLine();
+  //       printAlignedText('',
+  //           'Total Sales Return: ${totalSalesreturn.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
+  //       // printer.printCustom('Total Collections: $totalCollections', 1, 0);
+  //       printer.printNewLine();
+  //       // printer.printCustom('Return', 1, 0);
+  //       // printer.printCustom('SI NO  SHOP NAME        Reference    Amount', 1, 0);
+  //       // for (var returns in report.salesReturn!) {
+  //       //   String customerNames = returns.customer!.map((customer) => customer.name).join(", ");
+  //       //   String formattedShopName = customerNames.length > 12
+  //       //       ? '${customerNames.substring(0, 12)}...' // Shorten long names
+  //       //       : customerNames;
+  //       //   printer.printCustom(
+  //       //       '${(report.salesReturn!.indexOf(returns) + 1).toString().padRight(6)}'
+  //       //           '${formattedShopName.padRight(16)}'
+  //       //           '${returns.invoiceNo?.padRight(12) ?? 'No Invoice'.padRight(12)}'
+  //       //           '${returns.grandTotal.toString().padLeft(8)}',
+  //       //       1, 0);
+  //       // }
+  //       // printer.printCustom('Total Sales Return: $totalSalesreturn', 1, 0);
+  //       // printer.printNewLine();
+  //     }
 
-      // Printing Collection Section
-      if (report.collection != null && report.collection!.isNotEmpty) {
-        // Define column widths
-        const int columnWidth1 = 10; // S.No
-        const int columnWidth2 = 30; // Shop Name
-        const int columnWidth3 = 12; // Invoice No
-        const int columnWidth4 = 8; // Amount
+  //     // Printing Collection Section
+  //     if (report.collection != null && report.collection!.isNotEmpty) {
+  //       // Define column widths
+  //       const int columnWidth1 = 10; // S.No
+  //       const int columnWidth2 = 30; // Shop Name
+  //       const int columnWidth3 = 12; // Invoice No
+  //       const int columnWidth4 = 8; // Amount
 
-        // Print the table header
-        String headers = "${'SI NO'.padRight(columnWidth1)}"
-            "${'SHOP NAME'.padRight(columnWidth2)}"
-            "${'TYPE'.padRight(columnWidth3)}"
-            "${'Amount'.padLeft(columnWidth4)}";
-        printer.printCustom('Collection', 1, 0); // Section title
-        printer.printCustom(headers, 1, 0); // Print table headers
+  //       // Print the table header
+  //       String headers = "${'SI NO'.padRight(columnWidth1)}"
+  //           "${'SHOP NAME'.padRight(columnWidth2)}"
+  //           "${'TYPE'.padRight(columnWidth3)}"
+  //           "${'Amount'.padLeft(columnWidth4)}";
+  //       printer.printCustom('Collection', 1, 0); // Section title
+  //       printer.printCustom(headers, 1, 0); // Print table headers
 
-        // Helper function to split text by word count
-        List<String> splitByWords(String text, int maxWords) {
-          List<String> words = text.split(' ');
-          List<String> lines = [];
-          for (int i = 0; i < words.length; i += maxWords) {
-            lines.add(words
-                .sublist(i,
-                    i + maxWords > words.length ? words.length : i + maxWords)
-                .join(' '));
-          }
-          return lines;
-        }
+  //       // Helper function to split text by word count
+  //       List<String> splitByWords(String text, int maxWords) {
+  //         List<String> words = text.split(' ');
+  //         List<String> lines = [];
+  //         for (int i = 0; i < words.length; i += maxWords) {
+  //           lines.add(words
+  //               .sublist(i,
+  //                   i + maxWords > words.length ? words.length : i + maxWords)
+  //               .join(' '));
+  //         }
+  //         return lines;
+  //       }
 
-        // Print each collection row
-        for (var collection in report.collection!) {
-          String customerNames =
-              collection.customer!.map((customer) => customer.name).join(", ");
-          List<String> customerNameLines = splitByWords(customerNames, 4);
-          String firstLine =
-              "${(report.collection!.indexOf(collection) + 1).toString().padRight(columnWidth1)}"
-              "${customerNameLines[0].padRight(columnWidth2)}"
-              "${(collection.collectionType ?? 'No Type').padRight(columnWidth3)}"
-              "${(double.tryParse(collection.totalAmount ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00').padLeft(columnWidth4)}";
+  //       // Print each collection row
+  //       for (var collection in report.collection!) {
+  //         String customerNames =
+  //             collection.customer!.map((customer) => customer.name).join(", ");
+  //         List<String> customerNameLines = splitByWords(customerNames, 4);
+  //         String firstLine =
+  //             "${(report.collection!.indexOf(collection) + 1).toString().padRight(columnWidth1)}"
+  //             "${customerNameLines[0].padRight(columnWidth2)}"
+  //             "${(collection.collectionType ?? 'No Type').padRight(columnWidth3)}"
+  //             "${(double.tryParse(collection.totalAmount ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00').padLeft(columnWidth4)}";
 
-          printer.printCustom(firstLine, 1, 0);
-          for (int i = 1; i < customerNameLines.length; i++) {
-            String subsequentLine = "${''.padRight(columnWidth1)}"
-                "${customerNameLines[i].padRight(columnWidth2)}";
-            printer.printCustom(subsequentLine, 1, 0);
-          }
-        }
-        printer.printNewLine();
-        printAlignedText('',
-            'Total Collections: ${totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
-        // printer.printCustom('Total Collections: $totalCollections', 1, 0);
-        printer.printNewLine();
-      }
+  //         printer.printCustom(firstLine, 1, 0);
+  //         for (int i = 1; i < customerNameLines.length; i++) {
+  //           String subsequentLine = "${''.padRight(columnWidth1)}"
+  //               "${customerNameLines[i].padRight(columnWidth2)}";
+  //           printer.printCustom(subsequentLine, 1, 0);
+  //         }
+  //       }
+  //       printer.printNewLine();
+  //       printAlignedText('',
+  //           'Total Collections: ${totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
+  //       // printer.printCustom('Total Collections: $totalCollections', 1, 0);
+  //       printer.printNewLine();
+  //     }
 
-      // Printing Expense Section
-      // Printing Expense Section
-      if (report.expense != null && report.expense!.isNotEmpty) {
-        const int columnWidth1 = 6; // SI NO
-        const int columnWidth2 = 11; // REFERENCE
-        const int columnWidth3 = 12; // EXP.NAME
-        const int columnWidth4 = 11; // REMARKS
-        const int columnWidth5 = 8; // AMOUNT
-        // total = 42, and every header label is now SHORTER than its column
-        // width (so padRight actually adds a visible gap before the next column)
+  //     // Printing Expense Section
+  //     // Printing Expense Section
+  //     if (report.expense != null && report.expense!.isNotEmpty) {
+  //       const int columnWidth1 = 6; // SI NO
+  //       const int columnWidth2 = 11; // REFERENCE
+  //       const int columnWidth3 = 12; // EXP.NAME
+  //       const int columnWidth4 = 11; // REMARKS
+  //       const int columnWidth5 = 8; // AMOUNT
+  //       // total = 42, and every header label is now SHORTER than its column
+  //       // width (so padRight actually adds a visible gap before the next column)
 
-        String headers = "${'SI NO'.padRight(columnWidth1)}"
-            "${'REFERENCE'.padRight(columnWidth2)}"
-            "${'EXP.NAME'.padRight(columnWidth3)}"
-            "${'REMARKS'.padRight(columnWidth4)}"
-            "${'AMOUNT'.padLeft(columnWidth5)}";
-        printer.printCustom('Expense', 1, 0);
-        printer.printCustom(headers, 1, 0);
+  //       String headers = "${'SI NO'.padRight(columnWidth1)}"
+  //           "${'REFERENCE'.padRight(columnWidth2)}"
+  //           "${'EXP.NAME'.padRight(columnWidth3)}"
+  //           "${'REMARKS'.padRight(columnWidth4)}"
+  //           "${'AMOUNT'.padLeft(columnWidth5)}";
+  //       printer.printCustom('Expense', 1, 0);
+  //       printer.printCustom(headers, 1, 0);
 
-        List<String> splitByWords(String text, int maxWords) {
-          List<String> words = text.split(' ');
-          List<String> lines = [];
-          for (int i = 0; i < words.length; i += maxWords) {
-            lines.add(
-              words
-                  .sublist(i,
-                      i + maxWords > words.length ? words.length : i + maxWords)
-                  .join(' '),
-            );
-          }
-          return lines;
-        }
+  //       List<String> splitByWords(String text, int maxWords) {
+  //         List<String> words = text.split(' ');
+  //         List<String> lines = [];
+  //         for (int i = 0; i < words.length; i += maxWords) {
+  //           lines.add(
+  //             words
+  //                 .sublist(i,
+  //                     i + maxWords > words.length ? words.length : i + maxWords)
+  //                 .join(' '),
+  //           );
+  //         }
+  //         return lines;
+  //       }
 
-        for (var expense in report.expense!) {
-          String expenseName = expense.expense!.map((e) => e.name).join(", ");
-          List<String> expenseNameLines = splitByWords(expenseName, 2);
-          String remarks = expense.description ?? '';
-          List<String> remarkLines = splitByWords(remarks, 2);
+  //       for (var expense in report.expense!) {
+  //         String expenseName = expense.expense!.map((e) => e.name).join(", ");
+  //         List<String> expenseNameLines = splitByWords(expenseName, 2);
+  //         String remarks = expense.description ?? '';
+  //         List<String> remarkLines = splitByWords(remarks, 2);
 
-          String firstLine =
-              "${(report.expense!.indexOf(expense) + 1).toString().padRight(columnWidth1)}"
-              "${(expense.invoiceNo ?? '').padRight(columnWidth2)}"
-              "${expenseNameLines[0].padRight(columnWidth3)}"
-              "${(remarkLines.isNotEmpty ? remarkLines[0] : '').padRight(columnWidth4)}"
-              "${(double.tryParse(expense.amount ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00').padLeft(columnWidth5)}";
+  //         String firstLine =
+  //             "${(report.expense!.indexOf(expense) + 1).toString().padRight(columnWidth1)}"
+  //             "${(expense.invoiceNo ?? '').padRight(columnWidth2)}"
+  //             "${expenseNameLines[0].padRight(columnWidth3)}"
+  //             "${(remarkLines.isNotEmpty ? remarkLines[0] : '').padRight(columnWidth4)}"
+  //             "${(double.tryParse(expense.amount ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00').padLeft(columnWidth5)}";
 
-          printer.printCustom(firstLine, 1, 0);
+  //         printer.printCustom(firstLine, 1, 0);
 
-          int maxLines = expenseNameLines.length > remarkLines.length
-              ? expenseNameLines.length
-              : remarkLines.length;
+  //         int maxLines = expenseNameLines.length > remarkLines.length
+  //             ? expenseNameLines.length
+  //             : remarkLines.length;
 
-          for (int i = 1; i < maxLines; i++) {
-            String nextLine = "${''.padRight(columnWidth1)}"
-                "${''.padRight(columnWidth2)}"
-                "${(i < expenseNameLines.length ? expenseNameLines[i] : '').padRight(columnWidth3)}"
-                "${(i < remarkLines.length ? remarkLines[i] : '').padRight(columnWidth4)}";
-            printer.printCustom(nextLine, 1, 0);
-          }
-        }
+  //         for (int i = 1; i < maxLines; i++) {
+  //           String nextLine = "${''.padRight(columnWidth1)}"
+  //               "${''.padRight(columnWidth2)}"
+  //               "${(i < expenseNameLines.length ? expenseNameLines[i] : '').padRight(columnWidth3)}"
+  //               "${(i < remarkLines.length ? remarkLines[i] : '').padRight(columnWidth4)}";
+  //           printer.printCustom(nextLine, 1, 0);
+  //         }
+  //       }
 
-        printer.printNewLine();
-        printAlignedText(
-          '',
-          'Total Expenses: ${totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
-        );
-        printer.printNewLine();
-      }
-      printer.printCustom('Expense ${report.data!.expense}', 1, 0);
-      printer.printCustom('Cash Deposited ${report.data!.cashDeposited}', 1, 0);
-      printer.printCustom(
-          'Cash Handed Over ${report.data!.cashHandOver}', 1, 0);
-      printer.printCustom(
-          'No of Cheque Deposited ${report.data!.noOfChequeDeposited}', 1, 0);
-      printer.printCustom(
-          'Cheque Deposited Amount ${report.data!.chequeDepositedAmount}',
-          1,
-          0);
-      printer.printCustom(
-          'No of Cheque Handed Over ${report.data!.noOfChequeHandOver}', 1, 0);
-      printer.printCustom(
-          'Cheque Handed Over Amount ${report.data!.chequeHandOverAmount}',
-          1,
-          0);
-      printer.printCustom(
-          'Balance Cash in Hand ${report.data!.balanceCashInHand}', 1, 0);
-      printer.printCustom(
-          'No of Cheque in Hand ${report.data!.noOfChequeInHand}', 1, 0);
-      printer.printCustom(
-          'Cheque Amount in Hand ${report.data!.chequeAmountInHand}', 1, 0);
-      printer.printNewLine();
+  //       printer.printNewLine();
+  //       printAlignedText(
+  //         '',
+  //         'Total Expenses: ${totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
+  //       );
+  //       printer.printNewLine();
+  //     }
+  //     printer.printCustom('Expense ${report.data!.expense}', 1, 0);
+  //     printer.printCustom('Cash Deposited ${report.data!.cashDeposited}', 1, 0);
+  //     printer.printCustom(
+  //         'Cash Handed Over ${report.data!.cashHandOver}', 1, 0);
+  //     printer.printCustom(
+  //         'No of Cheque Deposited ${report.data!.noOfChequeDeposited}', 1, 0);
+  //     printer.printCustom(
+  //         'Cheque Deposited Amount ${report.data!.chequeDepositedAmount}',
+  //         1,
+  //         0);
+  //     printer.printCustom(
+  //         'No of Cheque Handed Over ${report.data!.noOfChequeHandOver}', 1, 0);
+  //     printer.printCustom(
+  //         'Cheque Handed Over Amount ${report.data!.chequeHandOverAmount}',
+  //         1,
+  //         0);
+  //     printer.printCustom(
+  //         'Balance Cash in Hand ${report.data!.balanceCashInHand}', 1, 0);
+  //     printer.printCustom(
+  //         'No of Cheque in Hand ${report.data!.noOfChequeInHand}', 1, 0);
+  //     printer.printCustom(
+  //         'Cheque Amount in Hand ${report.data!.chequeAmountInHand}', 1, 0);
+  //     printer.printNewLine();
 
-      printer.printCustom('Thank you', 1, 1);
-      printer.paperCut();
-    }
+  //     printer.printCustom('Thank you', 1, 1);
+  //     printer.paperCut();
+  //   }
+  //   if (!_connected) {
+  //     await _connect();
+  //   }
+  // }
+/// Main Print Dispatcher: Routes automatically to Zebra (CPCL) or Sewoo (ESC/POS)
+  /// Main Print Dispatcher: single shared image pipeline, auto-detects
+  /// Zebra vs Sewoo internally via printReport().
+  Future<void> _print(DayCloseResponse123 report) async {
     if (!_connected) {
       await _connect();
     }
-  }
+    if (!_connected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Printer not connected')),
+      );
+      return;
+    }
 
+    try {
+  if (isZebraPrinter(_selectedDevice)) {
+    await printReport(
+      printer,
+      _selectedDevice,
+      (b) => drawDayCloseSummaryReport(b, report, routeName: routeName),
+    );
+  } else {
+    await _printSewoo(report);
+  }
+} catch (e, st) {
+      print('Print error: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Print failed: $e')),
+        );
+      }
+    }
+  }
+  // ═══════════════════════════════════════════════════════════════
+  // 1. ZEBRA ENGINE (CPCL Mode)
+// ═══════════════════════════════════════════════════════════════
+  // 1. ZEBRA ENGINE (CPCL Mode - Clean Layout, No Overlap)
+  // ═══════════════════════════════════════════════════════════════
+  Future<void> _printZebra(DayCloseResponse123 report) async {
+    final int decimals = AppState().noOfDecimals ?? 2;
+
+    double totalSales = report.sales.isNotEmpty
+        ? report.sales
+            .map((sales) => double.tryParse(sales.grandTotal.toString()) ?? 0.0)
+            .reduce((a, b) => a + b)
+        : 0.0;
+
+    double totalSalesreturn = report.salesReturn.isNotEmpty
+        ? report.salesReturn
+            .map((r) => double.tryParse(r.grandTotal.toString()) ?? 0.0)
+            .reduce((a, b) => a + b)
+        : 0.0;
+
+    double totalCollections = report.collection.isNotEmpty
+        ? report.collection
+            .map((c) => double.tryParse(c.totalAmount.toString()) ?? 0.0)
+            .reduce((a, b) => a + b)
+        : 0.0;
+
+    double totalExpenses = report.expense.isNotEmpty
+        ? report.expense
+            .map((e) => double.tryParse(e.totalAmount.toString()) ?? 0.0)
+            .reduce((a, b) => a + b)
+        : 0.0;
+
+    final vanName = (report.data.van.isNotEmpty)
+        ? report.data.van[0].name
+        : 'N/A';
+
+    final cpcl = CpclBuilder(kLabelWidthDots);
+
+    // ---- Header info ----
+    cpcl.boldText("DAY CLOSE REPORT", font: 5, lineGap: 34);
+    cpcl.hLine();
+    cpcl.twoColumn("Date: ${DateHelper.displayDate(report.data.inDate)}", "Time: ${report.data.inTime}");
+    cpcl.twoColumn("Salesman: ${AppState().name}", "VAN: $vanName");
+    if (routeName != null && routeName!.isNotEmpty) {
+      cpcl.text('Route: $routeName');
+    }
+    cpcl.twoColumn("Inv: ${report.data.invoiceNo}", "Petty: ${report.data.pettyCash}");
+    cpcl.hLine();
+
+    // Summary tiles at the top
+    cpcl.twoColumn("Sales (${report.data.noOfSales})", report.data.amountOfSales.toStringAsFixed(decimals));
+    cpcl.twoColumn("Returns (${report.data.noOfReturns})", report.data.amountOfReturns.toStringAsFixed(decimals));
+    cpcl.twoColumn("Cash Coll", report.data.collectionCashAmount.toStringAsFixed(decimals));
+    cpcl.twoColumn("Cheque Coll (${report.data.collectionNoOfCheque})", report.data.collectionChequeAmount.toStringAsFixed(decimals));
+    cpcl.twoColumn("Last Day Cash", report.data.lastDayBalanceAmount.toStringAsFixed(decimals));
+    cpcl.twoColumn("Last Day Cheque (${report.data.lastDayBalanceNoOfCheque})", report.data.lastDayBalanceChequeAmount.toStringAsFixed(decimals));
+    cpcl.hLine();
+
+    // ---- Sales section ----
+    if (report.sales.isNotEmpty) {
+      cpcl.boldText("SALES", font: 5, lineGap: 30);
+      cpcl.hLine(thickness: 1);
+      cpcl.text("Sl   Shop Name / Invoice           Amount", font: 4, lineGap: 30);
+      cpcl.hLine(thickness: 1);
+
+      for (int i = 0; i < report.sales.length; i++) {
+        var sale = report.sales[i];
+        String sNo = (i + 1).toString().padRight(4);
+        String customerNames =
+            sale.customer.map((customer) => customer.name).join(", ");
+        if (customerNames.length > 36) customerNames = customerNames.substring(0, 36);
+
+        String inv = sale.invoiceNo.isNotEmpty ? sale.invoiceNo : 'N/A';
+        String amt = sale.grandTotal.toStringAsFixed(decimals).padLeft(10);
+
+        // Line 1: Sl + Shop Name
+        cpcl.text('$sNo$customerNames', font: 4, lineGap: 28);
+        // Line 2: Invoice No + Amount
+        String details = '     [$inv]'.padRight(32) + amt;
+        cpcl.text(details, font: 4, lineGap: 30);
+      }
+      cpcl.hLine(thickness: 1);
+      cpcl.twoColumn('', 'Total Sales: ${totalSales.toStringAsFixed(decimals)}');
+      cpcl.feed(14);
+    }
+
+    // ---- Sales Return section ----
+    if (report.salesReturn.isNotEmpty) {
+      cpcl.boldText("SALES RETURN", font: 5, lineGap: 30);
+      cpcl.hLine(thickness: 1);
+      cpcl.text("Sl   Shop Name / Ref               Amount", font: 4, lineGap: 30);
+      cpcl.hLine(thickness: 1);
+
+      for (int i = 0; i < report.salesReturn.length; i++) {
+        var salesReturn = report.salesReturn[i];
+        String sNo = (i + 1).toString().padRight(4);
+        String customerNames =
+            salesReturn.customer?.map((customer) => customer.name).join(", ") ?? '';
+        if (customerNames.length > 36) customerNames = customerNames.substring(0, 36);
+
+        String ref = salesReturn.invoiceNo ?? 'No Ref';
+        String amt = (salesReturn.grandTotal ?? 0).toDouble().toStringAsFixed(decimals).padLeft(10);
+
+        // Line 1: Sl + Shop Name
+        cpcl.text('$sNo$customerNames', font: 4, lineGap: 28);
+        // Line 2: Ref + Amount
+        String details = '     [$ref]'.padRight(32) + amt;
+        cpcl.text(details, font: 4, lineGap: 30);
+      }
+      cpcl.hLine(thickness: 1);
+      cpcl.twoColumn('', 'Total Return: ${totalSalesreturn.toStringAsFixed(decimals)}');
+      cpcl.feed(14);
+    }
+
+    // ---- Collection section ----
+    if (report.collection.isNotEmpty) {
+      cpcl.boldText("COLLECTION", font: 5, lineGap: 30);
+      cpcl.hLine(thickness: 1);
+      cpcl.text("Sl   Shop Name / Type              Amount", font: 4, lineGap: 30);
+      cpcl.hLine(thickness: 1);
+
+      for (int i = 0; i < report.collection.length; i++) {
+        var collection = report.collection[i];
+        String sNo = (i + 1).toString().padRight(4);
+        String customerNames =
+            collection.customer?.map((customer) => customer.name).join(", ") ?? '';
+        if (customerNames.length > 36) customerNames = customerNames.substring(0, 36);
+
+        String type = collection.collectionType ?? 'Cash';
+        double parsedAmt = double.tryParse(collection.totalAmount ?? '0') ?? 0;
+        String amt = parsedAmt.toStringAsFixed(decimals).padLeft(10);
+
+        // Line 1: Sl + Shop Name
+        cpcl.text('$sNo$customerNames', font: 4, lineGap: 28);
+        // Line 2: Type + Amount
+        String details = '     Type: $type'.padRight(32) + amt;
+        cpcl.text(details, font: 4, lineGap: 30);
+      }
+      cpcl.hLine(thickness: 1);
+      cpcl.twoColumn('', 'Total Collection: ${totalCollections.toStringAsFixed(decimals)}');
+      cpcl.feed(14);
+    }
+
+    // ---- Expense section ----
+    if (report.expense.isNotEmpty) {
+      cpcl.boldText("EXPENSE", font: 5, lineGap: 30);
+      cpcl.hLine(thickness: 1);
+      cpcl.text("Sl   Reference / Expense           Amount", font: 4, lineGap: 30);
+      cpcl.hLine(thickness: 1);
+
+      for (int i = 0; i < report.expense.length; i++) {
+        var expense = report.expense[i];
+        String sNo = (i + 1).toString().padRight(4);
+        String expenseName = expense.expense?.map((e) => e.name).join(", ") ?? "Expense";
+        if (expenseName.length > 36) expenseName = expenseName.substring(0, 36);
+
+        String ref = expense.invoiceNo ?? 'N/A';
+        double parsedAmt = double.tryParse(expense.amount ?? '0') ?? 0;
+        String amt = parsedAmt.toStringAsFixed(decimals).padLeft(10);
+
+        // Line 1: Sl + Expense Name
+        cpcl.text('$sNo$expenseName', font: 4, lineGap: 28);
+        // Line 2: Ref + Amount
+        String remarks = (expense.description != null && expense.description!.isNotEmpty) 
+            ? '($ref - ${expense.description})' 
+            : '($ref)';
+        if (remarks.length > 25) remarks = remarks.substring(0, 25);
+        String details = '     $remarks'.padRight(32) + amt;
+        cpcl.text(details, font: 4, lineGap: 30);
+      }
+      cpcl.hLine(thickness: 1);
+      cpcl.twoColumn('', 'Total Expenses: ${totalExpenses.toStringAsFixed(decimals)}');
+      cpcl.feed(14);
+    }
+
+    // ---- Day-close summary ----
+    cpcl.boldText("SUMMARY DETAILS", font: 5, lineGap: 30);
+    cpcl.hLine(thickness: 1);
+    cpcl.twoColumn('Expense Total', report.data.expense.toString());
+    cpcl.twoColumn('Cash Deposited', report.data.cashDeposited.toString());
+    cpcl.twoColumn('Cash Handed Over', report.data.cashHandOver.toString());
+    cpcl.twoColumn('Cheque Deposited (${report.data.noOfChequeDeposited})', report.data.chequeDepositedAmount.toString());
+    cpcl.twoColumn('Cheque Handed Over (${report.data.noOfChequeHandOver})', report.data.chequeHandOverAmount.toString());
+    cpcl.twoColumn('Balance Cash in Hand', report.data.balanceCashInHand.toString());
+    cpcl.twoColumn('Balance Cheque (${report.data.noOfChequeInHand})', report.data.chequeAmountInHand.toString());
+    cpcl.hLine();
+    cpcl.feed(10);
+    cpcl.centerText('--- THANK YOU ---', font: 4, lineGap: 24);
+    cpcl.feed(40);
+
+    final bytes = cpcl.build();
+    await sendCpcl(printer, bytes);
+  }
+  // ═══════════════════════════════════════════════════════════════
+  // 2. SEWOO ENGINE (Exact Old ESC/POS Sizes & Alignments)
+  // ═══════════════════════════════════════════════════════════════
+  Future<void> _printSewoo(DayCloseResponse123 report) async {
+    double totalSales = report.sales.isNotEmpty
+        ? report.sales.map((sales) {
+            return double.tryParse(sales.grandTotal.toString()) ?? 0.0;
+          }).reduce((a, b) => a + b)
+        : 0.0;
+
+    double totalSalesreturn = report.salesReturn.isNotEmpty
+        ? report.salesReturn.map((salesReturn) {
+            return double.tryParse(salesReturn.grandTotal.toString()) ?? 0.0;
+          }).reduce((a, b) => a + b)
+        : 0.0;
+
+    double totalCollections = report.collection.isNotEmpty
+        ? report.collection.map((collection) {
+            return double.tryParse(collection.totalAmount.toString()) ?? 0.0;
+          }).reduce((a, b) => a + b)
+        : 0.0;
+
+    double totalExpenses = report.expense.isNotEmpty
+        ? report.expense.map((expense) {
+            return double.tryParse(expense.totalAmount.toString()) ?? 0.0;
+          }).reduce((a, b) => a + b)
+        : 0.0;
+
+    final vanName = (report.data.van.isNotEmpty)
+        ? report.data.van[0].name
+        : 'N/A';
+
+    printer.printCustom(
+        'Date ${DateHelper.displayDate(report.data.inDate)}', 1, 0);
+    printer.printCustom('Time ${report.data.inTime}', 1, 0);
+    printer.printCustom('SalesMan: ${AppState().name}', 1, 0);
+    if (routeName != null && routeName!.isNotEmpty) {
+      printer.printCustom('Route: $routeName', 1, 0);
+    }
+    printer.printCustom('VAN:$vanName', 1, 0);
+    printer.printCustom('Petty Cash:${report.data.pettyCash}', 1, 0);
+    printer.printCustom('Invoice No: ${report.data.invoiceNo}', 1, 0);
+    printer.printCustom(
+        'Sales: ${report.data.noOfSales} | ${report.data.amountOfSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
+        1,
+        0);
+    printer.printCustom(
+        'Returns: ${report.data.noOfReturns} | ${report.data.amountOfReturns}',
+        1,
+        0);
+    printer.printCustom('Collection', 1, 0);
+    printer.printCustom('Cash: ${report.data.collectionCashAmount}', 1, 0);
+    printer.printCustom(
+        'Cheque: ${report.data.collectionChequeAmount} | ${report.data.collectionNoOfCheque}',
+        1,
+        0);
+    printer.printCustom('Last Day Balance', 1, 0);
+    printer.printCustom('Cash: ${report.data.lastDayBalanceAmount}', 1, 0);
+    printer.printCustom(
+        'Cheque: ${report.data.lastDayBalanceChequeAmount} | ${report.data.lastDayBalanceNoOfCheque}',
+        1,
+        0);
+    printer.printNewLine();
+
+    void printAlignedText(String leftText, String rightText) {
+      const int maxLineLength = 68;
+      int leftTextLength = leftText.length;
+      int rightTextLength = rightText.length;
+
+      int spaceLength = maxLineLength - (leftTextLength + rightTextLength);
+      String spaces = ' ' * spaceLength;
+
+      printer.printCustom('$leftText$spaces$rightText', 1, 0);
+    }
+
+    List<String> splitByWords(String text, int maxWords) {
+      List<String> words = text.split(' ');
+      List<String> lines = [];
+      for (int i = 0; i < words.length; i += maxWords) {
+        lines.add(words
+            .sublist(i,
+                i + maxWords > words.length ? words.length : i + maxWords)
+            .join(' '));
+      }
+      return lines;
+    }
+
+    // Printing Sales Section
+    if (report.sales.isNotEmpty) {
+      const int columnWidth1 = 10; // S.No
+      const int columnWidth2 = 30; // Shop Name
+      const int columnWidth3 = 12; // Invoice No
+      const int columnWidth4 = 8; // Amount
+
+      String headers = "${'SI NO'.padRight(columnWidth1)}"
+          "${'SHOP NAME'.padRight(columnWidth2)}"
+          "${'INVOICE NO'.padRight(columnWidth3)}"
+          "${'Amount'.padLeft(columnWidth4)}";
+      printer.printCustom('Sales', 1, 0);
+      printer.printCustom(headers, 1, 0);
+
+      for (var sale in report.sales) {
+        String customerNames =
+            sale.customer.map((customer) => customer.name).join(", ");
+
+        List<String> customerNameLines = splitByWords(customerNames, 4);
+        String firstLine =
+            "${(report.sales.indexOf(sale) + 1).toString().padRight(columnWidth1)}"
+            "${customerNameLines[0].padRight(columnWidth2)}"
+            "${sale.invoiceNo.padRight(columnWidth3)}"
+            "${sale.grandTotal.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(columnWidth4)}";
+
+        printer.printCustom(firstLine, 1, 0);
+
+        for (int i = 1; i < customerNameLines.length; i++) {
+          String subsequentLine =
+              "${''.padRight(columnWidth1)}"
+              "${customerNameLines[i].padRight(columnWidth2)}";
+          printer.printCustom(subsequentLine, 1, 0);
+        }
+      }
+      printer.printNewLine();
+      printAlignedText('',
+          'Total Sales: ${totalSales.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
+      printer.printNewLine();
+    }
+
+    // Printing Return Section
+    if (report.salesReturn.isNotEmpty) {
+      const int columnWidth1 = 10;
+      const int columnWidth2 = 30;
+      const int columnWidth3 = 12;
+      const int columnWidth4 = 8;
+
+      String headers = "${'SI NO'.padRight(columnWidth1)}"
+          "${'SHOP NAME'.padRight(columnWidth2)}"
+          "${'TYPE'.padRight(columnWidth3)}"
+          "${'Amount'.padLeft(columnWidth4)}";
+      printer.printCustom('Sales Return', 1, 0);
+      printer.printCustom(headers, 1, 0);
+
+      for (var salesReturn in report.salesReturn) {
+        String customerNames =
+            salesReturn.customer?.map((customer) => customer.name).join(", ") ?? '';
+        List<String> customerNameLines = splitByWords(customerNames, 4);
+        String firstLine =
+            "${(report.salesReturn.indexOf(salesReturn) + 1).toString().padRight(columnWidth1)}"
+            "${(customerNameLines.isNotEmpty ? customerNameLines[0] : '').padRight(columnWidth2)}"
+            "${(salesReturn.invoiceNo ?? 'No Type').padRight(columnWidth3)}"
+            "${(salesReturn.grandTotal ?? 0).toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(columnWidth4)}";
+
+        printer.printCustom(firstLine, 1, 0);
+        for (int i = 1; i < customerNameLines.length; i++) {
+          String subsequentLine = "${''.padRight(columnWidth1)}"
+              "${customerNameLines[i].padRight(columnWidth2)}";
+          printer.printCustom(subsequentLine, 1, 0);
+        }
+      }
+      printer.printNewLine();
+      printAlignedText('',
+          'Total Sales Return: ${totalSalesreturn.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
+      printer.printNewLine();
+    }
+
+    // Printing Collection Section
+    if (report.collection.isNotEmpty) {
+      const int columnWidth1 = 10;
+      const int columnWidth2 = 30;
+      const int columnWidth3 = 12;
+      const int columnWidth4 = 8;
+
+      String headers = "${'SI NO'.padRight(columnWidth1)}"
+          "${'SHOP NAME'.padRight(columnWidth2)}"
+          "${'TYPE'.padRight(columnWidth3)}"
+          "${'Amount'.padLeft(columnWidth4)}";
+      printer.printCustom('Collection', 1, 0);
+      printer.printCustom(headers, 1, 0);
+
+      for (var collection in report.collection) {
+        String customerNames =
+            collection.customer?.map((customer) => customer.name).join(", ") ?? '';
+        List<String> customerNameLines = splitByWords(customerNames, 4);
+        String firstLine =
+            "${(report.collection.indexOf(collection) + 1).toString().padRight(columnWidth1)}"
+            "${(customerNameLines.isNotEmpty ? customerNameLines[0] : '').padRight(columnWidth2)}"
+            "${(collection.collectionType ?? 'No Type').padRight(columnWidth3)}"
+            "${(double.tryParse(collection.totalAmount ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00').padLeft(columnWidth4)}";
+
+        printer.printCustom(firstLine, 1, 0);
+        for (int i = 1; i < customerNameLines.length; i++) {
+          String subsequentLine = "${''.padRight(columnWidth1)}"
+              "${customerNameLines[i].padRight(columnWidth2)}";
+          printer.printCustom(subsequentLine, 1, 0);
+        }
+      }
+      printer.printNewLine();
+      printAlignedText('',
+          'Total Collections: ${totalCollections.toStringAsFixed(AppState().noOfDecimals ?? 2)}');
+      printer.printNewLine();
+    }
+
+    // Printing Expense Section
+    if (report.expense.isNotEmpty) {
+      const int columnWidth1 = 6; // SI NO
+      const int columnWidth2 = 11; // REFERENCE
+      const int columnWidth3 = 12; // EXP.NAME
+      const int columnWidth4 = 11; // REMARKS
+      const int columnWidth5 = 8; // AMOUNT
+
+      String headers = "${'SI NO'.padRight(columnWidth1)}"
+          "${'REFERENCE'.padRight(columnWidth2)}"
+          "${'EXP.NAME'.padRight(columnWidth3)}"
+          "${'REMARKS'.padRight(columnWidth4)}"
+          "${'AMOUNT'.padLeft(columnWidth5)}";
+      printer.printCustom('Expense', 1, 0);
+      printer.printCustom(headers, 1, 0);
+
+      for (var expense in report.expense) {
+        String expenseName = expense.expense?.map((e) => e.name).join(", ") ?? "";
+        List<String> expenseNameLines = splitByWords(expenseName, 2);
+        String remarks = expense.description ?? '';
+        List<String> remarkLines = splitByWords(remarks, 2);
+
+        String firstLine =
+            "${(report.expense.indexOf(expense) + 1).toString().padRight(columnWidth1)}"
+            "${(expense.invoiceNo ?? '').padRight(columnWidth2)}"
+            "${(expenseNameLines.isNotEmpty ? expenseNameLines[0] : '').padRight(columnWidth3)}"
+            "${(remarkLines.isNotEmpty ? remarkLines[0] : '').padRight(columnWidth4)}"
+            "${(double.tryParse(expense.amount ?? '0')?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00').padLeft(columnWidth5)}";
+
+        printer.printCustom(firstLine, 1, 0);
+
+        int maxLines = expenseNameLines.length > remarkLines.length
+            ? expenseNameLines.length
+            : remarkLines.length;
+
+        for (int i = 1; i < maxLines; i++) {
+          String nextLine = "${''.padRight(columnWidth1)}"
+              "${''.padRight(columnWidth2)}"
+              "${(i < expenseNameLines.length ? expenseNameLines[i] : '').padRight(columnWidth3)}"
+              "${(i < remarkLines.length ? remarkLines[i] : '').padRight(columnWidth4)}";
+          printer.printCustom(nextLine, 1, 0);
+        }
+      }
+
+      printer.printNewLine();
+      printAlignedText(
+        '',
+        'Total Expenses: ${totalExpenses.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
+      );
+      printer.printNewLine();
+    }
+
+    printer.printCustom('Expense ${report.data.expense}', 1, 0);
+    printer.printCustom('Cash Deposited ${report.data.cashDeposited}', 1, 0);
+    printer.printCustom('Cash Handed Over ${report.data.cashHandOver}', 1, 0);
+    printer.printCustom(
+        'No of Cheque Deposited ${report.data.noOfChequeDeposited}', 1, 0);
+    printer.printCustom(
+        'Cheque Deposited Amount ${report.data.chequeDepositedAmount}', 1, 0);
+    printer.printCustom(
+        'No of Cheque Handed Over ${report.data.noOfChequeHandOver}', 1, 0);
+    printer.printCustom(
+        'Cheque Handed Over Amount ${report.data.chequeHandOverAmount}', 1, 0);
+    printer.printCustom(
+        'Balance Cash in Hand ${report.data.balanceCashInHand}', 1, 0);
+    printer.printCustom(
+        'No of Cheque in Hand ${report.data.noOfChequeInHand}', 1, 0);
+    printer.printCustom(
+        'Cheque Amount in Hand ${report.data.chequeAmountInHand}', 1, 0);
+    printer.printNewLine();
+
+    printer.printCustom('Thank you', 1, 1);
+    printer.paperCut();
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(

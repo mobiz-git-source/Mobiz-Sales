@@ -2,7 +2,11 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image/image.dart' as img;
+import 'package:mobizapp/Utilities/cpcl_helper.dart';
+import '../Utilities/report_printer.dart';
+import '../Reports/van_stock_report.dart';
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
@@ -88,6 +92,7 @@ class _VanStockScreenState extends State<VanStockScreen>
   }
 
   void _initPrinter() async {
+    await loadPrinterTypeCache();
     bool? isConnected = await printer.isConnected;
     if (isConnected!) {
       setState(() {
@@ -97,7 +102,7 @@ class _VanStockScreenState extends State<VanStockScreen>
     _getBluetoothDevices();
   }
 
-  void _getBluetoothDevices() async {
+  Future<void> _getBluetoothDevices() async {
     List<BluetoothDevice> devices = await printer.getBondedDevices();
     BluetoothDevice? defaultDevice;
     final prefs = await SharedPreferences.getInstance();
@@ -471,12 +476,9 @@ class _VanStockScreenState extends State<VanStockScreen>
                                                                         .blockSizeHorizontal *
                                                                     70,
                                                                 child: Text(
-                                                                  '${product.code} | ${product.name!.toUpperCase()}',
-                                                                  style: TextStyle(
-                                                                      fontSize:
-                                                                          AppConfig
-                                                                              .textCaption2Size),
-                                                                ),
+  '${product.code} | ${product.name!.toUpperCase()}',
+  style: TextStyle(fontSize: AppConfig.textCaption2Size.sp),
+),
                                                               ),
                                                             ),
                                                             Row(
@@ -752,299 +754,855 @@ class _VanStockScreenState extends State<VanStockScreen>
           ),
         ));
   }
+Future<void> _printVanStockAsImage({
+  required String title,
+  required List<VanStockPrintProduct> products,
+}) async {
+  final response = await http.get(Uri.parse(
+    '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}',
+  ));
 
+  if (response.statusCode != 200) {
+    throw Exception('Failed to load store details');
+  }
+
+  final storeDetail = StoreDetail.fromJson(json.decode(response.body));
+  final logoName = storeDetail.logos;
+  final logo = logoName != null && logoName.isNotEmpty
+      ? await loadLogo('https://erpadmin.mobiz.ae/uploads/store/$logoName')
+      : null;
+
+  await printReport(
+    printer,
+    _selectedDevice,
+    (builder) => drawVanStockReport(
+      builder,
+      companyName: '${storeDetail.name}',
+      title: title,
+      products: products,
+      logo: logo,
+    ),
+    widthDots: kLabelWidthDots,
+  );
+}
+
+Future<void> _printImageVanStock() async {
+  final seenProducts = <String>{};
+  final products = <VanStockPrintProduct>[];
+
+  for (final product in _filteredProducts) {
+    if (product.code.isEmpty || !seenProducts.add(product.code)) continue;
+
+    final seenUnits = <String>{};
+    final units = <VanStockPrintUnit>[];
+    for (final unit in product.units) {
+      final key = '${unit.name}-${unit.stock}';
+      if (seenUnits.add(key)) {
+        units.add(VanStockPrintUnit(
+          name: unit.name,
+          quantity: unit.stock.toString(),
+        ));
+      }
+    }
+
+    products.add(VanStockPrintProduct(
+      name: product.name,
+      code: product.code,
+      units: units,
+    ));
+  }
+
+  await _printVanStockAsImage(title: 'Van Stock', products: products);
+}
+
+Future<void> _printImageVanReturn() async {
+  final products = _filteredProducts1.map((product) {
+    return VanStockPrintProduct(
+      name: product.name.toUpperCase(),
+      code: product.code,
+      units: product.units
+          .map((unit) => VanStockPrintUnit(
+                name: unit.name,
+                quantity: unit.stock.toString(),
+              ))
+          .toList(),
+    );
+  }).toList();
+
+  await _printVanStockAsImage(title: 'Van Return', products: products);
+}
+  // Future<void> _printReturn() async {
+  //   if (_connected) {
+  //     // Print the top separator line
+  //     final response = await http.get(Uri.parse(
+  //         '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
+  //     if (response.statusCode == 200) {
+  //       // Parse JSON response into StoreDetail object
+  //       StoreDetail storeDetail =
+  //           StoreDetail.fromJson(json.decode(response.body));
+  //       final String api =
+  //           '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
+  //       final logoResponse = await http.get(Uri.parse(api));
+  //       if (logoResponse.statusCode != 200) {
+  //         throw Exception('Failed to load logo image');
+  //       }
+  //       String logoUrl =
+  //           'http://erpadmin.mobiz.ae/uploads/store/${storeDetail.logos}';
+  //       if (logoUrl.isNotEmpty) {
+  //         final response = await http.get(Uri.parse(logoUrl));
+  //         if (response.statusCode == 200) {
+  //           Uint8List imageBytes = response.bodyBytes;
+
+  //           // Decode image and convert to monochrome bitmap if needed
+  //           img.Image originalImage = img.decodeImage(imageBytes)!;
+  //           img.Image monoLogo = img.grayscale(originalImage);
+
+  //           // Encode the image to the required format (e.g., PNG)
+  //           Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
+
+  //           // Print the logo image
+  //           printer.printImageBytes(logoBytes);
+  //         } else {
+  //           print('Failed to load image: ${response.statusCode}');
+  //         }
+  //       }
+  //       printer.printNewLine();
+  //       String companyName = '${storeDetail.name}';
+  //       printer.printCustom(companyName, 3, 1);
+  //       printer.printNewLine();
+  //       printer.printCustom("Van Return", 3, 1);
+  //       printer.printNewLine();
+  //       printer.printCustom("-" * 70, 1, 1); // Centered
+
+  //       // Define column widths for table
+  //       const int columnWidth1 = 5; // S.No
+  //       const int columnWidth2 = 30; // Product Description
+  //       const int columnWidth3 = 13; // Code
+  //       const int columnWidth4 = 10; // Unit
+  //       const int columnWidth5 = 10; // Qty
+
+  //       // Print table headers
+  //       String headers = "${'S.No'.padRight(columnWidth1)}"
+  //           " ${'Product'.padRight(columnWidth2)}"
+  //           " ${'Code'.padRight(columnWidth3)}"
+  //           " ${'Unit'.padRight(columnWidth4)}"
+  //           "${'Qty'.padRight(columnWidth5)}";
+  //       printer.printCustom(headers, 1, 0); // Left aligned
+
+  //       // Function to split text into lines of a given width
+  //       List<String> splitText(String text, int width) {
+  //         List<String> lines = [];
+  //         while (text.length > width) {
+  //           lines.add(text.substring(0, width));
+  //           text = text.substring(width);
+  //         }
+  //         lines.add(text);
+  //         return lines;
+  //       }
+
+  //       printer.printNewLine();
+
+  //       int serialNumber = 1; // Initialize serial number counter
+
+  //       for (int i = 0; i < _filteredProducts1.length; i++) {
+  //         var product = _filteredProducts1[i];
+  //         String productName = "${product.name!.toUpperCase()}";
+  //         String productCode = "${product.code}";
+
+  //         // Check if there are units available
+  //         if (product.units.isNotEmpty) {
+  //           for (var unit in product.units) {
+  //             String productUnit = "${unit.name}"; // Access the unit name
+  //             String productQty = "${unit.stock}"; // Access the unit stock
+
+  //             List<String> descriptionLines =
+  //                 splitText(productName, columnWidth2);
+
+  //             for (int j = 0; j < descriptionLines.length; j++) {
+  //               String line;
+  //               if (j == 0) {
+  //                 // For the first line, include all columns
+  //                 line = "${serialNumber.toString().padRight(columnWidth1)}"
+  //                     "${descriptionLines[j].padRight(columnWidth2)}"
+  //                     "  ${productCode.padRight(columnWidth3)}"
+  //                     "${productUnit.padRight(columnWidth4)}"
+  //                     "${productQty.padRight(columnWidth5)}";
+  //               } else {
+  //                 line = "${''.padRight(columnWidth1)}"
+  //                     "${descriptionLines[j].padRight(columnWidth2)}"
+  //                     "${''.padRight(columnWidth3)}"
+  //                     "${''.padRight(columnWidth4)}"
+  //                     "${''.padRight(columnWidth5)}";
+  //               }
+  //               printer.printCustom(line, 1, 0); // Left aligned
+  //             }
+  //             serialNumber++; // Increment the serial number for each unit printed
+  //           }
+  //         } else {
+  //           // Handle case where no units are available
+  //           String productUnit = "No units available";
+  //           String productQty = "N/A"; // Or any default value
+
+  //           List<String> descriptionLines =
+  //               splitText(productName, columnWidth2);
+  //           for (int j = 0; j < descriptionLines.length; j++) {
+  //             String line;
+  //             if (j == 0) {
+  //               line = "${serialNumber.toString().padRight(columnWidth1)}"
+  //                   "${descriptionLines[j].padRight(columnWidth2)}"
+  //                   "  ${productCode.padRight(columnWidth3)}"
+  //                   "${productUnit.padRight(columnWidth4)}"
+  //                   "${productQty.padRight(columnWidth5)}";
+  //             } else {
+  //               line = "${''.padRight(columnWidth1)}"
+  //                   "${descriptionLines[j].padRight(columnWidth2)}"
+  //                   "${''.padRight(columnWidth3)}"
+  //                   "${''.padRight(columnWidth4)}"
+  //                   "${''.padRight(columnWidth5)}";
+  //             }
+  //             printer.printCustom(line, 1, 0); // Left aligned
+  //           }
+  //         }
+  //       }
+
+  //       // Print the bottom separator line
+  //       printer.printCustom("-" * 70, 1, 1); // Centered
+  //       printer.printNewLine();
+  //       printer.paperCut();
+  //     } else {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('Printer not connected')),
+  //       );
+  //     }
+  //   }
+  //   if (!_connected) {
+  //     await _connect();
+  //   }
+  // }
+
+  // Future<void> _printStock() async {
+  //   if (_connected) {
+  //     final response = await http.get(Uri.parse(
+  //         '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
+
+  //     if (response.statusCode == 200) {
+  //       StoreDetail storeDetail =
+  //       StoreDetail.fromJson(json.decode(response.body));
+  //       final String api =
+  //           '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
+  //       final logoResponse = await http.get(Uri.parse(api));
+  //       if (logoResponse.statusCode != 200) {
+  //         throw Exception('Failed to load logo image');
+  //       }
+  //       Uint8List imageBytes = logoResponse.bodyBytes;
+  //       img.Image originalImage = img.decodeImage(imageBytes)!;
+  //       img.Image monoLogo = img.grayscale(originalImage);
+  //       Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
+  //       printer.printImageBytes(logoBytes);
+
+  //       printer.printNewLine();
+  //       printer.printCustom(storeDetail.name, 3, 1);
+  //       printer.printNewLine();
+  //       printer.printCustom("Van Stock", 3, 1);
+  //       printer.printNewLine();
+  //       printer.printCustom("-" * 70, 1, 1);
+
+  //       const int columnWidth1 = 5;
+  //       const int columnWidth2 = 30;
+  //       const int columnWidth3 = 13;
+  //       const int columnWidth4 = 10;
+  //       const int columnWidth5 = 10;
+  //       String headers = "${'S.No'.padRight(columnWidth1)}"
+  //           " ${'Product'.padRight(columnWidth2)}"
+  //           " ${'Code'.padRight(columnWidth3)}"
+  //           " ${'Unit'.padRight(columnWidth4)}"
+  //           "${'Qty'.padRight(columnWidth5)}";
+  //       printer.printCustom(headers, 1, 0);
+
+  //       List<String> splitText(String text, int width) {
+  //         List<String> lines = [];
+  //         while (text.length > width) {
+  //           lines.add(text.substring(0, width));
+  //           text = text.substring(width);
+  //         }
+  //         lines.add(text);
+  //         return lines;
+  //       }
+
+  //       printer.printNewLine();
+  //       int serialNumber = 1;
+
+  //       final uniqueProducts = <String, dynamic>{};
+  //       for (var product in _filteredProducts) {
+  //         uniqueProducts[product.code!] = product;
+  //       }
+
+  //       for (var product in uniqueProducts.values) {
+  //         final uniqueUnits = <String, dynamic>{};
+  //         for (var unit in product.units) {
+  //           final key = '${unit.name}-${unit.stock}';
+  //           uniqueUnits[key] = unit;
+  //         }
+
+  //         if (uniqueUnits.isNotEmpty) {
+  //           for (var unit in uniqueUnits.values) {
+  //             String productName = "${product.name!.toUpperCase()}";
+  //             String productCode = "${product.code}";
+  //             String productUnit = "${unit.name}";
+  //             String productQty = "${unit.stock}";
+
+  //             List<String> descriptionLines =
+  //             splitText(productName, columnWidth2);
+
+  //             for (int j = 0; j < descriptionLines.length; j++) {
+  //               String line;
+  //               if (j == 0) {
+  //                 line = "${serialNumber.toString().padRight(columnWidth1)}"
+  //                     "${descriptionLines[j].padRight(columnWidth2)}"
+  //                     "  ${productCode.padRight(columnWidth3)}"
+  //                     "${productUnit.padRight(columnWidth4)}"
+  //                     "${productQty.padRight(columnWidth5)}";
+  //               } else {
+  //                 line = "${''.padRight(columnWidth1)}"
+  //                     "${descriptionLines[j].padRight(columnWidth2)}"
+  //                     "${''.padRight(columnWidth3)}"
+  //                     "${''.padRight(columnWidth4)}"
+  //                     "${''.padRight(columnWidth5)}";
+  //               }
+  //               printer.printCustom(line, 1, 0);
+  //             }
+  //             serialNumber++;
+  //           }
+  //         } else {
+  //           // No units available
+  //           String productName = "${product.name!.toUpperCase()}";
+  //           String productCode = "${product.code}";
+  //           String productUnit = "No units available";
+  //           String productQty = "N/A";
+
+  //           List<String> descriptionLines =
+  //           splitText(productName, columnWidth2);
+  //           for (int j = 0; j < descriptionLines.length; j++) {
+  //             String line;
+  //             if (j == 0) {
+  //               line = "${serialNumber.toString().padRight(columnWidth1)}"
+  //                   "${descriptionLines[j].padRight(columnWidth2)}"
+  //                   "  ${productCode.padRight(columnWidth3)}"
+  //                   "${productUnit.padRight(columnWidth4)}"
+  //                   "${productQty.padRight(columnWidth5)}";
+  //             } else {
+  //               line = "${''.padRight(columnWidth1)}"
+  //                   "${descriptionLines[j].padRight(columnWidth2)}"
+  //                   "${''.padRight(columnWidth3)}"
+  //                   "${''.padRight(columnWidth4)}"
+  //                   "${''.padRight(columnWidth5)}";
+  //             }
+  //             printer.printCustom(line, 1, 0);
+  //           }
+  //           serialNumber++;
+  //         }
+  //       }
+
+  //       printer.printCustom("-" * 70, 1, 1);
+  //       printer.printNewLine();
+  //       printer.paperCut();
+  //     } else {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('Printer not connected')),
+  //       );
+  //     }
+  //   }
+  //   if (_selectedDevice == null) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('Default device not found')),
+  //     );
+  //     return;
+  //   }
+  //   if (!_connected) {
+  //     await _connect();
+  //   }
+  // }
+// ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════
+  // VAN RETURN PRINT ROUTER
+  // ═══════════════════════════════════════════════════════════════
   Future<void> _printReturn() async {
-    if (_connected) {
-      // Print the top separator line
-      final response = await http.get(Uri.parse(
-          '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
-      if (response.statusCode == 200) {
-        // Parse JSON response into StoreDetail object
-        StoreDetail storeDetail =
-            StoreDetail.fromJson(json.decode(response.body));
-        final String api =
-            '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
-        final logoResponse = await http.get(Uri.parse(api));
-        if (logoResponse.statusCode != 200) {
-          throw Exception('Failed to load logo image');
-        }
-        String logoUrl =
-            'http://erpadmin.mobiz.ae/uploads/store/${storeDetail.logos}';
-        if (logoUrl.isNotEmpty) {
-          final response = await http.get(Uri.parse(logoUrl));
-          if (response.statusCode == 200) {
-            Uint8List imageBytes = response.bodyBytes;
-
-            // Decode image and convert to monochrome bitmap if needed
-            img.Image originalImage = img.decodeImage(imageBytes)!;
-            img.Image monoLogo = img.grayscale(originalImage);
-
-            // Encode the image to the required format (e.g., PNG)
-            Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
-
-            // Print the logo image
-            printer.printImageBytes(logoBytes);
-          } else {
-            print('Failed to load image: ${response.statusCode}');
-          }
-        }
-        printer.printNewLine();
-        String companyName = '${storeDetail.name}';
-        printer.printCustom(companyName, 3, 1);
-        printer.printNewLine();
-        printer.printCustom("Van Return", 3, 1);
-        printer.printNewLine();
-        printer.printCustom("-" * 70, 1, 1); // Centered
-
-        // Define column widths for table
-        const int columnWidth1 = 5; // S.No
-        const int columnWidth2 = 30; // Product Description
-        const int columnWidth3 = 13; // Code
-        const int columnWidth4 = 10; // Unit
-        const int columnWidth5 = 10; // Qty
-
-        // Print table headers
-        String headers = "${'S.No'.padRight(columnWidth1)}"
-            " ${'Product'.padRight(columnWidth2)}"
-            " ${'Code'.padRight(columnWidth3)}"
-            " ${'Unit'.padRight(columnWidth4)}"
-            "${'Qty'.padRight(columnWidth5)}";
-        printer.printCustom(headers, 1, 0); // Left aligned
-
-        // Function to split text into lines of a given width
-        List<String> splitText(String text, int width) {
-          List<String> lines = [];
-          while (text.length > width) {
-            lines.add(text.substring(0, width));
-            text = text.substring(width);
-          }
-          lines.add(text);
-          return lines;
-        }
-
-        printer.printNewLine();
-
-        int serialNumber = 1; // Initialize serial number counter
-
-        for (int i = 0; i < _filteredProducts1.length; i++) {
-          var product = _filteredProducts1[i];
-          String productName = "${product.name!.toUpperCase()}";
-          String productCode = "${product.code}";
-
-          // Check if there are units available
-          if (product.units.isNotEmpty) {
-            for (var unit in product.units) {
-              String productUnit = "${unit.name}"; // Access the unit name
-              String productQty = "${unit.stock}"; // Access the unit stock
-
-              List<String> descriptionLines =
-                  splitText(productName, columnWidth2);
-
-              for (int j = 0; j < descriptionLines.length; j++) {
-                String line;
-                if (j == 0) {
-                  // For the first line, include all columns
-                  line = "${serialNumber.toString().padRight(columnWidth1)}"
-                      "${descriptionLines[j].padRight(columnWidth2)}"
-                      "  ${productCode.padRight(columnWidth3)}"
-                      "${productUnit.padRight(columnWidth4)}"
-                      "${productQty.padRight(columnWidth5)}";
-                } else {
-                  line = "${''.padRight(columnWidth1)}"
-                      "${descriptionLines[j].padRight(columnWidth2)}"
-                      "${''.padRight(columnWidth3)}"
-                      "${''.padRight(columnWidth4)}"
-                      "${''.padRight(columnWidth5)}";
-                }
-                printer.printCustom(line, 1, 0); // Left aligned
-              }
-              serialNumber++; // Increment the serial number for each unit printed
-            }
-          } else {
-            // Handle case where no units are available
-            String productUnit = "No units available";
-            String productQty = "N/A"; // Or any default value
-
-            List<String> descriptionLines =
-                splitText(productName, columnWidth2);
-            for (int j = 0; j < descriptionLines.length; j++) {
-              String line;
-              if (j == 0) {
-                line = "${serialNumber.toString().padRight(columnWidth1)}"
-                    "${descriptionLines[j].padRight(columnWidth2)}"
-                    "  ${productCode.padRight(columnWidth3)}"
-                    "${productUnit.padRight(columnWidth4)}"
-                    "${productQty.padRight(columnWidth5)}";
-              } else {
-                line = "${''.padRight(columnWidth1)}"
-                    "${descriptionLines[j].padRight(columnWidth2)}"
-                    "${''.padRight(columnWidth3)}"
-                    "${''.padRight(columnWidth4)}"
-                    "${''.padRight(columnWidth5)}";
-              }
-              printer.printCustom(line, 1, 0); // Left aligned
-            }
-          }
-        }
-
-        // Print the bottom separator line
-        printer.printCustom("-" * 70, 1, 1); // Centered
-        printer.printNewLine();
-        printer.paperCut();
-      } else {
+    // Printer must be known BEFORE choosing Zebra/Sewoo
+    if (_selectedDevice == null) await _getBluetoothDevices();
+    if (_selectedDevice == null) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Printer not connected')),
+          const SnackBar(content: Text('Default printer not found')),
+        );
+      }
+      return;
+    }
+    print('PRINT route: zebra=${isZebraPrinter(_selectedDevice)} '
+        'name=${_selectedDevice?.name} addr=${_selectedDevice?.address}');
+
+    final bool? isActuallyConnected = await printer.isConnected;
+    if (isActuallyConnected != true) {
+      _connected = false;
+      await _connect();
+    }
+
+    if (!_connected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Printer not connected')),
+      );
+      return;
+    }
+
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    try {
+    if (isZebraPrinter(_selectedDevice)) {
+  await _printImageVanReturn();
+} else {
+  await _printSewooReturn();
+}
+    } catch (e, st) {
+      print('Print error: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Print failed: $e')),
         );
       }
     }
-    if (!_connected) {
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // VAN STOCK PRINT ROUTER
+  // ═══════════════════════════════════════════════════════════════
+  Future<void> _printStock() async {
+    if (_selectedDevice == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Default device not found')),
+      );
+      return;
+    }
+
+    final bool? isActuallyConnected = await printer.isConnected;
+    if (isActuallyConnected != true) {
+      _connected = false;
       await _connect();
+    }
+
+    if (!_connected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Printer not connected')),
+      );
+      return;
+    }
+
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    try {
+     if (isZebraPrinter(_selectedDevice)) {
+  await _printImageVanStock();
+} else {
+  await _printSewooStock();
+}
+    } catch (e, st) {
+      print('Print error: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Print failed: $e')),
+        );
+      }
     }
   }
 
-  Future<void> _printStock() async {
-    if (_connected) {
-      final response = await http.get(Uri.parse(
-          '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
+  // ───────────────────────────────────────────────────────────────
+  // 1. ZEBRA ENGINE - VAN RETURN (CPCL)
+  // ───────────────────────────────────────────────────────────────
+  Future<void> _printZebraReturn() async {
+    final response = await http.get(Uri.parse(
+        '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
+    if (response.statusCode != 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to load store details')));
+      return;
+    }
+    StoreDetail storeDetail = StoreDetail.fromJson(json.decode(response.body));
 
-      if (response.statusCode == 200) {
-        StoreDetail storeDetail =
-        StoreDetail.fromJson(json.decode(response.body));
-        final String api =
-            '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
-        final logoResponse = await http.get(Uri.parse(api));
-        if (logoResponse.statusCode != 200) {
-          throw Exception('Failed to load logo image');
-        }
-        Uint8List imageBytes = logoResponse.bodyBytes;
-        img.Image originalImage = img.decodeImage(imageBytes)!;
-        img.Image monoLogo = img.grayscale(originalImage);
-        Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
-        printer.printImageBytes(logoBytes);
+    final cpcl = CpclBuilder(kLabelWidthDots);
 
-        printer.printNewLine();
-        printer.printCustom(storeDetail.name, 3, 1);
-        printer.printNewLine();
-        printer.printCustom("Van Stock", 3, 1);
-        printer.printNewLine();
-        printer.printCustom("-" * 70, 1, 1);
-
-        const int columnWidth1 = 5;
-        const int columnWidth2 = 30;
-        const int columnWidth3 = 13;
-        const int columnWidth4 = 10;
-        const int columnWidth5 = 10;
-        String headers = "${'S.No'.padRight(columnWidth1)}"
-            " ${'Product'.padRight(columnWidth2)}"
-            " ${'Code'.padRight(columnWidth3)}"
-            " ${'Unit'.padRight(columnWidth4)}"
-            "${'Qty'.padRight(columnWidth5)}";
-        printer.printCustom(headers, 1, 0);
-
-        List<String> splitText(String text, int width) {
-          List<String> lines = [];
-          while (text.length > width) {
-            lines.add(text.substring(0, width));
-            text = text.substring(width);
+    if (storeDetail.logos != null && storeDetail.logos!.isNotEmpty) {
+      try {
+        String logoUrl =
+            'https://erpadmin.mobiz.ae/uploads/store/${storeDetail.logos}';
+        final logoResp = await http.get(Uri.parse(logoUrl));
+        if (logoResp.statusCode == 200) {
+          img.Image? original = img.decodeImage(logoResp.bodyBytes);
+          if (original != null) {
+            img.Image resized = img.copyResize(original, width: kLogoWidthPx);
+            final bytesPerRow = (resized.width / 8).ceil();
+            final packed = imageTo1BitCpcl(resized, invert: kInvertLogoBits);
+            cpcl.addLogo(packed, bytesPerRow, resized.height);
           }
-          lines.add(text);
-          return lines;
         }
+      } catch (e) {
+        print('Logo error: $e');
+      }
+    }
 
-        printer.printNewLine();
-        int serialNumber = 1;
+    cpcl.centerText('${storeDetail.name}', font: 5, lineGap: 34);
+    cpcl.centerText("Van Return", font: 5, lineGap: 34);
+    cpcl.hLine();
 
-        final uniqueProducts = <String, dynamic>{};
-        for (var product in _filteredProducts) {
-          uniqueProducts[product.code!] = product;
+    cpcl.text("S.No Product                   Unit      Qty", font: 4, lineGap: 30);
+    cpcl.hLine(thickness: 1);
+
+    int serialNumber = 1;
+    for (int i = 0; i < _filteredProducts1.length; i++) {
+      var product = _filteredProducts1[i];
+      if (product.units.isNotEmpty) {
+        for (var unit in product.units) {
+          String sNo = serialNumber.toString().padRight(4);
+          String name = product.name.toUpperCase();
+          if (name.length > 38) name = name.substring(0, 38);
+          String unitName = unit.name.toString().padLeft(6);
+          String qty = unit.stock.toString().padLeft(8);
+
+          cpcl.text('$sNo$name', font: 4, lineGap: 28);
+          String details = '     [${product.code}]'.padRight(25) + '$unitName  $qty';
+          cpcl.text(details, font: 4, lineGap: 30);
+
+          serialNumber++;
         }
+      } else {
+        String sNo = serialNumber.toString().padRight(4);
+        String name = product.name.toUpperCase();
+        if (name.length > 38) name = name.substring(0, 38);
+        cpcl.text('$sNo$name', font: 4, lineGap: 28);
+        String details = '     [${product.code}]'.padRight(25) + '   N/A       0';
+        cpcl.text(details, font: 4, lineGap: 30);
+        serialNumber++;
+      }
+    }
 
-        for (var product in uniqueProducts.values) {
-          final uniqueUnits = <String, dynamic>{};
+    cpcl.hLine();
+    cpcl.centerText('Total Items: ${serialNumber - 1}', font: 4, lineGap: 30);
+    cpcl.feed(40);
+
+    final bytes = cpcl.build();
+    await sendCpcl(printer, bytes);
+  }
+
+  // ───────────────────────────────────────────────────────────────
+  // 2. SEWOO ENGINE - VAN RETURN (ESC/POS)
+  // ───────────────────────────────────────────────────────────────
+  Future<void> _printSewooReturn() async {
+    final response = await http.get(Uri.parse(
+        '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
+    if (response.statusCode == 200) {
+      StoreDetail storeDetail =
+          StoreDetail.fromJson(json.decode(response.body));
+
+      String logoUrl =
+          'http://erpadmin.mobiz.ae/uploads/store/${storeDetail.logos}';
+      if (logoUrl.isNotEmpty) {
+        try {
+          final logoBytes = await buildSewooLogoBytes(logoUrl);
+          if (logoBytes != null) {
+            await printer.printImageBytes(logoBytes);
+            await Future.delayed(const Duration(milliseconds: 500));
+          }
+        } catch (e) {
+          print('Failed to load logo: $e');
+        }
+      }
+
+      printer.printNewLine();
+      String companyName = '${storeDetail.name}';
+      printer.printCustom(companyName, 3, 1);
+      printer.printNewLine();
+      printer.printCustom("Van Return", 3, 1);
+      printer.printNewLine();
+      printer.printCustom("-" * 70, 1, 1);
+
+      const int columnWidth1 = 5;
+      const int columnWidth2 = 30;
+      const int columnWidth3 = 13;
+      const int columnWidth4 = 10;
+      const int columnWidth5 = 10;
+
+     String headers = "${'#'.padRight(columnWidth1)}"
+    "${'Product'.padRight(columnWidth2)} "
+    "${'Unit'.padRight(columnWidth3)}"
+          "${'Qty'.padRight(columnWidth5)}";
+      printer.printCustom(headers, 1, 0);
+      printer.printNewLine();
+
+      int serialNumber = 1;
+      for (int i = 0; i < _filteredProducts1.length; i++) {
+        var product = _filteredProducts1[i];
+        String productName = "${product.name.toUpperCase()}";
+        String productCode = "${product.code}";
+
+        if (product.units.isNotEmpty) {
           for (var unit in product.units) {
-            final key = '${unit.name}-${unit.stock}';
-            uniqueUnits[key] = unit;
-          }
+            String productUnit = "${unit.name}";
+            String productQty = "${unit.stock}";
+            List<String> descriptionLines = _splitText(productName, columnWidth2);
 
-          if (uniqueUnits.isNotEmpty) {
-            for (var unit in uniqueUnits.values) {
-              String productName = "${product.name!.toUpperCase()}";
-              String productCode = "${product.code}";
-              String productUnit = "${unit.name}";
-              String productQty = "${unit.stock}";
-
-              List<String> descriptionLines =
-              splitText(productName, columnWidth2);
-
-              for (int j = 0; j < descriptionLines.length; j++) {
-                String line;
-                if (j == 0) {
-                  line = "${serialNumber.toString().padRight(columnWidth1)}"
+            for (int j = 0; j < descriptionLines.length; j++) {
+              String line = j == 0
+                  ? "${serialNumber.toString().padRight(columnWidth1)}"
                       "${descriptionLines[j].padRight(columnWidth2)}"
                       "  ${productCode.padRight(columnWidth3)}"
                       "${productUnit.padRight(columnWidth4)}"
-                      "${productQty.padRight(columnWidth5)}";
-                } else {
-                  line = "${''.padRight(columnWidth1)}"
+                      "${productQty.padRight(columnWidth5)}"
+                  : "${''.padRight(columnWidth1)}"
                       "${descriptionLines[j].padRight(columnWidth2)}"
                       "${''.padRight(columnWidth3)}"
                       "${''.padRight(columnWidth4)}"
                       "${''.padRight(columnWidth5)}";
-                }
-                printer.printCustom(line, 1, 0);
-              }
-              serialNumber++;
-            }
-          } else {
-            // No units available
-            String productName = "${product.name!.toUpperCase()}";
-            String productCode = "${product.code}";
-            String productUnit = "No units available";
-            String productQty = "N/A";
-
-            List<String> descriptionLines =
-            splitText(productName, columnWidth2);
-            for (int j = 0; j < descriptionLines.length; j++) {
-              String line;
-              if (j == 0) {
-                line = "${serialNumber.toString().padRight(columnWidth1)}"
-                    "${descriptionLines[j].padRight(columnWidth2)}"
-                    "  ${productCode.padRight(columnWidth3)}"
-                    "${productUnit.padRight(columnWidth4)}"
-                    "${productQty.padRight(columnWidth5)}";
-              } else {
-                line = "${''.padRight(columnWidth1)}"
-                    "${descriptionLines[j].padRight(columnWidth2)}"
-                    "${''.padRight(columnWidth3)}"
-                    "${''.padRight(columnWidth4)}"
-                    "${''.padRight(columnWidth5)}";
-              }
               printer.printCustom(line, 1, 0);
             }
             serialNumber++;
           }
-        }
+        } else {
+          String productUnit = "No units available";
+          String productQty = "N/A";
+          List<String> descriptionLines = _splitText(productName, columnWidth2);
 
-        printer.printCustom("-" * 70, 1, 1);
-        printer.printNewLine();
-        printer.paperCut();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Printer not connected')),
-        );
+          for (int j = 0; j < descriptionLines.length; j++) {
+            String line = j == 0
+                ? "${serialNumber.toString().padRight(columnWidth1)}"
+                    "${descriptionLines[j].padRight(columnWidth2)}"
+                    "  ${productCode.padRight(columnWidth3)}"
+                    "${productUnit.padRight(columnWidth4)}"
+                    "${productQty.padRight(columnWidth5)}"
+                : "${''.padRight(columnWidth1)}"
+                    "${descriptionLines[j].padRight(columnWidth2)}"
+                    "${''.padRight(columnWidth3)}"
+                    "${''.padRight(columnWidth4)}"
+                    "${''.padRight(columnWidth5)}";
+            printer.printCustom(line, 1, 0);
+          }
+          serialNumber++;
+        }
       }
-    }
-    if (_selectedDevice == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Default device not found')),
-      );
-      return;
-    }
-    if (!_connected) {
-      await _connect();
+
+      printer.printCustom("-" * 70, 1, 1);
+      printer.printNewLine();
+      printer.paperCut();
     }
   }
 
+  // ───────────────────────────────────────────────────────────────
+  // 3. ZEBRA ENGINE - VAN STOCK (CPCL)
+  // ───────────────────────────────────────────────────────────────
+  Future<void> _printZebraStock() async {
+    final response = await http.get(Uri.parse(
+        '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
+    if (response.statusCode != 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to load store details')));
+      return;
+    }
+    StoreDetail storeDetail = StoreDetail.fromJson(json.decode(response.body));
+
+    final cpcl = CpclBuilder(kLabelWidthDots);
+
+    if (storeDetail.logos != null && storeDetail.logos!.isNotEmpty) {
+      try {
+        final String api =
+            '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
+        final logoResponse = await http.get(Uri.parse(api));
+        if (logoResponse.statusCode == 200) {
+          img.Image? original = img.decodeImage(logoResponse.bodyBytes);
+          if (original != null) {
+            img.Image resized = img.copyResize(original, width: kLogoWidthPx);
+            final bytesPerRow = (resized.width / 8).ceil();
+            final packed = imageTo1BitCpcl(resized, invert: kInvertLogoBits);
+            cpcl.addLogo(packed, bytesPerRow, resized.height);
+          }
+        }
+      } catch (e) {
+        print('Logo error: $e');
+      }
+    }
+
+    cpcl.centerText(storeDetail.name, font: 5, lineGap: 34);
+    cpcl.centerText("Van Stock", font: 5, lineGap: 34);
+    cpcl.hLine();
+
+    cpcl.text("S.No Product                   Unit      Qty", font: 4, lineGap: 30);
+    cpcl.hLine(thickness: 1);
+
+    int serialNumber = 1;
+    final uniqueProducts = <String, dynamic>{};
+    for (var product in _filteredProducts) {
+      if (product.code.isNotEmpty) {
+        uniqueProducts[product.code] = product;
+      }
+    }
+
+    for (var product in uniqueProducts.values) {
+      final uniqueUnits = <String, dynamic>{};
+      for (var unit in product.units) {
+        final key = '${unit.name}-${unit.stock}';
+        uniqueUnits[key] = unit;
+      }
+
+      if (uniqueUnits.isNotEmpty) {
+        for (var unit in uniqueUnits.values) {
+          String sNo = serialNumber.toString().padRight(4);
+          String name = product.name.toUpperCase();
+          if (name.length > 38) name = name.substring(0, 38);
+          String unitName = unit.name.toString().padLeft(6);
+          String qty = unit.stock.toString().padLeft(8);
+
+          cpcl.text('$sNo$name', font: 4, lineGap: 28);
+          String details = '     [${product.code}]'.padRight(25) + '$unitName  $qty';
+          cpcl.text(details, font: 4, lineGap: 30);
+
+          serialNumber++;
+        }
+      } else {
+        String sNo = serialNumber.toString().padRight(4);
+        String name = product.name.toUpperCase();
+        if (name.length > 38) name = name.substring(0, 38);
+        cpcl.text('$sNo$name', font: 4, lineGap: 28);
+        String details = '     [${product.code}]'.padRight(25) + '   N/A       0';
+        cpcl.text(details, font: 4, lineGap: 30);
+        serialNumber++;
+      }
+    }
+
+    cpcl.hLine();
+    cpcl.centerText('Total Items: ${serialNumber - 1}', font: 4, lineGap: 30);
+    cpcl.feed(40);
+
+    final bytes = cpcl.build();
+    await sendCpcl(printer, bytes);
+  }
+
+  // ───────────────────────────────────────────────────────────────
+  // 4. SEWOO ENGINE - VAN STOCK (ESC/POS)
+  // ───────────────────────────────────────────────────────────────
+  Future<void> _printSewooStock() async {
+    final response = await http.get(Uri.parse(
+        '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
+
+    if (response.statusCode == 200) {
+      StoreDetail storeDetail =
+          StoreDetail.fromJson(json.decode(response.body));
+
+      try {
+        final String api =
+            '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
+        final logoBytes = await buildSewooLogoBytes(api);
+        if (logoBytes != null) {
+          await printer.printImageBytes(logoBytes);
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      } catch (e) {
+        print('Logo load error: $e');
+      }
+      printer.printNewLine();
+      printer.printCustom(storeDetail.name, 3, 1);
+      printer.printNewLine();
+      printer.printCustom("Van Stock", 3, 1);
+      printer.printNewLine();
+      printer.printCustom("-" * 70, 1, 1);
+
+      const int columnWidth1 = 5;
+      const int columnWidth2 = 30;
+      const int columnWidth3 = 13;
+      const int columnWidth4 = 10;
+      const int columnWidth5 = 10;
+
+      String headers = "${'S.No'.padRight(columnWidth1)}"
+          " ${'Product'.padRight(columnWidth2)}"
+          " ${'Code'.padRight(columnWidth3)}"
+          " ${'Unit'.padRight(columnWidth4)}"
+          "${'Qty'.padRight(columnWidth5)}";
+      printer.printCustom(headers, 1, 0);
+      printer.printNewLine();
+
+      int serialNumber = 1;
+      final uniqueProducts = <String, dynamic>{};
+      for (var product in _filteredProducts) {
+        if (product.code.isNotEmpty) {
+          uniqueProducts[product.code] = product;
+        }
+      }
+
+      for (var product in uniqueProducts.values) {
+        final uniqueUnits = <String, dynamic>{};
+        for (var unit in product.units) {
+          final key = '${unit.name}-${unit.stock}';
+          uniqueUnits[key] = unit;
+        }
+
+        if (uniqueUnits.isNotEmpty) {
+          for (var unit in uniqueUnits.values) {
+            String productName = "${product.name.toUpperCase()}";
+            String productCode = "${product.code}";
+            String productUnit = "${unit.name}";
+            String productQty = "${unit.stock}";
+            List<String> descriptionLines = _splitText(productName, columnWidth2);
+
+            for (int j = 0; j < descriptionLines.length; j++) {
+              String line = j == 0
+                  ? "${serialNumber.toString().padRight(columnWidth1)}"
+                      "${descriptionLines[j].padRight(columnWidth2)}"
+                      "  ${productCode.padRight(columnWidth3)}"
+                      "${productUnit.padRight(columnWidth4)}"
+                      "${productQty.padRight(columnWidth5)}"
+                  : "${''.padRight(columnWidth1)}"
+                      "${descriptionLines[j].padRight(columnWidth2)}"
+                      "${''.padRight(columnWidth3)}"
+                      "${''.padRight(columnWidth4)}"
+                      "${''.padRight(columnWidth5)}";
+              printer.printCustom(line, 1, 0);
+            }
+            serialNumber++;
+          }
+        } else {
+          String productName = "${product.name.toUpperCase()}";
+          String productCode = "${product.code}";
+          String productUnit = "No units available";
+          String productQty = "N/A";
+          List<String> descriptionLines = _splitText(productName, columnWidth2);
+
+          for (int j = 0; j < descriptionLines.length; j++) {
+            String line = j == 0
+                ? "${serialNumber.toString().padRight(columnWidth1)}"
+                    "${descriptionLines[j].padRight(columnWidth2)}"
+                    "  ${productCode.padRight(columnWidth3)}"
+                    "${productUnit.padRight(columnWidth4)}"
+                    "${productQty.padRight(columnWidth5)}"
+                : "${''.padRight(columnWidth1)}"
+                    "${descriptionLines[j].padRight(columnWidth2)}"
+                    "${''.padRight(columnWidth3)}"
+                    "${''.padRight(columnWidth4)}"
+                    "${''.padRight(columnWidth5)}";
+            printer.printCustom(line, 1, 0);
+          }
+          serialNumber++;
+        }
+      }
+
+      printer.printCustom("-" * 70, 1, 1);
+      printer.printNewLine();
+      printer.paperCut();
+    }
+  }
+
+  List<String> _splitText(String text, int width) {
+    List<String> lines = [];
+    while (text.length > width) {
+      lines.add(text.substring(0, width));
+      text = text.substring(width);
+    }
+    lines.add(text);
+    return lines;
+  }
   // Widget _buildListItem(Product product) {
   //   // Implement the widget to build the list item for each product
   //   return ListTile(
@@ -1194,4 +1752,3 @@ class Unit {
     );
   }
 }
-

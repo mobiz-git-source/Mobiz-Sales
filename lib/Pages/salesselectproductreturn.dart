@@ -41,6 +41,8 @@ class _SalesselectproductreturnState extends State<Salesselectproductreturn> {
   String? paydata;
   List<ProductType> productTypes = [];
   // int? dataId;
+  String _productTypeKey(int index) =>
+    'productTypereturn_store${AppState().storeId ?? 0}_$index';
       Future<bool> addToCart(
         Product product, String qty, String rate, String? typeName) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -72,9 +74,9 @@ class _SalesselectproductreturnState extends State<Salesselectproductreturn> {
     await prefs.setStringList('cartItemsreturn', cartItems);
       await prefs.setString('qtyreturn$newIndex', qty);
     await prefs.setString('amountreturn$newIndex', rate);
-    if (typeName != null) {
-      await prefs.setString('productTypereturn$newIndex', typeName);
-    }
+   if (typeName != null) {
+  await prefs.setString(_productTypeKey(newIndex), typeName);
+}
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${product.name} added')),
@@ -407,8 +409,7 @@ class _SalesselectproductreturnState extends State<Salesselectproductreturn> {
   String? selectedUnitName =
       product.units.isNotEmpty ? product.units.first.name : null;
 
-  ProductType? selectedType =
-      productTypes.isNotEmpty ? productTypes.first : null;
+  ProductType? selectedType;
 
   showDialog(
     context: context,
@@ -578,8 +579,8 @@ class _SalesselectproductreturnState extends State<Salesselectproductreturn> {
                                           FontWeight.w500,
                                     ),
                                     value: selectedType,
-                                    hint: const Text(
-                                      'Normal',
+                                  hint: const Text(
+  'Select type',
                                       style: TextStyle(
                                         fontSize:
                                             AppFontSizes
@@ -1050,14 +1051,19 @@ class _SalesselectproductreturnState extends State<Salesselectproductreturn> {
                               ),
                               elevation: 0,
                             ),
-                            onPressed: () async {
-                          
+                         onPressed: () async {
+    if (selectedType == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Please select a product type.')),
+      );
+      return;
+    }
 
-                              if (selectedUnitName != null) {
-                                product.selectedUnitName =
-                                    selectedUnitName;
-                              }
-
+    if (selectedUnitName != null) {
+      product.selectedUnitName =
+          selectedUnitName;
+    }
                               await addToCart(
                                 product,
                                 qtyController.text.isEmpty

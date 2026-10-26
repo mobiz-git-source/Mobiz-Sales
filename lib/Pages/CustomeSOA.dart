@@ -8,6 +8,9 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:mobizapp/Models/appstate.dart';
+import 'package:mobizapp/Reports/soa_report.dart';
+import 'package:mobizapp/Utilities/cpcl_helper.dart';
+import 'package:mobizapp/Utilities/report_printer.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -48,6 +51,7 @@ class _SOAState extends State<SOA> {
   BlueThermalPrinter printer = BlueThermalPrinter.instance;
 
   void _initPrinter() async {
+    await loadPrinterTypeCache();
     bool? isConnected = await printer.isConnected;
     if (isConnected!) {
       setState(() {
@@ -57,7 +61,7 @@ class _SOAState extends State<SOA> {
     _getBluetoothDevices();
   }
 
-  void _getBluetoothDevices() async {
+  Future<void> _getBluetoothDevices() async {
     List<BluetoothDevice> devices = await printer.getBondedDevices();
     BluetoothDevice? defaultDevice;
     final prefs = await SharedPreferences.getInstance();
@@ -312,29 +316,298 @@ class _SOAState extends State<SOA> {
     await OpenFile.open(file.path);
   }
 
-  void _printSOA(
+  // void _printSOA(
+  //   StoreDetail store,
+  //   List<List<dynamic>> data,
+  //   double opening,
+  //   double closing,
+  // ) async {
+  //   if (!_connected) {
+  //     await _connect();
+  //   }
+
+  //   // 1. Print LOGO
+  //   final logoUrl =
+  //       '${RestDatasource().Image_URL}/uploads/store/${store.logos}';
+  //   final response = await http.get(Uri.parse(logoUrl));
+
+  //   if (response.statusCode == 200) {
+  //     Uint8List imageBytes = response.bodyBytes;
+  //     img.Image? original = img.decodeImage(imageBytes);
+  //     if (original != null) {
+  //       img.Image mono = img.grayscale(original);
+  //       Uint8List finalLogo = Uint8List.fromList(img.encodePng(mono));
+  //       printer.printImageBytes(finalLogo);
+  //     }
+  //   }
+
+  //   printer.printNewLine();
+
+  //   // 2. Company Name + TRN + Address
+  //   printer.printCustom(store.name, 3, 1);
+  //   if (store.address != null) printer.printCustom(store.address!, 1, 1);
+  //   if (store.trn != null) printer.printCustom("TRN: ${store.trn}", 1, 1);
+
+  //   printer.printNewLine();
+
+  //   // 3. Title
+  //   printer.printCustom("STATEMENT OF ACCOUNTS", 2, 1);
+  //   printer.printCustom("-" * 68, 1, 1);
+
+  //   // 4. Customer + Date Range
+  //   printer.printCustom("Customer: $code | $name", 1, 0);
+  //   printer.printCustom("Address: $address", 1, 0);
+  //   printer.printCustom(
+  //       "From: ${DateHelper.displayFromDateTime(_selectedDatefrom!)}", 1, 0);
+
+  //   printer.printCustom(
+  //       "To     : ${DateHelper.displayFromDateTime(_selectedDateto!)}", 1, 0);
+
+  //   printer.printCustom("-" * 68, 1, 1);
+  //   const dateHeader = 'Date';
+  //   const refHeader = 'Ref';
+  //   const debitHeader = 'Debit';
+  //   const creditHeader = 'Credit';
+  //   const balHeader = 'Balance';
+
+  //   printer.printCustom(
+  //       '${dateHeader.padRight(12)}'
+  //       '${refHeader.padRight(8)}'
+  //       '${debitHeader.padLeft(9)}'
+  //       '${creditHeader.padLeft(9)}'
+  //       '${balHeader.padLeft(10)}',
+  //       1,
+  //       0);
+  //   printer.printCustom("-" * 68, 1, 0);
+
+  //   // 6. OPENING ROW
+  //   printer.printCustom(
+  //       "${''.padRight(10)} ${''.padRight(30)} ${''.padRight(7)} ${'Opening'.padRight(7)} ${opening.toStringAsFixed(AppState().noOfDecimals ?? 2)}",
+  //       1,
+  //       0);
+
+  //   // 7. ALL ROWS - Use balance from API (index 4)
+  //   for (var row in data) {
+  //     String date = DateHelper.displayDate(row[0].toString());
+  //     String ref = row[1].toString();
+  //     double Debit =
+  //         row[2] != null ? double.parse(row[2].toString()).abs() : 0.0;
+  //     double Credit =
+  //         row[3] != null ? double.parse(row[3].toString()).abs() : 0.0;
+  //     double balance = row[4] != null ? double.parse(row[4].toString()) : 0.0;
+
+  //     final dateStr = date.length > 12 ? date.substring(0, 12) : date;
+  //     final refStr = ref.length > 8 ? ref.substring(0, 8) : ref;
+
+  //     printer.printCustom(
+  //       '${dateStr.padRight(12)}'
+  //       '${refStr.padRight(8)}'
+  //       '${Debit.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(9)}'
+  //       '${Credit.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(9)}'
+  //       '${balance.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(10)}',
+  //       1,
+  //       0,
+  //     );
+  //   }
+
+  //   printer.printCustom("-" * 68, 1, 1);
+
+  //   // 8. CLOSING BALANCE
+  //   printer.printCustom(
+  //       "Closing Balance: ${closing.toStringAsFixed(AppState().noOfDecimals ?? 2)}",
+  //       2,
+  //       1);
+
+  //   printer.printNewLine();
+
+  //   // FINAL CUT
+  //   printer.paperCut();
+  // }
+/// Main Print Dispatcher: Routes automatically to Zebra (CPCL) or Sewoo (ESC/POS)
+   /// Main Print Dispatcher: single shared image pipeline, auto-detects
+  /// Zebra vs Sewoo internally via printReport().
+  Future<void> _printSOA(
+    StoreDetail store,
+    List<List<dynamic>> data,
+    double opening,
+    double closing,
+    ) async {
+    // Printer must be known BEFORE choosing Zebra/Sewoo
+    if (_selectedDevice == null) await _getBluetoothDevices();
+    if (_selectedDevice == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Default printer not found')),
+        );
+      }
+      return;
+    }
+    print('PRINT route: zebra=${isZebraPrinter(_selectedDevice)} '
+        'name=${_selectedDevice?.name} addr=${_selectedDevice?.address}');
+
+    if (!_connected) await _connect();
+    if (!_connected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Printer not connected')),
+      );
+      return;
+    }
+   try {
+  if (isZebraPrinter(_selectedDevice)) {
+    final logoFile = store.logos;
+    final logo = (logoFile != null && logoFile.isNotEmpty)
+        ? await loadLogo(
+            '${RestDatasource().Image_URL}/uploads/store/$logoFile',
+          )
+        : null;
+
+    await printReport(
+      printer,
+      _selectedDevice,
+      (b) => drawSoaReport(
+        b,
+        store,
+        data,
+        opening,
+        closing,
+        logo: logo,
+        customerCode: code,
+        customerName: name,
+        customerAddress: address,
+        fromDate: _selectedDatefrom,
+        toDate: _selectedDateto,
+      ),
+    );
+  } else {
+    await _printSewooSOA(store, data, opening, closing);
+  }
+} catch (e, st) {
+      print('Print error: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Print failed: $e')),
+        );
+      }
+    }
+  }
+  // ═══════════════════════════════════════════════════════════════
+  // 1. ZEBRA ENGINE (CPCL Mode)
+  // ═══════════════════════════════════════════════════════════════
+ // ═══════════════════════════════════════════════════════════════
+  // 1. ZEBRA ENGINE (CPCL Mode - Clean Layout, No Overlap)
+  // ═══════════════════════════════════════════════════════════════
+  Future<void> _printZebraSOA(
     StoreDetail store,
     List<List<dynamic>> data,
     double opening,
     double closing,
   ) async {
-    if (!_connected) {
-      await _connect();
+    final int decimals = AppState().noOfDecimals ?? 2;
+    final cpcl = CpclBuilder(kLabelWidthDots);
+
+    // ---- 1. Logo ----
+    if (store.logos != null && store.logos!.isNotEmpty) {
+      try {
+        final logoUrl =
+            '${RestDatasource().Image_URL}/uploads/store/${store.logos}';
+        final response = await http.get(Uri.parse(logoUrl));
+        if (response.statusCode == 200) {
+          img.Image? original = img.decodeImage(response.bodyBytes);
+          if (original != null) {
+            img.Image resized = img.copyResize(original, width: kLogoWidthPx);
+            final bytesPerRow = (resized.width / 8).ceil();
+            final packed = imageTo1BitCpcl(resized, invert: kInvertLogoBits);
+            cpcl.addLogo(packed, bytesPerRow, resized.height);
+          }
+        }
+      } catch (e) {
+        print('Logo error: $e');
+      }
     }
 
-    // 1. Print LOGO
-    final logoUrl =
-        '${RestDatasource().Image_URL}/uploads/store/${store.logos}';
-    final response = await http.get(Uri.parse(logoUrl));
+    // ---- 2. Company header ----
+    cpcl.centerText(store.name, font: 5, lineGap: 34);
+    if (store.address != null && store.address!.isNotEmpty) {
+      cpcl.centerText(store.address!, font: 4, lineGap: 24);
+    }
+    if (store.trn != null && store.trn!.isNotEmpty) {
+      cpcl.centerText("TRN: ${store.trn}", font: 4, lineGap: 24);
+    }
+    cpcl.hLine();
+    cpcl.centerText("STATEMENT OF ACCOUNTS", font: 5, lineGap: 34);
+    cpcl.hLine();
 
-    if (response.statusCode == 200) {
-      Uint8List imageBytes = response.bodyBytes;
-      img.Image? original = img.decodeImage(imageBytes);
-      if (original != null) {
-        img.Image mono = img.grayscale(original);
-        Uint8List finalLogo = Uint8List.fromList(img.encodePng(mono));
-        printer.printImageBytes(finalLogo);
-      }
+    // ---- 3. Customer + date range ----
+    cpcl.text("Customer: ${code ?? ''} | ${name ?? ''}");
+    if (address != null && address!.isNotEmpty) {
+      cpcl.text("Address: $address");
+    }
+    if (_selectedDatefrom != null) {
+      cpcl.twoColumn("From: ${DateHelper.displayFromDateTime(_selectedDatefrom!)}", 
+          "To: ${_selectedDateto != null ? DateHelper.displayFromDateTime(_selectedDateto!) : ''}");
+    }
+    cpcl.hLine();
+
+    // ---- 4. Table Header (Max 42 characters) ----
+    // Format: Date (10) | Ref (10) | Debit (7) | Credit (7) | Bal (8) = 42 chars
+    cpcl.text("Date       Ref        Debit  Credit   Balance", font: 4, lineGap: 30);
+    cpcl.hLine(thickness: 1);
+
+    // ---- 5. Opening balance row ----
+    String openAmt = opening.toStringAsFixed(decimals).padLeft(8);
+    cpcl.text("                      Opening Balance:$openAmt", font: 4, lineGap: 28);
+
+    // ---- 6. Transaction rows (Clean 42-char alignment) ----
+    for (var row in data) {
+      String date = DateHelper.displayDate(row[0].toString());
+      if (date.length > 10) date = date.substring(0, 10);
+      String dateStr = date.padRight(11);
+
+      String ref = row[1]?.toString() ?? '';
+      if (ref.length > 10) ref = ref.substring(0, 10);
+      String refStr = ref.padRight(11);
+
+      double debit =
+          row[2] != null ? double.parse(row[2].toString()).abs() : 0.0;
+      double credit =
+          row[3] != null ? double.parse(row[3].toString()).abs() : 0.0;
+      double balance =
+          row[4] != null ? double.parse(row[4].toString()) : 0.0;
+
+      String dStr = debit > 0 ? debit.toStringAsFixed(decimals).padLeft(7) : "       ";
+      String cStr = credit > 0 ? credit.toStringAsFixed(decimals).padLeft(7) : "       ";
+      String bStr = balance.toStringAsFixed(decimals).padLeft(8);
+
+      cpcl.text('$dateStr$refStr$dStr $cStr $bStr', font: 4, lineGap: 28);
+    }
+    cpcl.hLine();
+
+    // ---- 7. Closing balance ----
+    cpcl.boldText("Closing Balance: ${closing.toStringAsFixed(decimals)}",
+        font: 5, x: 180, lineGap: 36);
+    cpcl.feed(10);
+    cpcl.centerText('--- THANK YOU ---', font: 4, lineGap: 24);
+    cpcl.feed(40);
+
+    final bytes = cpcl.build();
+    await sendCpcl(printer, bytes);
+  }
+  // ═══════════════════════════════════════════════════════════════
+  // 2. SEWOO ENGINE (Original Exact ESC/POS Size & Formatting)
+  // ═══════════════════════════════════════════════════════════════
+  Future<void> _printSewooSOA(
+    StoreDetail store,
+    List<List<dynamic>> data,
+    double opening,
+    double closing,
+  ) async {
+    // 1. Print LOGO
+      final logoUrl =
+        '${RestDatasource().Image_URL}/uploads/store/${store.logos}';
+    final logoBytes = await buildSewooLogoBytes(logoUrl);
+    if (logoBytes != null) {
+      await printer.printImageBytes(logoBytes);
+      await Future.delayed(const Duration(milliseconds: 500));
     }
 
     printer.printNewLine();
@@ -420,7 +693,8 @@ class _SOAState extends State<SOA> {
     printer.paperCut();
   }
 
-  _generateAndPrintSOA(List data, double opening, double closing) async {
+  Future<void> _generateAndPrintSOA(
+      List data, double opening, double closing) async {
     final response = await http.get(Uri.parse(
         '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
 
@@ -428,7 +702,7 @@ class _SOAState extends State<SOA> {
       StoreDetail storeDetail =
           StoreDetail.fromJson(json.decode(response.body));
 
-      _printSOA(
+      await _printSOA(
         storeDetail,
         data.map<List<dynamic>>((e) => List<dynamic>.from(e)).toList(),
         opening,

@@ -754,9 +754,10 @@ SizedBox(height: 10),
                             '-' +
                             (1000 + (DateTime.now().microsecond % 9000))
                                 .toString();
-                        final selectedProduct = {
+                                          final selectedProduct = {
                           'serial_number': serialNumber,
                           'id': product.id,
+                          'tax_percentage': product.taxPercentage, // Sale-il ullathu pole
                           'code': product.code,
                           'name': product.name,
                           'pro_image': product.proImage,

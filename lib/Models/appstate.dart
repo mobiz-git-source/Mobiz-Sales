@@ -10,8 +10,47 @@ class AppState {
   String? name;
   String? email;
   String? vatState;
-  String? vatLabel;
-  String? validate_qtySO;
+String? vatLabel;
+String? taxName;
+
+String get taxLabel {
+  final name = taxName?.trim();
+  return name == null || name.isEmpty ? 'Vat' : name;
+}
+static const String _taxNameKey = 'tax_name_cache';
+
+Future<void> saveTaxName() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final n = taxName?.trim();
+    if (n != null && n.isNotEmpty) {
+      await prefs.setString(_taxNameKey, n);
+    }
+  } catch (e) {
+    print('saveTaxName error: $e');
+  }
+}
+
+Future<void> loadTaxName() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_taxNameKey);
+    if ((taxName == null || taxName!.trim().isEmpty) &&
+        saved != null &&
+        saved.isNotEmpty) {
+      taxName = saved;
+    }
+  } catch (e) {
+    print('loadTaxName error: $e');
+  }
+}
+
+Future<void> clearTaxName() async {
+  taxName = null;
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove(_taxNameKey);
+}
+String? validate_qtySO;
   String? validate_qtySales;
   String? discountState;
   String? attendanceState;
@@ -53,9 +92,10 @@ class AppState {
     userId;
     rolId;
     storeId;
-    vatState;
-    vatLabel = "VAT";
-    validate_qtySO;
+   vatState;
+vatLabel = "VAT";
+taxName = null;
+validate_qtySO;
     validate_qtySales;
     discountState;
     attendanceState;
@@ -93,9 +133,18 @@ AppState.fromJson(Map<String, dynamic> json) {
     isExistingUser = json['is_existing_user'];
     token = json['token'];
     storeId = json['store_id'];
-    vatState = json['vat_no_vat'];
-    vatLabel = json['vat_label'];
-    validate_qtySO = json['validate_qty_in_so'];
+   vatState = json['vat_no_vat'];
+vatLabel = json['vat_label'];
+
+final tax = json['tax'];
+final newTaxName = json['tax_name']?.toString() ??
+    (tax is Map ? tax['name']?.toString() : null);
+if (newTaxName != null && newTaxName.trim().isNotEmpty) {
+  taxName = newTaxName.trim();
+  saveTaxName(); // NEW: persist
+}
+
+validate_qtySO = json['validate_qty_in_so'];
     validate_qtySales = json['validate_qty_in_sales'];
     discountState = json['discount'];
     attendanceState = json['attendance'];
@@ -138,9 +187,17 @@ void updateFromJson(Map<String, dynamic> json) {
   isExistingUser = json['is_existing_user'];
   token = json['token'];
   storeId = json['store_id'];
-  vatState = json['vat_no_vat'];
-  vatLabel = json['vat_label'];
-  validate_qtySO = json['validate_qty_in_so'];
+ vatState = json['vat_no_vat'];
+vatLabel = json['vat_label'];
+final tax = json['tax'];
+final newTaxName = json['tax_name']?.toString() ??
+    (tax is Map ? tax['name']?.toString() : null);
+if (newTaxName != null && newTaxName.trim().isNotEmpty) {
+  taxName = newTaxName.trim();
+  saveTaxName(); // NEW: persist
+}
+
+validate_qtySO = json['validate_qty_in_so'];
   validate_qtySales = json['validate_qty_in_sales'];
   discountState = json['discount'];
   attendanceState = json['attendance'];
@@ -193,9 +250,10 @@ Map<String, dynamic> toJson() {
   data['name'] = name;
   data['email'] = email;
   data['store_id'] = storeId;
-  data['vat_no_vat'] = vatState;
-  data['vat_label'] = vatLabel;
-  data['validate_qty_in_so'] = validate_qtySO;
+data['vat_no_vat'] = vatState;
+data['vat_label'] = vatLabel;
+data['tax_name'] = taxName;
+data['validate_qty_in_so'] = validate_qtySO;
   data['validate_qty_in_sales'] = validate_qtySales;
   data['discount'] = discountState;
   data['attendance'] = attendanceState;

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +13,11 @@ import 'package:printing/printing.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:http/http.dart' as http;
+import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../Utilities/cpcl_helper.dart';
+import '../Utilities/report_printer.dart';
+import '../Reports/sales_order_report.dart';
 
 import '../Models/invoicedata.dart' as Invoice;
 import '../Models/pdfgenerate.dart';
@@ -46,15 +52,427 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
   int? id;
   String? name;
 
-  Qty.ProductQuantityDetails qunatityData = Qty.ProductQuantityDetails();
+    Qty.ProductQuantityDetails qunatityData = Qty.ProductQuantityDetails();
   List<Qty.ProductQuantityDetails> quantity = [];
 
-  @override
-  void initState() {
-    super.initState();
-    _getProducts();
+  BluetoothDevice? _selectedDevice;
+  List<BluetoothDevice> _devices = [];
+  BlueThermalPrinter printer = BlueThermalPrinter.instance;
+  bool _connected = false;
+
+ @override
+void initState() {
+  super.initState();
+  AppState().loadTaxName().then((_) {
+    if (mounted) setState(() {});
+  });
+  _initPrinter();
+}
+
+bool _listInit = false;
+String _listType = 'sales'; // 'sales' | 'proforma' | 'merchandise'
+
+List<Map<String, dynamic>> merchList = [];
+List<Map<String, dynamic>> filteredMerch = [];
+bool get _isMerch => _listType == 'merchandise';
+
+String get _listPath => _listType == 'proforma'
+    ? '/api/proforma_order.index'
+    : _isMerch
+        ? '/api/merchandise.index'
+        : '/api/vansales_order.index';
+
+String get _statusPath => _listType == 'proforma'
+    ? '/api/proforma_order.status'
+    : _isMerch
+        ? '/api/merchandise.status'
+        : '/api/vansales_order.status';
+
+String get _screenTitle => _listType == 'proforma'
+    ? 'Proforma Orders'
+    : _isMerch
+        ? 'Merchandise Orders'
+        : 'Sales Order';
+
+@override
+void didChangeDependencies() {
+  super.didChangeDependencies();
+  if (_listInit) return;
+  _listInit = true;
+  final args = ModalRoute.of(context)?.settings.arguments;
+  if (args is Map && args['listType'] != null) {
+    _listType = args['listType'].toString();
+  }
+  _getProducts();
+}
+
+  void _initPrinter() async {
+    await loadPrinterTypeCache();
+    bool? isConnected = await printer.isConnected;
+    if (isConnected == true && mounted) {
+      setState(() => _connected = true);
+    }
+    _getBluetoothDevices();
   }
 
+   Future<void> _getBluetoothDevices() async {
+    List<BluetoothDevice> devices = await printer.getBondedDevices();
+    BluetoothDevice? defaultDevice;
+    final prefs = await SharedPreferences.getInstance();
+    final savedDeviceAddress = prefs.getString('selected_device_address');
+    for (BluetoothDevice device in devices) {
+      if (device.address == savedDeviceAddress) {
+        defaultDevice = device;
+        break;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _devices = devices;
+      _selectedDevice = defaultDevice;
+    });
+  }
+
+  Future<void> _connect() async {
+    if (_selectedDevice != null) {
+      await printer.connect(_selectedDevice!);
+      if (!mounted) return;
+      setState(() => _connected = true);
+    }
+  }
+
+  Future<void> _print(Invoice.InvoiceData invoice) async {
+    await AppState().loadTaxName();
+
+    final bool? live = await printer.isConnected;
+    if (live != true) {
+      _connected = false;
+      await _connect();
+    }
+    if (!_connected) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Printer not connected')),
+        );
+      }
+      return;
+    }
+
+      try {
+      if (isZebraPrinter(_selectedDevice)) {
+        // ZEBRA: image print (Arabic support)
+        final logoFile = invoice.data?.store?.firstOrNull?.logo;
+        final logo = (logoFile != null && logoFile.isNotEmpty)
+            ? await loadLogo('$kOrderLogoBaseUrl$logoFile')
+            : null;
+
+        await printReport(
+          printer,
+          _selectedDevice,
+          (b) => drawSalesOrder(b, invoice, logo: logo),
+        );
+      } else {
+        // SEWOO: pazhaya text print, invoice pole
+        await _printSewoo(invoice);
+      }
+    } catch (e, st) {
+      print('Print error: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Print failed: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _getInvoicePrint(int id) async {
+    try {
+      if (_selectedDevice == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Default device not found')),
+        );
+        return;
+      }
+      RestDatasource api = RestDatasource();
+    dynamic response = await api.getDetails(
+    '/api/get_sales_order_invoice?id=$id${_listType == 'proforma' ? '&type=proforma' : ''}',
+    AppState().token);
+         debugPrint('PRINT RESPONSE (id=$id, type=$_listType): $response');
+      if (response['data'] != null) {
+        final invoice = Invoice.InvoiceData.fromJson(response);
+        await _print(invoice);
+      }
+    } catch (e, st) {
+      print('Error printing order: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error printing order: $e')),
+        );
+      }
+    }
+  }
+  Future<Uint8List> _arabicTextToImageBytes(
+    String text, {
+    double fontSize = 26,
+    double maxWidth = 380,
+  }) async {
+    final TextPainter textPainter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: Colors.black,
+          fontSize: fontSize,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'NotoNaskhArabic',
+        ),
+      ),
+      textDirection: ui.TextDirection.rtl,
+      textAlign: TextAlign.center,
+    );
+    textPainter.layout(maxWidth: maxWidth);
+
+    final double rawWidth = textPainter.width.ceilToDouble();
+    final double width = (rawWidth / 8).ceil() * 8;
+    final double height = textPainter.height.ceilToDouble();
+
+    final ui.PictureRecorder recorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(recorder, Rect.fromLTWH(0, 0, width, height));
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, width, height),
+      Paint()..color = Colors.white,
+    );
+    textPainter.paint(canvas, Offset.zero);
+
+    final ui.Image image =
+        await recorder.endRecording().toImage(width.toInt(), height.toInt());
+    final ByteData? byteData =
+        await image.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  List<String> _wrapWords(String text, int width) {
+    final lines = <String>[];
+    var current = '';
+    for (final word in text.trim().split(RegExp(r'\s+'))) {
+      if (word.isEmpty) continue;
+      if (word.length > width) {
+        if (current.isNotEmpty) {
+          lines.add(current);
+          current = '';
+        }
+        var w = word;
+        while (w.length > width) {
+          lines.add(w.substring(0, width));
+          w = w.substring(width);
+        }
+        current = w;
+      } else if (current.isEmpty) {
+        current = word;
+      } else if (current.length + 1 + word.length <= width) {
+        current = '$current $word';
+      } else {
+        lines.add(current);
+        current = word;
+      }
+    }
+    if (current.isNotEmpty) lines.add(current);
+    return lines.isEmpty ? [''] : lines;
+  }
+
+  String _amountInWords(num amount) {
+    final dec = AppState().noOfDecimals ?? 2;
+    final parts = amount.toStringAsFixed(dec).split('.');
+    final whole = int.parse(parts[0]);
+    final minor = parts.length > 1 ? int.parse(parts[1]) : 0;
+
+    var words = "Amount in Words: ${AppState().code} "
+        "${NumberToWord().convert('en-in', whole).toUpperCase()}";
+
+    if (minor > 0) {
+      words += " AND ${NumberToWord().convert('en-in', minor).toUpperCase()} "
+          "${AppState().minor}";
+    }
+    return "$words ONLY";
+  }
+
+  Future<void> _printSewoo(Invoice.InvoiceData invoice) async {
+       final d = invoice.data!;
+    if (d.store == null || d.store!.isEmpty) {
+      throw Exception('Server returned no store details for this order');
+    }
+    if (d.customer == null || d.customer!.isEmpty) {
+      throw Exception('Server returned no customer details for this order');
+    }
+    final store = d.store![0];
+    final cust = d.customer![0];
+    final decimals = AppState().noOfDecimals ?? 2;
+
+    String companyName = store.invoice_company_name ?? store.name ?? 'N/A';
+    String companyNameAr = store.name_ar ?? '';
+    String companyAddress = store.address ?? 'N/A';
+    String companyMail = store.email ?? 'N/A';
+    String companyTRN = "TRN: ${store.trn ?? 'N/A'}";
+
+    String customerName = "${cust.name}";
+    List<String> nameWords = customerName.split(' ');
+    String firstLine = customerName;
+    String secondLine = "";
+    if (nameWords.length > 7) {
+      firstLine = nameWords.sublist(0, 7).join(' ');
+      secondLine = nameWords.sublist(7).join(' ');
+    }
+    String cusAddress = cust.address?.toString() ?? '';
+    String customerContact = cust.contactNumber ?? 'N/A';
+    String customerTRN = cust.trn ?? '';
+
+    final orderNumber = d.invoiceNo ?? 'N/A';
+    final orderDate = DateHelper.displayDate(d.inDate);
+    final remarks = d.remarks;
+
+    final amountInWords = _amountInWords(d.grandTotal ?? 0);
+    String van = d.van?.firstOrNull?.name ?? 'N/A';
+    String salesman = d.user?.firstOrNull?.name ?? 'N/A';
+
+    void printAlignedText(String leftText, String rightText) {
+      const int maxLineLength = 68;
+      int spaceLength = maxLineLength - (leftText.length + rightText.length);
+      String spaces = ' ' * (spaceLength > 0 ? spaceLength : 1);
+      printer.printCustom('$leftText$spaces$rightText', 1, 0);
+    }
+
+    // Logo
+    String logoUrl = '$kOrderLogoBaseUrl${store.logo}';
+    if (store.logo != null && store.logo!.isNotEmpty) {
+      try {
+        final logoBytes = await buildSewooLogoBytes(logoUrl);
+        if (logoBytes != null) {
+          await printer.printImageBytes(logoBytes);
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      } catch (e) {
+        print('Sewoo logo error: $e');
+      }
+    }
+
+    // Company details
+    printer.printNewLine();
+    printer.printCustom(companyName, 3, 1);
+    if (companyNameAr.trim().isNotEmpty) {
+      try {
+        final Uint8List arabicNameBytes =
+            await _arabicTextToImageBytes(companyNameAr, fontSize: 30);
+        await printer.printImageBytes(arabicNameBytes);
+        await Future.delayed(const Duration(milliseconds: 300));
+      } catch (e) {
+        print('Failed to print Arabic company name: $e');
+      }
+    }
+    printer.printCustom(companyAddress, 1, 1);
+    printer.printCustom(companyMail, 1, 1);
+    printer.printCustom(companyTRN, 1, 1);
+    printer.printNewLine();
+
+       printer.printCustom(_listType == 'proforma' ? "PROFORMA ORDER" : "SALES ORDER", 2, 1);
+    printer.printNewLine();
+
+    printer.printCustom("-" * 72, 1, 1);
+    printAlignedText("Order No: $orderNumber", "Date: $orderDate");
+    printAlignedText("", "Time: ${d.inTime ?? ''}");
+    if (remarks != null && remarks.toString().isNotEmpty) {
+      printAlignedText("Remarks: $remarks", "");
+    }
+    printer.printNewLine();
+
+    // Customer
+    printAlignedText("Customer: $firstLine", "");
+    if (secondLine.isNotEmpty) {
+      printAlignedText("         $secondLine", "");
+    }
+    if (cusAddress.isNotEmpty && cusAddress != 'null') {
+      printAlignedText(cusAddress, " ");
+    }
+    printAlignedText("Contact No: $customerContact", "");
+    printAlignedText("${store.vat_label ?? 'TRN'}: $customerTRN", " ");
+    printer.printNewLine();
+
+    printer.printCustom("-" * 70, 1, 1);
+
+    const int columnWidth1 = 3; // #
+    const int columnWidth2 = 19; // Product
+    const int columnWidth3 = 4; // Unit
+    const int columnWidth4 = 5; // Qty
+    const int columnWidth6 = 9; // Rate
+    const int columnWidth7 = 9; // Amount
+    const int columnWidth8 = 8; // Tax
+    const int columnWidth9 = 9; // Total
+
+    String headers = "${'#'.padRight(columnWidth1)}"
+        "${'Product'.padRight(columnWidth2)} "
+        "${'Unit'.padRight(columnWidth3)}"
+        "${'Qty'.padLeft(columnWidth4)}"
+        "${'Rate'.padLeft(columnWidth6)}"
+        "${'Amount'.padLeft(columnWidth7)}"
+        "${AppState().taxLabel.padLeft(columnWidth8)}"
+        "${'Total'.padLeft(columnWidth9)}";
+    printer.printCustom(headers, 1, 0);
+
+    for (int i = 0; i < d.detail!.length; i++) {
+      final it = d.detail![i];
+      String productDescription = it.name ?? 'N/A';
+      String productUnit = '${it.unit ?? 'N/A'}';
+      String productQty = it.quantity?.toString() ?? '0';
+      String productRate = it.mrp?.toStringAsFixed(decimals) ?? '0.00';
+      String productTotal = it.taxable?.toStringAsFixed(decimals) ?? '0.00';
+      String productTax = it.taxAmt?.toStringAsFixed(decimals) ?? '0.00';
+      String productAmount = it.amount?.toStringAsFixed(decimals) ?? '0.00';
+
+      List<String> descriptionLines =
+          _wrapWords(productDescription, columnWidth2);
+
+      for (int j = 0; j < descriptionLines.length; j++) {
+        String line;
+        if (j == 0) {
+          line = "${(i + 1).toString().padRight(columnWidth1)}"
+              "${descriptionLines[j].padRight(columnWidth2)} "
+              "${productUnit.padRight(columnWidth3)}"
+              "${productQty.padLeft(columnWidth4)}"
+              "${productRate.padLeft(columnWidth6)}"
+              "${productTotal.padLeft(columnWidth7)}"
+              "${productTax.padLeft(columnWidth8)}"
+              "${productAmount.padLeft(columnWidth9)}";
+        } else {
+          line = "${''.padRight(columnWidth1)}"
+              "${descriptionLines[j].padRight(columnWidth2)}";
+        }
+        printer.printCustom(line, 1, 0);
+      }
+    }
+    printer.printCustom("-" * 70, 1, 1);
+
+    // Totals
+    final total = (d.total ?? 0).toDouble();
+    final double discount = d.effectiveDiscount.toDouble();
+    final subTotal = total - discount;
+    final tax = (d.totalTax ?? 0).toStringAsFixed(decimals);
+    final grandTotal = (d.grandTotal ?? 0).toStringAsFixed(decimals);
+
+    printAlignedText(
+        "Van      : $van", "Total: ${total.toStringAsFixed(decimals)}");
+    if (discount > 0) {
+          printAlignedText("Salesman : $salesman",
+          "${d.discountLabel}: ${discount.toStringAsFixed(decimals)}");
+    } else {
+      printAlignedText("Salesman : $salesman", "");
+    }
+    printAlignedText(
+        "", "Sub Total: ${subTotal.toStringAsFixed(decimals)}");
+    printAlignedText("", "${AppState().taxLabel}: $tax");
+    printAlignedText("", "Grand Total: $grandTotal");
+    printer.printNewLine();
+    printer.printCustom(amountInWords, 1, 0);
+
+    printer.paperCut();
+  }
   @override
   void dispose() {
     _searchController.dispose();
@@ -62,7 +480,7 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
   }
 
   Future<String?> fetchUpdatedStatus(int id) async {
-    final url = Uri.parse('http://68.183.92.8:3699/api/vansales_order.status?id=$id');
+ final url = Uri.parse('http://68.183.92.8:3699$_statusPath?id=$id');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
@@ -78,7 +496,23 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
     return null;
   }
 
-  void _filterProducts(String query) {
+    void _filterProducts(String query) {
+    if (_isMerch) {
+      final q = query.toLowerCase();
+      setState(() {
+        _isSearching = query.isNotEmpty;
+        filteredMerch = q.isEmpty
+            ? merchList
+            : merchList.where((m) {
+                final c = (m['customer']?['name'] ?? '').toString().toLowerCase();
+                         return (m['invoice_no'] ?? '').toString().toLowerCase().contains(q) ||
+                    c.contains(q) ||
+                    (m['in_date'] ?? '').toString().contains(q);
+              }).toList();
+      });
+      return;
+    }
+
     if (query.isEmpty) {
       setState(() {
         filteredProducts = products.data ?? [];
@@ -128,11 +562,12 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
       return [
         IconButton(
           icon: Icon(Icons.clear, color: AppConfig.backgroundColor),
-          onPressed: () {
+               onPressed: () {
             setState(() {
               _searchController.clear();
               _isSearching = false;
               filteredProducts = products.data ?? [];
+              filteredMerch = merchList;
             });
           },
         ),
@@ -153,12 +588,11 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (ModalRoute.of(context)!.settings.arguments != null) {
-      final Map<String, dynamic>? params =
-      ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
-      id = params!['customerId'];
-      name = params!['name'];
-    }
+  final routeArgs = ModalRoute.of(context)?.settings.arguments;
+if (routeArgs is Map) {
+  id = routeArgs['customerId'] as int?;
+  name = routeArgs['name']?.toString();
+}
 
     String getStatusText(int status, int convertToSales) {
       if (convertToSales == 1) {
@@ -180,10 +614,10 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
     return Scaffold(
       appBar: AppBar(
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
-        title: _isSearching ? _buildSearchField() : const Text(
-          'Sales Order',
-          style: AppConfig.pageTitleStyle,
-        ),
+      title: _isSearching ? _buildSearchField() : Text(
+  _screenTitle,
+  style: AppConfig.pageTitleStyle,
+),
         backgroundColor: AppConfig.colorPrimary,
         actions: _buildActions(),
       ),
@@ -196,15 +630,20 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
               (_initDone && !_noData)
                   ? SizedBox(
                   height: SizeConfig.blockSizeVertical * 85,
-                  child: displayProducts != null && displayProducts.isNotEmpty
-                      ? ListView.separated(
-                    separatorBuilder: (BuildContext context, int index) =>
-                        CommonWidgets.verticalSpace(1),
-                    itemCount: displayProducts.length,
-                    shrinkWrap: true,
-                    itemBuilder: (context, index) =>
-                        _productsCard(displayProducts[index], index),
-                  )
+               child: (_isMerch
+        ? (_isSearching ? filteredMerch : merchList).isNotEmpty
+        : displayProducts != null && displayProducts.isNotEmpty)
+    ? ListView.separated(
+  separatorBuilder: (BuildContext context, int index) =>
+      CommonWidgets.verticalSpace(1),
+  itemCount: _isMerch
+      ? (_isSearching ? filteredMerch : merchList).length
+      : displayProducts!.length,
+  shrinkWrap: true,
+  itemBuilder: (context, index) => _isMerch
+      ? _merchCard((_isSearching ? filteredMerch : merchList)[index])
+      : _productsCard(displayProducts![index], index),
+)
                       : _isSearching
                       ? Center(child: Text('No results found'))
                       : Center(child: Text('No data available')))
@@ -252,7 +691,102 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
       ),
     );
   }
+String _discountText(Data data) {
+  final String type = (data.discount_type ?? '').trim().toLowerCase();
+  final bool isPercentage = type == '1' || type == 'percentage';
+  final num pct = data.discount ?? 0;
+  num amount = data.discount_amount ?? 0;
 
+  if (amount == 0 && pct > 0) {
+    amount = isPercentage ? (data.total ?? 0) * pct / 100 : pct;
+  }
+
+  String label = 'Discount';
+  if (isPercentage && pct > 0) {
+    final s = pct.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
+    label = 'Discount ($s%)';
+  }
+  return '$label: ${amount.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
+}Widget _merchCard(Map<String, dynamic> m) {
+  final int id = m['id'];
+  final cust = (m['customer'] ?? {}) as Map;
+   final details = (m['detail'] as List?) ?? [];
+
+  return FutureBuilder<String?>(
+    future: fetchUpdatedStatus(id),
+    builder: (context, snap) {
+      String status = 'Loading...';
+      Color sc = Colors.grey;
+      if (snap.connectionState == ConnectionState.done) {
+        status = snap.data ?? 'Unavailable';
+        sc = status == 'Pending' ? Colors.orange
+           : status == 'Cancelled' ? Colors.red
+           : status == 'Confirmed' ? Colors.green
+           : status == 'Invoiced' ? Colors.blue : Colors.grey;
+      }
+      final fs = TextStyle(fontSize: AppConfig.textCaption3Size);
+      return Card(
+        elevation: 1,
+        child: ExpansionTile(
+          trailing: const SizedBox.shrink(),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Expanded(
+                  child: Text(
+                    '${m['invoice_no']} | ${DateHelper.displayDate(m['in_date'])} ${m['in_time'] ?? ''}',
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: fs),
+                ),
+                Text(status, style: TextStyle(
+                    fontSize: AppConfig.textCaption3Size,
+                    fontWeight: AppConfig.headLineWeight, color: sc)),
+              ]),
+                     Text('${cust['name'] ?? ''}', style: TextStyle(
+                  fontSize: AppConfig.textCaption3Size,
+                  fontWeight: AppConfig.headLineWeight)),
+              Row(children: [
+                const Spacer(),
+                InkWell(
+                  onTap: () => _printMerch(id),
+                  child: const Icon(Icons.print, color: Colors.blue, size: 30)),
+                CommonWidgets.horizontalSpace(2),
+                InkWell(
+                  onTap: () => _pdfMerch(id),
+                  child: const Icon(Icons.document_scanner, color: Colors.red, size: 30)),
+              ]),
+            ],
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final d in details) ...[
+                 Text(
+  (((d['product_code'] ?? '').toString().isNotEmpty
+          ? '${d['product_code']} | '
+          : '') +
+      '${d['product_name'] ?? ''}')
+      .toUpperCase(),
+                        style: TextStyle(fontSize: AppConfig.textCaption3Size,
+                            fontWeight: AppConfig.headLineWeight)),
+                    Text('${d['product_type_name'] ?? ''} | ${d['unit_name'] ?? ''} | Qty: ${d['quantity']}',
+                        style: fs),
+                    if ((d['description'] ?? '').toString().isNotEmpty)
+                      Text('Description: ${d['description']}', style: fs),
+                    const Divider(),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
   Widget _productsCard(Data data, int index) {
     return FutureBuilder<String?>(
         future: fetchUpdatedStatus(data.id!),
@@ -309,32 +843,32 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
                   title: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Tooltip(
-                        message: data.invoiceNo!,
-                        child: SizedBox(
-                          width: SizeConfig.blockSizeHorizontal * 70,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                          Text(
-                                '${data.invoiceNo!} | ${DateHelper.displayDate(data.inDate)} ${data.inTime}',
-                                style: TextStyle(
-                                  fontSize: AppConfig.textCaption3Size,
-                                ),
-                              ),
-                              SizedBox(width: 40),
-                              Text(
-                                status,
-                                style: TextStyle(
-                                  fontSize: AppConfig.textCaption3Size,
-                                  fontWeight: AppConfig.headLineWeight,
-                                  color: statusColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                    Tooltip(
+  message: data.invoiceNo!,
+  child: Row(
+    children: [
+      Expanded(
+        child: Text(
+          '${data.invoiceNo!} | ${DateHelper.displayDate(data.inDate)} ${data.inTime}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: AppConfig.textCaption3Size,
+          ),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Text(
+        status,
+        style: TextStyle(
+          fontSize: AppConfig.textCaption3Size,
+          fontWeight: AppConfig.headLineWeight,
+          color: statusColor,
+        ),
+      ),
+    ],
+  ),
+),
                       Row(
                         children: [
                           // Text(
@@ -361,12 +895,12 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
                           fontSize: AppConfig.textCaption3Size,
                         ),
                       ),
-                      Text(
-                        'Discount(%): ${data.discount}',
-                        style: TextStyle(
-                          fontSize: AppConfig.textCaption3Size,
-                        ),
-                      ),
+                 Text(
+  _discountText(data),
+  style: TextStyle(
+    fontSize: AppConfig.textCaption3Size,
+  ),
+),
                       SizedBox(
                         width: SizeConfig.blockSizeHorizontal * 90,
                         child: Row(
@@ -378,12 +912,8 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
                               ),
                             ),
                             const Spacer(),
-                            InkWell(
-                              onTap: () {
-                                print(data.id);
-                                print("Convert${data.convert_to_sale}");
-                                print("status${data.status}");
-                              },
+                                                       InkWell(
+                              onTap: () => _getInvoicePrint(data.id!),
                               child: const Icon(
                                 Icons.print,
                                 color: Colors.blue,
@@ -403,7 +933,7 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
                         ),
                       ),
                       Text(
-                        'Total Vat: ${data.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? ''}',
+                      '${AppState().taxLabel}: ${data.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? ''}',
                         style: TextStyle(
                           fontSize: AppConfig.textCaption3Size,
                         ),
@@ -513,16 +1043,24 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
 
   Future<void> _getProducts() async {
     RestDatasource api = RestDatasource();
-    dynamic resJson = await api.getDetails(
-        '/api/vansales_order.index?store_id=${AppState().storeId}&van_id=${AppState().vanId}&user_id=${AppState().userId}',
-        AppState().token); //
-    if (resJson['data'] != null) {
-      products = VanSaleProducts.fromJson(resJson);
-      filteredProducts = products.data ?? [];
-      setState(() {
-        _initDone = true;
-      });
-    } else {
+   dynamic resJson = await api.getDetails(
+    '$_listPath?store_id=${AppState().storeId}&van_id=${AppState().vanId}&user_id=${AppState().userId}',
+    AppState().token);
+debugPrint('LIST RESPONSE ($_listType): $resJson');
+if (resJson['data'] != null) {
+  if (_isMerch) {
+    merchList = (resJson['data'] as List)
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    filteredMerch = merchList;
+  } else {
+    products = VanSaleProducts.fromJson(resJson);
+    filteredProducts = products.data ?? [];
+  }
+  setState(() {
+    _initDone = true;
+  });
+} else {
       setState(() {
         _noData = true;
         _initDone = true;
@@ -537,7 +1075,8 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
     final Size pageSize = page.getClientSize();
 
     final double pageWidth = pageSize.width;
-    final Uint8List? imageData = await _readImageData(invoice.data!.store![0].logo);
+  final Uint8List? imageData =
+    await _readImageData(invoice.data!.store?.firstOrNull?.logo);
     if (imageData != null && imageData.isNotEmpty) {
       final PdfBitmap image = PdfBitmap(imageData);
       // Position logo at top-right (adjust width/height as needed)
@@ -553,8 +1092,8 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
     }
 
     // Left-aligned company info
-    final String companyName = '${invoice.data!.store![0].name}';
-    final String rawAddress = invoice.data!.store![0].address ?? 'N/A';
+ final String companyName = '${invoice.data!.store?.firstOrNull?.name ?? ''}';
+final String rawAddress = invoice.data!.store?.firstOrNull?.address ?? 'N/A';
 
 // Draw company name (bold, left-aligned)
     page.graphics.drawString(
@@ -579,7 +1118,7 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
       }
     }
 
-    final String? name = "SALES ORDER";
+        final String? name = _listType == 'proforma' ? "PROFORMA ORDER" : "SALES ORDER";
     final String text = '$name';
 
     final PdfFont font = PdfStandardFont(PdfFontFamily.helvetica, 15);
@@ -608,13 +1147,23 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
       Offset(0, lineYPosition),
       Offset(pageWidth, lineYPosition),
     );
+final custList = invoice.data!.customer;
+if (custList == null || custList.isEmpty) {
+  throw Exception('Server returned no customer details for this order');
+}
+final cust = custList[0];
+final custCode = (cust.code ?? '').toString().trim();
+final custEmail = (cust.email ?? '').toString().trim();
+final custContact = (cust.contactNumber ?? '').toString().trim();
+final custTrn = (cust.trn ?? '').toString().trim();
 
-    String address = '''
-  Customer: ${invoice.data!.customer![0].code} | ${invoice.data!.customer![0].name}
-  Email: ${invoice.data!.customer![0].email}
-  Contact No:  ${invoice.data!.customer![0].contactNumber}
-  TRN:  ${invoice.data!.customer![0].trn ?? ''}
-  ''';
+final addressLines = <String>[
+  'Customer: ${custCode.isNotEmpty ? '$custCode | ' : ''}${cust.name ?? ''}',
+  if (custEmail.isNotEmpty) 'Email: $custEmail',
+  if (custContact.isNotEmpty) 'Contact No: $custContact',
+  if (custTrn.isNotEmpty) 'TRN: $custTrn',
+];
+final String address = addressLines.join('\n');
 
     String invoiceDetails = '''
   Order No: ${invoice.data!.invoiceNo!}
@@ -664,7 +1213,7 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
     headerRow.cells[3].value = 'Rate';
     headerRow.cells[4].value = 'Qty';
     headerRow.cells[5].value = 'Foc';
-    headerRow.cells[6].value = 'Vat';
+    headerRow.cells[6].value = AppState().taxLabel;
     headerRow.cells[7].value = 'Amount';
 
     for (int k = 0; k < invoice.data!.detail!.length; k++) {
@@ -674,12 +1223,14 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
       row.cells[2].value = '${invoice.data!.detail![k].unit}';
       row.cells[3].value = '${invoice.data!.detail![k].mrp}';
       row.cells[4].value = '${invoice.data!.detail![k].quantity}';
-      row.cells[5].value =
-      (invoice.data!.detail![k].productType!.toLowerCase() == "foc")
+       row.cells[5].value =
+      ((invoice.data!.detail![k].productType ?? '').toLowerCase() == "foc")
           ? '1'
           : '0';
-      row.cells[6].value = '${invoice.data!.detail![k].taxAmt!.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
-      row.cells[7].value = '${invoice.data!.detail![k].amount!.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
+      row.cells[6].value = (invoice.data!.detail![k].taxAmt ?? 0)
+          .toStringAsFixed(AppState().noOfDecimals ?? 2);
+      row.cells[7].value = (invoice.data!.detail![k].amount ?? 0)
+          .toStringAsFixed(AppState().noOfDecimals ?? 2);
     }
 
     // Define no border style
@@ -738,12 +1289,12 @@ class _HomeorderScreenState extends State<HomeorderScreen> {
 
     // Draw invoice details at the bottom right.
     String bottomInvoiceDetails = '''
-  ${num.parse(invoice.data!.roundOff.toString()) != 0 ? 'Discount: ${invoice.data!.discount}' : '\t'}
+  ${invoice.data!.effectiveDiscount > 0 ? '${invoice.data!.discountLabel}: ${invoice.data!.effectiveDiscount.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : '\t'}
   Total: ${invoice.data!.total}
-  Vat: ${invoice.data!.totalTax!.toStringAsFixed(AppState().noOfDecimals ?? 2)}
+   ${AppState().taxLabel}: ${(invoice.data!.totalTax ?? 0).toStringAsFixed(AppState().noOfDecimals ?? 2)}
 ${invoice.data?.roundOff != null && double.tryParse(invoice.data!.roundOff.toString()) != 0
-        ? 'Round off: ${double.tryParse(invoice.data!.roundOff.toString())?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00'}\nGrand Total: ${invoice.data!.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)}'
-        : 'Grand Total: ${invoice.data!.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)}'}
+        ? 'Round off: ${double.tryParse(invoice.data!.roundOff.toString())?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00'}\nGrand Total: ${(invoice.data!.grandTotal ?? 0).toStringAsFixed(AppState().noOfDecimals ?? 2)}'
+        : 'Grand Total: ${(invoice.data!.grandTotal ?? 0).toStringAsFixed(AppState().noOfDecimals ?? 2)}'}
 
 
   ''';
@@ -763,16 +1314,15 @@ ${invoice.data?.roundOff != null && double.tryParse(invoice.data!.roundOff.toStr
     );
 
 // in word
-    String textData =
-        'Amount in Words: AED ${NumberToWord().convert('en-in', invoice.data!.grandTotal!.toInt()).toUpperCase()} ONLY';
+      String textData = _amountInWords(invoice.data!.grandTotal ?? 0);
 
 // Adjust the vertical position for the van details
     double vanDetailsTop = tableBottom + 20 + 100 + 10;
 
 // Construct the van details string.
     String bottomVanDetails = '''
-Van: ${invoice.data!.van![0].name}
-Salesman: ${invoice.data!.user![0].name}
+Van: ${invoice.data!.van?.firstOrNull?.name ?? ''}
+Salesman: ${invoice.data!.user?.firstOrNull?.name ?? ''}
 ''';
 
 // Draw the word text above the van details
@@ -830,17 +1380,201 @@ Salesman: ${invoice.data!.user![0].name}
     }
   }
 
-  Future<void> _getInvoiceData(int id, bool isPrint) async {
-    Invoice.InvoiceData invoice = Invoice.InvoiceData();
-    RestDatasource api = RestDatasource();
-    dynamic response = await api.getDetails(
-        '/api/get_sales_order_invoice?id=$id', AppState().token);
-    print("ssdsdsdssds${id}");
-    if (response['data'] != null) {
-      invoice = Invoice.InvoiceData.fromJson(response);
-      _createPdf(invoice, isPrint);
+   Future<void> _getInvoiceData(int id, bool isPrint) async {
+    if (_isMerch) return _pdfMerch(id);
+    try {
+      RestDatasource api = RestDatasource();
+      dynamic response = await api.getDetails(
+          '/api/get_sales_order_invoice?id=$id', AppState().token);
+      debugPrint('PDF RESPONSE (id=$id, type=$_listType): $response');
+
+      if (response['data'] == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No data returned for this order')),
+          );
+        }
+        return;
+      }
+      final invoice = Invoice.InvoiceData.fromJson(response);
+      await _createPdf(invoice, isPrint);
+    } catch (e, st) {
+      debugPrint('PDF error: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PDF failed: $e')),
+        );
+      }
     }
   }
+  Future<Map<String, dynamic>?> _fetchMerchPrint(int id) async {
+  final res = await RestDatasource()
+      .getDetails('/api/get_merchandise_print?id=$id', AppState().token);
+  if (res['data'] != null) return Map<String, dynamic>.from(res['data']);
+  return null;
+}
+
+Future<void> _printMerch(int id) async {
+  try {
+    if (_selectedDevice == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Default device not found')));
+      return;
+    }
+    final bool? live = await printer.isConnected;
+    if (live != true) await _connect();
+    if (!_connected) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Printer not connected')));
+      }
+      return;
+    }
+    if (isZebraPrinter(_selectedDevice)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Zebra print for Merchandise not added yet')));
+      }
+      return;
+    }
+    final d = await _fetchMerchPrint(id);
+    if (d == null) return;
+    final store = (d['store'] ?? {}) as Map;
+    final cust = (d['customer'] ?? {}) as Map;
+    final details = (d['detail'] as List?) ?? [];
+
+    void line(String l, [String r = '']) {
+      final sp = 68 - (l.length + r.length);
+      printer.printCustom('$l${' ' * (sp > 0 ? sp : 1)}$r', 1, 0);
+    }
+
+    printer.printNewLine();
+    printer.printCustom('${store['invoice_company_name'] ?? store['name'] ?? ''}', 3, 1);
+    printer.printCustom('${store['address'] ?? ''}', 1, 1);
+    printer.printCustom('${store['email'] ?? ''}', 1, 1);
+    printer.printCustom('TRN: ${store['trn'] ?? ''}', 1, 1);
+    printer.printNewLine();
+    printer.printCustom('MERCHANDISE ORDER', 2, 1);
+    printer.printNewLine();
+    printer.printCustom('-' * 70, 1, 1);
+    line('Order No: ${d['invoice_no'] ?? ''}',
+        'Date: ${DateHelper.displayDate(d['in_date'])}');
+    line('', 'Time: ${d['in_time'] ?? ''}');
+    printer.printNewLine();
+    line('Customer: ${cust['name'] ?? ''}');
+    if ((cust['contact_number'] ?? '').toString().isNotEmpty) {
+      line('Contact No: ${cust['contact_number']}');
+    }
+    printer.printCustom('-' * 70, 1, 1);
+    printer.printCustom(
+        '${'#'.padRight(3)}${'Product'.padRight(34)} ${'Unit'.padRight(8)}${'Qty'.padLeft(8)}', 1, 0);
+    for (int i = 0; i < details.length; i++) {
+      final it = details[i];
+      final lines = _wrapWords('${it['product_name'] ?? ''}', 34);
+      for (int j = 0; j < lines.length; j++) {
+        printer.printCustom(
+            j == 0
+                ? '${(i + 1).toString().padRight(3)}${lines[j].padRight(34)} ${'${it['unit_name'] ?? ''}'.padRight(8)}${'${it['quantity']}'.padLeft(8)}'
+                : '${''.padRight(3)}${lines[j]}',
+            1, 0);
+      }
+    }
+    printer.printCustom('-' * 70, 1, 1);
+    line('Van      : ${(d['van'] ?? {})['name'] ?? ''}');
+    line('Salesman : ${(d['user'] ?? {})['name'] ?? ''}');
+    printer.paperCut();
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Print failed: $e')));
+    }
+  }
+}
+
+Future<void> _pdfMerch(int id) async {
+  final d = await _fetchMerchPrint(id);
+  if (d == null) return;
+  final store = (d['store'] ?? {}) as Map;
+  final cust = (d['customer'] ?? {}) as Map;
+  final details = (d['detail'] as List?) ?? [];
+
+  final document = PdfDocument();
+  final page = document.pages.add();
+  final Size ps = page.getClientSize();
+
+  final img = await _readImageData(store['logo']?.toString());
+  if (img.isNotEmpty) {
+    page.graphics.drawImage(PdfBitmap(img),
+        Rect.fromLTWH(ps.width - 100, 30, 80, 80));
+  }
+  page.graphics.drawString('${store['name'] ?? ''}',
+      PdfStandardFont(PdfFontFamily.helvetica, 18, style: PdfFontStyle.bold),
+      bounds: Rect.fromLTWH(30, 30, ps.width - 150, 30));
+  page.graphics.drawString('${store['address'] ?? ''}',
+      PdfStandardFont(PdfFontFamily.helvetica, 10),
+      bounds: Rect.fromLTWH(30, 60, ps.width - 150, 40));
+
+  final f15 = PdfStandardFont(PdfFontFamily.helvetica, 15);
+  const title = 'MERCHANDISE ORDER';
+  final tw = f15.measureString(title);
+  page.graphics.drawString(title, f15,
+      bounds: Rect.fromLTWH((ps.width - tw.width) / 2, 165, tw.width, tw.height));
+  page.graphics.drawLine(PdfPen(PdfColor(0, 0, 0)),
+      Offset(0, 195), Offset(ps.width, 195));
+
+   final left = [
+    'Customer: ${cust['code'] ?? ''} | ${cust['name'] ?? ''}',
+    if ((cust['contact_number'] ?? '').toString().isNotEmpty)
+      'Contact No: ${cust['contact_number']}',
+  ].join('\n');
+  final right = [
+    'Order No: ${d['invoice_no'] ?? ''}',
+    'Date: ${DateHelper.displayDate(d['in_date'])}',
+  ].join('\n');
+  final f12 = PdfStandardFont(PdfFontFamily.helvetica, 12);
+  page.graphics.drawString(left, f12,
+      bounds: Rect.fromLTWH(0, 205, ps.width / 2, 80));
+  page.graphics.drawString(right, f12,
+      bounds: Rect.fromLTWH(ps.width / 2, 205, ps.width / 2, 80),
+      format: PdfStringFormat(alignment: PdfTextAlignment.right));
+
+  final grid = PdfGrid();
+  grid.columns.add(count: 5);
+  grid.columns[0].width = 30;
+  grid.columns[1].width = 240;
+  grid.columns[2].width = 80;
+  grid.columns[3].width = 70;
+  grid.columns[4].width = 60;
+  final h = grid.headers.add(1)[0];
+  h.cells[0].value = 'Sl.No';
+  h.cells[1].value = 'Product';
+  h.cells[2].value = 'Type';
+  h.cells[3].value = 'Unit';
+  h.cells[4].value = 'Qty';
+  for (int k = 0; k < details.length; k++) {
+    final it = details[k];
+    final r = grid.rows.add();
+    r.cells[0].value = '${k + 1}';
+    r.cells[1].value = '${it['product_name'] ?? ''}';
+    r.cells[2].value = '${it['product_type_name'] ?? ''}';
+    r.cells[3].value = '${it['unit_name'] ?? ''}';
+    r.cells[4].value = '${it['quantity']}';
+  }
+  final res = grid.draw(
+      page: page,
+      bounds: Rect.fromLTWH(0, 300, ps.width, ps.height - 380))!;
+
+  final last = res.page;
+  final bottom = res.bounds.bottom;
+  last.graphics.drawString(
+      'Van: ${(d['van'] ?? {})['name'] ?? ''}\nSalesman: ${(d['user'] ?? {})['name'] ?? ''}',
+      f12,
+      bounds: Rect.fromLTWH(0, bottom + 20, ps.width / 2, 60));
+
+  final bytes = await document.save();
+  document.dispose();
+  await saveAndLaunchFile(bytes, '${d['invoice_no']}.pdf', false);
+}
 }
 
 class VanSalesOrderStatusResponse {

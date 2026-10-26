@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:mobizapp/Models/appstate.dart';
 import 'package:mobizapp/Pages/homeorder.dart';
+import 'package:mobizapp/Pages/homepage.dart';
 import 'package:mobizapp/Pages/salesselectproductorder.dart';
 import 'package:mobizapp/vanstockselactpro_tst.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -45,8 +46,22 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
   String? name;
   bool _isButtonDisabled = false;
   bool _isDialogOpen = false;
+  bool _isProforma = false; // NEW: true aanenkil Proforma Order
+  bool _isMerchandise = false;
+  final TextEditingController _poReferenceController = TextEditingController();
   String roundoff = '';
+double _r(double v) {
+  final int dec = AppState().noOfDecimals ?? 2;
+  double f = 1;
+  for (int i = 0; i < dec; i++) f *= 10;
+  final double sign = v < 0 ? -1 : 1;
+  return sign * ((v.abs() * f) + 1e-9).roundToDouble() / f;
+}
 
+double _vatRound(double v) {
+  final double sign = v < 0 ? -1 : 1;
+  return sign * ((v.abs() * 100) + 1e-9).roundToDouble() / 100;
+}
   // =====================================================================
   // NOTE: Everything in this class below `build()` (all calculations,
   // API calls, SharedPreferences logic, navigation, and the product
@@ -57,13 +72,34 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
   // with semantic constants from AppFontSizes.
   // =====================================================================
 
-  @override
+   @override
   void initState() {
-    super.initState();
-    _selectedDate = DateTime.now();
+      super.initState();
+    AppState().loadTaxName().then((_) {
+      if (mounted) setState(() {});
+    });
+       _selectedDate = DateTime.now();
+    _loadProformaFlag(); // NEW
     _loadSavedProducts();
     fetchProductTypes();
     fetchCheckInDetail();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)!.settings.arguments;
+      print("========== ORDER ARGS DEBUG ==========");
+      print(args);
+      print("=======================================");
+    });
+  }
+
+    // NEW: Customer screen set cheytha flag vaayikkunnu
+  Future<void> _loadProformaFlag() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+      setState(() {
+      _isProforma = prefs.getBool('is_proforma_order') ?? false;
+      _isMerchandise = prefs.getBool('is_merchandise_order') ?? false;
+    });
   }
 
   void _showWelcomeDialog() {
@@ -148,6 +184,7 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
     double discountAmount = double.tryParse(discountValue) ?? 0;
 
     for (var product in savedProducts) {
+      print('TAX DEBUG ${product['code']} keys=${product.keys.toList()} pct=${product['tax_percentage']}');
       double quantity =
           double.tryParse(product['quantity']?.toString() ?? '0') ?? 0;
 
@@ -170,30 +207,34 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
       tax += (taxableAmount * taxPercentage) / 100;
     }
 
-    return double.parse(tax.toStringAsFixed(AppState().noOfDecimals ?? 2));
+ return _vatRound(tax);
   }
 
-  Map<String, dynamic> CalculatedValue() {
-    double taxamt = calculateTax();
-    roundoff = _roundoff.text;
-    double rundff = double.tryParse(roundoff) ?? 0;
-    String discountValue = _discountData.text.trim();
-    double discountAmount = double.tryParse(discountValue) ?? 0;
-    double grandTotal = _ifVat == 1
-        ? _isPercentage
-            ? totalAmount - ((totalAmount * discountAmount) / 100) + taxamt
-            : (totalAmount - discountAmount) + taxamt
-        : _isPercentage
-            ? totalAmount - (totalAmount * discountAmount) / 100
-            : totalAmount - discountAmount;
-    num roundedGrandTotal1 =
-        roundoff == '' ? customRound(grandTotal) : grandTotal + rundff;
-    double roundOffValue = roundedGrandTotal1 - grandTotal;
-    return {
-      'rounded': roundedGrandTotal1,
-      'roundOffValue': roundOffValue,
-    };
+Map<String, dynamic> CalculatedValue() {
+  final double taxamt = _ifVat == 1 ? calculateTax() : 0;
+  final double discountAmount =
+      double.tryParse(_discountData.text.trim()) ?? 0;
+
+  final double netAmount = _isPercentage
+      ? totalAmount - (totalAmount * discountAmount / 100)
+      : totalAmount - discountAmount;
+
+  final double grandTotal = _r(netAmount + taxamt);
+
+  roundoff = _roundoff.text.trim();
+  double roundedGrandTotal;
+  double roundOffValue;
+
+  if (roundoff.isEmpty) {
+    roundedGrandTotal = customRound(grandTotal).toDouble();
+    roundOffValue = _r(roundedGrandTotal - grandTotal);
+  } else {
+    roundOffValue = _r(double.tryParse(roundoff) ?? 0);
+    roundedGrandTotal = _r(grandTotal + roundOffValue);
   }
+
+  return {'rounded': roundedGrandTotal, 'roundOffValue': roundOffValue};
+}
 
   Future<void> _loadSavedProducts() async {
     final prefs = await SharedPreferences.getInstance();
@@ -240,13 +281,8 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
     });
   }
 
-  String getVatLabel() {
-    if (_ifVat == 0) return 'VAT';
-    if (savedProducts.isEmpty) return 'VAT';
-    // Uses the backend-configured VAT label (fetched in HomeScreen via
-    // get_store_detail and stored in AppState().vatLabel), instead of
-    // building "VAT (5%)" from tax_percentage.
-    return AppState().vatLabel ?? 'VAT';
+   String getVatLabel() {
+    return AppState().taxLabel;
   }
 
   Future<void> fetchProductTypes() async {
@@ -334,18 +370,26 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
 
     double tax = _ifVat == 1 ? calculateTax() : 0;
     String taxpost = tax.toStringAsFixed(AppState().noOfDecimals ?? 2);
-    double roundedGrandTotal = double.parse(
-        double.parse(grandTotalMap['rounded'].toString())
-            .toStringAsFixed(AppState().noOfDecimals ?? 2));
-    double roundOffValue = double.parse(
-        double.parse(grandTotalMap['roundOffValue'].toString())
-            .toStringAsFixed(AppState().noOfDecimals ?? 2));
+ final double roundedGrandTotal = grandTotalMap['rounded'];
+final double roundOffValue = grandTotalMap['roundOffValue'];
+final double _d = double.tryParse(_discountData.text.trim()) ?? 0;
+final double _discAmt = _isPercentage ? totalAmount * _d / 100 : _d;
+final double subTotal = totalAmount - _discAmt;
     double total;
-    if (ModalRoute.of(context)!.settings.arguments != null) {
+  if (ModalRoute.of(context)!.settings.arguments != null) {
       final Map<String, dynamic>? params =
           ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
-      id = params!['customerId'];
-      name = params['name'];
+      if (params != null) {
+        id = params['customerId'] ?? params['id'];
+        name = params['name'] ?? params['customerName'] ?? params['customer_name'];
+
+      
+        if (name != null && name!.isNotEmpty) {
+          SharedPreferences.getInstance().then((prefs) {
+            prefs.setString('saved_order_customer_name', name!);
+          });
+        }
+      }
     }
 
     void postDataToApi() async {
@@ -354,8 +398,13 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
       });
 
       try {
-        var url =
-            Uri.parse('${RestDatasource().BASE_URL}/api/vansales_order.store');
+              var url = Uri.parse(
+          _isMerchandise
+              ? '${RestDatasource().BASE_URL}/api/merchandise-order/store'
+              : _isProforma
+                  ? '${RestDatasource().BASE_URL}/api/proforma-order/store'
+                  : '${RestDatasource().BASE_URL}/api/vansales_order.store',
+        );
 
         List<int> productIds = savedProducts.map<int>((product) {
           return product['id'];
@@ -364,15 +413,16 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
           // Assuming product['unit_id'] already contains the selected unit ID
           return int.parse(product['unit_id']);
         }).toList();
-        List<double> amounts = savedProducts.map<double>((product) {
-          return double.parse(double.parse(product['amount'].toString())
-              .toStringAsFixed(AppState().noOfDecimals ?? 2));
+         List<double> amounts = savedProducts.map<double>((product) {
+          final double a =
+              double.tryParse(product['amount']?.toString() ?? '') ?? 0;
+          return double.parse(a.toStringAsFixed(AppState().noOfDecimals ?? 2));
         }).toList();
         List<double> quantity = savedProducts.map<double>((product) {
           return double.parse(product['quantity'].toString());
         }).toList();
         List<String> description = savedProducts.map<String>((product) {
-          return product['description'].toString();
+            return (product['description'] ?? '').toString();
         }).toList();
         List<int> productTypes = savedProducts.map<int>((product) {
           return int.parse(product['type_id']);
@@ -391,16 +441,32 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
           'product_type': productTypes,
           'total_tax': taxpost,
           "discount": _discountData.text.isEmpty ? '0' : _discountData.text,
-          "total": totalAmount,
-          "round_off": roundOffValue,
-          "grand_total": roundedGrandTotal,
+        "total": _r(totalAmount),
+"round_off": roundOffValue,
+"grand_total": roundedGrandTotal,
           'remarks': _remarksText,
           'scheduled_date': _selectedDate.toString(),
           'description': description,
           'delivery_location':
               _remarksController.text.isEmpty ? '' : _remarksController.text
         };
-        var body = json.encode(data);
+             final Map<String, dynamic> merchandiseData = {
+          'customer_id': id,
+          'store_id': AppState().storeId,
+          'van_id': AppState().vanId,
+          'user_id': AppState().userId,
+          'if_vat': _ifVat == 1 ? 1 : 0,
+          'order_type': 1,
+          'po_reference': _poReferenceController.text.trim(),
+          'delivery_location':
+              _remarksController.text.isEmpty ? '' : _remarksController.text,
+          'item_id': productIds,
+          'quantity': quantity,
+          'unit': unitIds,
+          'product_type': productTypes,
+          'description': description,
+        };
+        var body = json.encode(_isMerchandise ? merchandiseData : data);
 
         var response = await http.post(
           url,
@@ -420,28 +486,56 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
           print("Details: $_ifVat");
           print("_remarksText: $_remarksText");
           print('Post successful');
-          if (mounted) {
-            CommonWidgets.showDialogueBox(
-                    context: context,
-                    title: "Alert",
-                    msg: "Created Successfully")
-                .then(
-              (value) {
-                clearCart();
-                Navigator.pushReplacementNamed(
-                  context,
-                  HomeorderScreen.routeName,
-                );
-              },
-            );
-          }
+        // after
+if (mounted) {
+  CommonWidgets.showDialogueBox(
+          context: context, title: "Alert", msg: "Created Successfully")
+      .then(
+       (value) async {
+      clearCart();
+      final bool wasProforma = _isProforma;
+      final bool wasMerchandise = _isMerchandise;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_proforma_order', false);
+      await prefs.setBool('is_merchandise_order', false);
+    if (!mounted) return;
+final String listType = wasMerchandise
+    ? 'merchandise'
+    : (wasProforma ? 'proforma' : 'sales');
+
+Navigator.pushNamedAndRemoveUntil(
+  context,
+  HomeorderScreen.routeName,
+  (route) => route.settings.name == HomeScreen.routeName,
+  arguments: {
+    'listType': listType,
+    'customerId': id,
+    'name': name,
+  },
+);
+    },
+  );
+}
           print(response.body);
         } else {
-          print('Post failed with status: ${response.statusCode}');
+           print('Post failed with status: ${response.statusCode}');
           print(response.body);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Save failed (${response.statusCode})'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         }
       } catch (e) {
-        print('An error occurred: $e');
+         print('An error occurred: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          );
+        }
       } finally {
         setState(() {
           _isButtonDisabled =
@@ -472,8 +566,10 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
               },
               child: Icon(Icons.arrow_back_rounded)),
           iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
-          title: const Text(
-            'Order',
+                title: Text(
+                    _isMerchandise
+                ? 'Merchandise Order'
+                : (_isProforma ? 'Proforma Order' : 'Order'),
             style: AppConfig.pageTitleStyle,
           ),
           backgroundColor: AppConfig.colorPrimary,
@@ -553,9 +649,12 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
             CommonWidgets.horizontalSpace(3),
           ],
         ),
-        body: savedProducts.isEmpty
-            ? Center(
-                child: InkWell(
+     body: SafeArea(
+          top: false,
+          bottom: true,
+          child: savedProducts.isEmpty
+              ? Center(
+                  child: InkWell(
                   onTap: openProductSearch,
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -643,10 +742,10 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                             ),
                           ),
                           // VAT / NO VAT
-                          if (AppState().vatState != 'Disable') ...[
-                            const SizedBox(width: 5),
-                            Container(
-                              height: 22,
+                     if (AppState().vatState != 'Disable' && !_isMerchandise) ...[
+  const SizedBox(width: 5),
+  Container(
+    height: 22,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(3),
                                 border: Border.all(
@@ -679,9 +778,9 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                           : const Color(0xFFF7F7F7),
                                       child: FittedBox(
                                         fit: BoxFit.scaleDown,
-                                        child: Text(
-                                          AppState().vatLabel ?? 'VAT',
-                                          maxLines: 1,
+                                       child: Text(
+  AppState().taxLabel,
+  maxLines: 1,
                                           style: TextStyle(
                                             fontSize: AppFontSizes.body,
                                             fontWeight: FontWeight.w600,
@@ -714,9 +813,9 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                           : const Color(0xFFF7F7F7),
                                       child: FittedBox(
                                         fit: BoxFit.scaleDown,
-                                        child: Text(
-                                          'NO ${AppState().vatLabel ?? 'VAT'}',
-                                          maxLines: 1,
+                                      child: Text(
+  'NO ${AppState().taxLabel}',
+  maxLines: 1,
                                           style: TextStyle(
                                             fontSize: AppFontSizes.body,
                                             fontWeight: FontWeight.w600,
@@ -760,8 +859,8 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                           final bool isNarrow = tw < 340;
                           final double numW = isNarrow ? 26 : 35;
                           final double qtyW = isNarrow ? 26 : 34;
-                          final double rateW = isNarrow ? 40 : 48;
-                          final double amtW = isNarrow ? 40 : 48;
+                         final double rateW = isNarrow ? 44 : 52;
+final double amtW = isNarrow ? 44 : 52;
                           final double delW = isNarrow ? 26 : 32;
 
                           final query = _searchData.text.trim().toLowerCase();
@@ -838,6 +937,7 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                         ),
                                       ),
                                     ),
+                                     if (!_isMerchandise)
                                     SizedBox(
                                       width: rateW,
                                       child: Center(
@@ -851,6 +951,7 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                         ),
                                       ),
                                     ),
+                                      if (!_isMerchandise)
                                     SizedBox(
                                       width: amtW,
                                       child: Center(
@@ -1023,7 +1124,7 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                                                   .start,
                                                           children: [
                                                             Text(
-                                                              '$code | ${pname.toUpperCase()}',
+                                                    code.isNotEmpty ? '$code | ${pname.toUpperCase()}' : pname.toUpperCase(),
                                                               maxLines: 2,
                                                               softWrap: true,
                                                               overflow:
@@ -1143,6 +1244,7 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                                     ),
 
                                                     // RATE
+                                                   if (!_isMerchandise)
                                                     SizedBox(
                                                       width: rateW,
                                                       child: Center(
@@ -1166,6 +1268,7 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                                     ),
 
                                                     // AMOUNT
+                                                  if (!_isMerchandise)
                                                     SizedBox(
                                                       width: amtW,
                                                       child: Center(
@@ -1274,9 +1377,9 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                       builder: (context, constraints) {
                         final double screenWidth = constraints.maxWidth;
                         final bool isVerySmall = screenWidth < 340;
-
-                        final double labelWidth = isVerySmall ? 60 : 76;
-                        final double sectionPadding = isVerySmall ? 8 : 14;
+final double labelWidth = isVerySmall ? 68 : 84;
+final double discountLabelWidth = isVerySmall ? 52 : 60; // matches Sale/Return
+final double sectionPadding = isVerySmall ? 8 : 14;
 
                         return Container(
                           padding: EdgeInsets.fromLTRB(
@@ -1300,228 +1403,196 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                               ),
                             ],
                           ),
-                          child: Column(
-                            children: [
-                              IntrinsicHeight(
-                                child: Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
+                       child: Column(
+  children: [
+    if (!_isMerchandise) ...[
+      IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
                                     // ================= LEFT =================
                                     Expanded(
                                       flex: 6,
                                       child: Padding(
-                                        padding: EdgeInsets.only(
-                                            right: sectionPadding),
+                                                                            padding: EdgeInsets.only(
+                                            right: _isMerchandise ? 0 : sectionPadding),
                                         child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
                                             // -------- DELIVERY LOCATION --------
-                                            Row(
-                                              children: [
-                                                SizedBox(
-                                                  width: labelWidth,
-                                                  child: Text(
-                                                    'Delivery Location',
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      fontSize:
-                                                          AppFontSizes.label,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color:
-                                                          Color(0xFF222222),
-                                                    ),
-                                                  ),
-                                                ),
-                                                Expanded(
-                                                  child: InkWell(
-                                                    onTap: () {
-                                                      showDialog(
-                                                        context: context,
-                                                        builder: (context) {
-                                                          return AlertDialog(
-                                                            title: const Text(
-                                                                'Delivery Location'),
-                                                            content:
-                                                                TextField(
-                                                              controller:
-                                                                  _remarksController,
-                                                              onChanged:
-                                                                  (value) {
-                                                                setState(() {
-                                                                  _remarksText =
-                                                                      value;
-                                                                });
-                                                              },
-                                                            ),
-                                                            actions: [
-                                                              MaterialButton(
-                                                                color: AppConfig
-                                                                    .colorPrimary,
-                                                                textColor:
-                                                                    Colors
-                                                                        .white,
-                                                                child:
-                                                                    const Text(
-                                                                        'OK'),
-                                                                onPressed:
-                                                                    () {
-                                                                  setState(
-                                                                      () {});
-                                                                  Navigator.pop(
-                                                                      context);
-                                                                },
-                                                              ),
-                                                            ],
-                                                          );
-                                                        },
-                                                      );
-                                                    },
-                                                    child: Container(
-                                                      height: 30,
-                                                      padding:
-                                                          const EdgeInsets
-                                                              .symmetric(
-                                                        horizontal: 9,
-                                                      ),
-                                                      alignment: Alignment
-                                                          .centerLeft,
-                                                      decoration:
-                                                          BoxDecoration(
-                                                        border: Border.all(
-                                                          color: const Color(
-                                                              0xFFD2D2D2),
-                                                          width: 0.7,
-                                                        ),
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(4),
-                                                      ),
-                                                      child: Text(
-                                                        _remarksText.isEmpty
-                                                            ? 'Enter delivery location'
-                                                            : _remarksText,
-                                                        maxLines: 1,
-                                                        overflow:
-                                                            TextOverflow
-                                                                .ellipsis,
-                                                        style: TextStyle(
-                                                          fontSize:
-                                                              AppFontSizes
-                                                                  .label,
-                                                          color: _remarksText
-                                                                  .isEmpty
-                                                              ? const Color(
-                                                                  0xFF9A9A9A)
-                                                              : const Color(
-                                                                  0xFF222222),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-
+                                         Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    const Text(
+      'Delivery Location',
+      style: TextStyle(
+        fontSize: AppFontSizes.label,
+        fontWeight: FontWeight.w600,
+        color: Color(0xFF222222),
+      ),
+    ),
+    const SizedBox(height: 4),
+    InkWell(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('Delivery Location'),
+              content: TextField(
+                controller: _remarksController,
+                onChanged: (value) {
+                  setState(() {
+                    _remarksText = value;
+                  });
+                },
+              ),
+              actions: [
+                MaterialButton(
+                  color: AppConfig.colorPrimary,
+                  textColor: Colors.white,
+                  child: const Text('OK'),
+                  onPressed: () {
+                    setState(() {});
+                    Navigator.pop(context);
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        height: 30,
+        padding: const EdgeInsets.symmetric(horizontal: 9),
+        alignment: Alignment.centerLeft,
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFD2D2D2), width: 0.7),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          _remarksText.isEmpty ? 'Enter delivery location' : _remarksText,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: AppFontSizes.label,
+            color: _remarksText.isEmpty
+                ? const Color(0xFF9A9A9A)
+                : const Color(0xFF222222),
+          ),
+        ),
+      ),
+    ),
+  ],
+),
                                             const SizedBox(height: 9),
 
                                             // -------- SCHEDULE DATE --------
-                                            Row(
-                                              children: [
-                                                SizedBox(
-                                                  width: labelWidth,
-                                                  child: Text(
-                                                    'Schedule Date',
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      fontSize:
-                                                          AppFontSizes.label,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color:
-                                                          Color(0xFF222222),
-                                                    ),
-                                                  ),
-                                                ),
-                                                Expanded(
-                                                  child: InkWell(
-                                                    onTap: () {
-                                                      _selectDate(context);
-                                                    },
-                                                    child: Container(
-                                                      height: 30,
-                                                      padding:
-                                                          const EdgeInsets
-                                                              .symmetric(
-                                                        horizontal: 9,
-                                                      ),
-                                                      alignment: Alignment
-                                                          .centerLeft,
-                                                      decoration:
-                                                          BoxDecoration(
-                                                        border: Border.all(
-                                                          color: const Color(
-                                                              0xFFD2D2D2),
-                                                          width: 0.7,
-                                                        ),
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(4),
-                                                      ),
-                                                      child: Row(
-                                                        children: [
-                                                          Icon(
-                                                            Icons
-                                                                .calendar_today_outlined,
-                                                            size: 12,
-                                                            color: AppConfig
-                                                                .colorPrimary,
-                                                          ),
-                                                          const SizedBox(
-                                                              width: 5),
-                                                          Expanded(
-                                                            child: Text(
-                                                              _selectedDate ==
-                                                                      null
-                                                                  ? 'Select Date'
-                                                                  : DateHelper
-                                                                      .displayFromDateTime(
-                                                                          _selectedDate!),
-                                                              maxLines: 1,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              style:
-                                                                  TextStyle(
-                                                                fontSize:
-                                                                    AppFontSizes
-                                                                        .label,
-                                                                color: const Color(
-                                                                    0xFF222222),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
+                                            Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    const Text(
+      'Schedule Date',
+      style: TextStyle(
+        fontSize: AppFontSizes.label,
+        fontWeight: FontWeight.w600,
+        color: Color(0xFF222222),
+      ),
+    ),
+    const SizedBox(height: 4),
+    InkWell(
+      onTap: () {
+        _selectDate(context);
+      },
+      child: Container(
+        width: double.infinity,
+        height: 30,
+        padding: const EdgeInsets.symmetric(horizontal: 9),
+        alignment: Alignment.centerLeft,
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFD2D2D2), width: 0.7),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.calendar_today_outlined,
+              size: 12,
+              color: AppConfig.colorPrimary,
+            ),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                _selectedDate == null
+                    ? 'Select Date'
+                    : DateHelper.displayFromDateTime(_selectedDate!),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: AppFontSizes.label,
+                  color: const Color(0xFF222222),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  ],
+),
 
                                             const SizedBox(height: 9),
 
                                             // -------- DISCOUNT --------
+                                                                                     // -------- PO REFERENCE (Merchandise only) --------
+                                            if (_isMerchandise)
+                                              Row(
+                                                children: [
+                                                  const SizedBox(
+                                                    width: 60,
+                                                    child: Text(
+                                                      'PO Ref',
+                                                      style: TextStyle(
+                                                        fontSize: AppFontSizes.label,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: Color(0xFF222222),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Expanded(
+                                                    child: SizedBox(
+                                                      height: 30,
+                                                      child: TextField(
+                                                        controller: _poReferenceController,
+                                                        style: const TextStyle(
+                                                          fontSize: AppFontSizes.value,
+                                                        ),
+                                                        decoration: InputDecoration(
+                                                          hintText: 'PO reference',
+                                                          contentPadding:
+                                                              const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                            vertical: 6,
+                                                          ),
+                                                          border: OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(4),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+
+                                            // -------- DISCOUNT (Merchandise-il hide) --------
+                                            if (!_isMerchandise)
                                             Row(
                                               children: [
                                                 SizedBox(
-                                                  width: labelWidth,
+                                                width: discountLabelWidth,
                                                   child: const Text(
                                                     'Discount',
                                                     style: TextStyle(
@@ -1697,12 +1768,14 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                     ),
 
                                     // ================= DIVIDER =================
+                                   if (!_isMerchandise)
                                     Container(
                                       width: 0.8,
                                       color: const Color(0xFFE3E3E3),
                                     ),
 
                                     // ================= RIGHT =================
+                                  if (!_isMerchandise)
                                     Expanded(
                                       flex: 4,
                                       child: Padding(
@@ -1729,14 +1802,11 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                                     color: Color(0xFF222222),
                                                   ),
                                                 ),
-                                                Flexible(
-                                                  child: Text(
-                                                    totalAmount
-                                                        .toStringAsFixed(
-                                                      AppState()
-                                                              .noOfDecimals ??
-                                                          2,
-                                                    ),
+                                               Flexible(
+  child: Text(
+    subTotal.toStringAsFixed(
+      AppState().noOfDecimals ?? 2,
+    ),
                                                     textAlign:
                                                         TextAlign.right,
                                                     style: const TextStyle(
@@ -1932,15 +2002,8 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                                     ),
                                                     child: FittedBox(
                                                       fit: BoxFit.scaleDown,
-                                                      child: Text(
-                                                        roundoff == ''
-                                                            ? roundOffValue
-                                                                .toStringAsFixed(
-                                                                AppState()
-                                                                        .noOfDecimals ??
-                                                                    2,
-                                                              )
-                                                            : roundoff,
+                                                   child: Text(
+  roundOffValue.toStringAsFixed(AppState().noOfDecimals ?? 2),
                                                         style:
                                                             const TextStyle(
                                                           fontSize:
@@ -1970,36 +2033,25 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                             const SizedBox(height: 7),
 
                                             // GRAND TOTAL
-                                            Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .spaceBetween,
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.center,
-                                              children: [
-                                                const Flexible(
-                                                  child: Text(
-                                                    'Grand Total',
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow
-                                                        .ellipsis,
-                                                    style: TextStyle(
-                                                      fontSize:
-                                                          AppFontSizes.value,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      color:
-                                                          Color(0xFF222222),
-                                                    ),
-                                                  ),
-                                                ),
-                                                Flexible(
-                                                  child: FittedBox(
-                                                    fit: BoxFit.scaleDown,
-                                                    alignment:
-                                                        Alignment.centerRight,
-                                                    child: Text(
-                                                      roundedGrandTotal
+                                          Row(
+  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  crossAxisAlignment: CrossAxisAlignment.center,
+  children: [
+    const Text(
+      'Grand Total',
+      style: TextStyle(
+        fontSize: AppFontSizes.label,
+        fontWeight: FontWeight.w700,
+        color: Color(0xFF222222),
+      ),
+    ),
+    const SizedBox(width: 4),
+    Expanded(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerRight,
+        child: Text(
+          roundedGrandTotal
                                                           .toStringAsFixed(
                                                         AppState()
                                                                 .noOfDecimals ??
@@ -2023,11 +2075,12 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                         ),
                                       ),
                                     ),
-                                  ],
+                                                                ],
                                 ),
                               ),
 
                               const SizedBox(height: 11),
+                            ],
 
                               // ==========================================
                               // BOTTOM BUTTONS
@@ -2198,7 +2251,7 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                 ],
               ),
       ),
-    );
+     ) );
   }
 
   // =====================================================================
@@ -2260,7 +2313,8 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
             double.tryParse(selectedUnit?['stock']?.toString() ?? '0');
       }
 
-      bool isAmountValid() {
+         bool isAmountValid() {
+        if (_isMerchandise) return true; // Merchandise-il amount venda
         final enteredAmount =
             double.tryParse(amountController.text.trim()) ?? 0;
         final minPrice =
@@ -2341,6 +2395,7 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                               ),
                             ),
                             const SizedBox(height: 6),
+                                                if (!_isMerchandise)
                             Text(
                               'Minimum Rate : ${selectedUnit?['min_price'] ?? '0'}',
                               style: const TextStyle(
@@ -2537,6 +2592,7 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                if (!_isMerchandise) ...[
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
@@ -2610,7 +2666,8 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 14),
+                                                               const SizedBox(width: 14),
+                                ],
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
@@ -2679,7 +2736,7 @@ class _CustomerorderdetailState extends State<Customerorderdetail> {
                                   ),
                                 ),
                               ],
-                            ),
+                              ),
 
                             const SizedBox(height: 16),
 

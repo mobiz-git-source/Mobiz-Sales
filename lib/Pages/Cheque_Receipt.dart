@@ -12,6 +12,7 @@ import 'package:mobizapp/Utilities/date_helper.dart';
 import 'package:mobizapp/confg/appconfig.dart';
 import 'package:mobizapp/confg/sizeconfig.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../Utilities/cpcl_helper.dart'; 
 
 import '../Models/Store_model.dart';
 
@@ -40,6 +41,7 @@ class _ChequeReceiptState extends State<ChequeReceipt> {
   }
 
   void _initPrinter() async {
+    await loadPrinterTypeCache();
     try {
       bool? isConnected = await printer.isConnected;
       if (isConnected ?? false) {
@@ -280,75 +282,105 @@ class _ChequeReceiptState extends State<ChequeReceipt> {
       ),
     );
   }
-
+/// Main Print Dispatcher: Routes automatically to Zebra (CPCL) or Sewoo (ESC/POS)
   Future<void> _print(Data data) async {
-    try {
-      if (!_connected) {
-        bool connected = await _connect();
-        if (!connected) return;
+    if (!_connected) {
+      bool connected = await _connect();
+      if (!connected) return;
+    }
+
+    
+     try {
+      if (isZebraPrinter(_selectedDevice)) {
+        await _printZebra(data);
+      } else {
+        await _printSewoo(data);
       }
+    } catch (e, st) {
+      print('Print error: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Print failed: $e')),
+        );
+      }
+    }
+  }
+  
+  Future<void> _printZebra(Data data) async {
+    try {
       final response = await http.get(Uri.parse(
           '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
       if (response.statusCode != 200) {
-        print(response.body);
         throw Exception('Failed to load store details');
       }
       StoreDetail storeDetail = StoreDetail.fromJson(json.decode(response.body));
-      try {
-        final String logoUrl = '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
-        if (logoUrl.isNotEmpty) {
-          final logoResponse = await http.get(Uri.parse(logoUrl));
-          if (logoResponse.statusCode == 200) {
-            Uint8List imageBytes = logoResponse.bodyBytes;
-            img.Image originalImage = img.decodeImage(imageBytes)!;
-            img.Image monoLogo = img.grayscale(originalImage);
-            Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
-            await printer.printImageBytes(logoBytes);
+
+      String formatDate(String date) => DateHelper.displayDate(date);
+
+           final cpcl = CpclBuilder(kLabelWidthDots);
+
+      // ---- 1. Logo ----
+      if (storeDetail.logos != null && storeDetail.logos!.isNotEmpty) {
+        try {
+          final String logoUrl =
+              '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
+          final logoResp = await http.get(Uri.parse(logoUrl));
+          if (logoResp.statusCode == 200) {
+            img.Image? original = img.decodeImage(logoResp.bodyBytes);
+            if (original != null) {
+              img.Image resized = img.copyResize(original, width: kLogoWidthPx);
+              final bytesPerRow = (resized.width / 8).ceil();
+              final packed = imageTo1BitCpcl(resized, invert: kInvertLogoBits);
+              cpcl.addLogo(packed, bytesPerRow, resized.height);
+            }
           }
+        } catch (e) {
+          print('Error printing Zebra logo: $e');
         }
-      } catch (e) {
-        print('Error printing logo: $e');
       }
-      void printAlignedText(String leftText, String rightText) {
-        const int maxLineLength = 68;
-        int leftTextLength = leftText.length;
-        int rightTextLength = rightText.length;
 
-        int spaceLength = maxLineLength - (leftTextLength + rightTextLength);
-        String spaces = ' ' * spaceLength;
-        printer.printCustom('$leftText$spaces$rightText', 1,
-            0); // Print with left-aligned text
+      
+      cpcl.centerText('${storeDetail.name}', font: 7, size: 0, lineGap: 30);
+      if (data.store != null) {
+        if (data.store!.address.isNotEmpty) {
+          cpcl.centerText("Address: ${data.store!.address}", font: 4, lineGap: 24);
+        }
+        if (data.store!.trn != null && data.store!.trn!.isNotEmpty) {
+          cpcl.centerText("TRN: ${data.store!.trn}", font: 4, lineGap: 24);
+        }
       }
-    String formatDate(String date) {
-  return DateHelper.displayDate(date);}
-      printer.printNewLine();
-      String companyName =
-          '${storeDetail.name}';
-      printer.printCustom(companyName, 3, 1);
-      printer.printCustom("Address: ${data.store!.address}", 1, 1);
-      printer.printCustom("TRN: ${data.store!.trn}", 1, 1);
-      printer.printCustom("CHEQUE RECEIPT", 1, 1);
-      printer.printNewLine();
-      printer.printCustom("-" * 72, 1, 1);
-      printAlignedText('Customer: ${data.paymentType == "Individual" ? data.customer[0].name  : data.customerGroup[0].name}', '',);
-      printAlignedText('', 'Date: ${formatDate(data.inDate)}');
-      printer.printNewLine();
-      printer.printCustom("-" * 72, 1, 1); // Centered
+      cpcl.centerText("CHEQUE RECEIPT", font: 7, size: 0, lineGap: 30);
+      cpcl.hLine();
+
+      // ---- 3. Customer / date ----
+      String customerTitle = (data.paymentType == "Individual" && data.customer.isNotEmpty)
+          ? data.customer[0].name
+          : (data.customerGroup.isNotEmpty ? data.customerGroup[0].name : 'N/A');
+
+      cpcl.text('Customer: $customerTitle');
+      cpcl.twoColumn('', 'Date: ${formatDate(data.inDate)}');
+      cpcl.hLine();
+
+      // ---- 4. Collection info ----
       if (data.collectionType == 'Cheque') {
-        printAlignedText('Collection Type: Cheque', 'Cheque No: ${data.chequeNo}');
-        printAlignedText('Bank Name: ${data.bank}', 'Cheque Date: ${DateHelper.displayDate(data.chequeDate)}');
+        cpcl.twoColumn('Collection Type: Cheque', 'Cheque No: ${data.chequeNo ?? "N/A"}');
+        cpcl.twoColumn('Bank Name: ${data.bank ?? "N/A"}',
+            'Cheque Date: ${DateHelper.displayDate(data.chequeDate)}');
       } else if (data.collectionType == 'Cash') {
-        printAlignedText('Collection Type: Cash', ' '); // Uncomment if needed
+        cpcl.text('Collection Type: Cash');
       }
-      printAlignedText('Amount: ${data.amount}', ' ');
-      printer.printNewLine();
-      printer.printCustom("-" * 72, 1, 1);
-      printAlignedText("Van: ${data.vanId}", "");
-      printAlignedText("Salesman: ${data.user!.name}", "");
-      printer.printNewLine();
+      cpcl.text('Amount: ${data.amount}');
+      cpcl.hLine();
 
-      printer.paperCut();
+      // ---- 5. Van / Salesman ----
+      cpcl.text("Van: ${data.vanId}");
+      if (data.user != null) {
+        cpcl.text("Salesman: ${data.user!.name}");
+      }
+      cpcl.feed(40);
 
+   final bytes = cpcl.build();
+await sendCpcl(printer, bytes);
     } catch (e) {
       print('Printing error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -356,7 +388,167 @@ class _ChequeReceiptState extends State<ChequeReceipt> {
       );
     }
   }
-}
+
+  
+  Future<void> _printSewoo(Data data) async {
+    try {
+      final response = await http.get(Uri.parse(
+          '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
+      if (response.statusCode != 200) {
+        print(response.body);
+        throw Exception('Failed to load store details');
+      }
+      StoreDetail storeDetail = StoreDetail.fromJson(json.decode(response.body));
+
+        try {
+        final String logoUrl = '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
+        if (logoUrl.isNotEmpty) {
+          final logoBytes = await buildSewooLogoBytes(logoUrl);
+          if (logoBytes != null) {
+            await printer.printImageBytes(logoBytes);
+            await Future.delayed(const Duration(milliseconds: 500));
+          }
+        }
+      } catch (e) {
+        print('Error printing logo: $e');
+      }
+
+      void printAlignedText(String leftText, String rightText) {
+        const int maxLineLength = 68;
+        int leftTextLength = leftText.length;
+        int rightTextLength = rightText.length;
+
+        int spaceLength = maxLineLength - (leftTextLength + rightTextLength);
+        String spaces = ' ' * spaceLength;
+        printer.printCustom('$leftText$spaces$rightText', 1, 0);
+      }
+
+      String formatDate(String date) {
+        return DateHelper.displayDate(date);
+      }
+
+      printer.printNewLine();
+      String companyName = '${storeDetail.name}';
+      printer.printCustom(companyName, 3, 1);
+      if (data.store != null) {
+        printer.printCustom("Address: ${data.store!.address}", 1, 1);
+        if (data.store!.trn != null && data.store!.trn!.isNotEmpty) {
+          printer.printCustom("TRN: ${data.store!.trn}", 1, 1);
+        }
+      }
+      printer.printCustom("CHEQUE RECEIPT", 1, 1);
+      printer.printNewLine();
+      printer.printCustom("-" * 72, 1, 1);
+
+      String customerTitle = (data.paymentType == "Individual" && data.customer.isNotEmpty)
+          ? data.customer[0].name
+          : (data.customerGroup.isNotEmpty ? data.customerGroup[0].name : 'N/A');
+
+      printAlignedText('Customer: $customerTitle', '');
+      printAlignedText('', 'Date: ${formatDate(data.inDate)}');
+      printer.printNewLine();
+      printer.printCustom("-" * 72, 1, 1);
+
+      if (data.collectionType == 'Cheque') {
+        printAlignedText('Collection Type: Cheque', 'Cheque No: ${data.chequeNo}');
+        printAlignedText('Bank Name: ${data.bank}', 'Cheque Date: ${DateHelper.displayDate(data.chequeDate)}');
+      } else if (data.collectionType == 'Cash') {
+        printAlignedText('Collection Type: Cash', ' ');
+      }
+      printAlignedText('Amount: ${data.amount}', ' ');
+      printer.printNewLine();
+      printer.printCustom("-" * 72, 1, 1);
+      printAlignedText("Van: ${data.vanId}", "");
+      if (data.user != null) {
+        printAlignedText("Salesman: ${data.user!.name}", "");
+      }
+      printer.printNewLine();
+
+      printer.paperCut();
+    } catch (e) {
+      print('Printing error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Printing failed: $e')),
+      );
+    }
+  }
+  }
+  // Future<void> _print(Data data) async {
+  //   try {
+  //     if (!_connected) {
+  //       bool connected = await _connect();
+  //       if (!connected) return;
+  //     }
+  //     final response = await http.get(Uri.parse(
+  //         '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
+  //     if (response.statusCode != 200) {
+  //       print(response.body);
+  //       throw Exception('Failed to load store details');
+  //     }
+  //     StoreDetail storeDetail = StoreDetail.fromJson(json.decode(response.body));
+  //     try {
+  //       final String logoUrl = '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
+  //       if (logoUrl.isNotEmpty) {
+  //         final logoResponse = await http.get(Uri.parse(logoUrl));
+  //         if (logoResponse.statusCode == 200) {
+  //           Uint8List imageBytes = logoResponse.bodyBytes;
+  //           img.Image originalImage = img.decodeImage(imageBytes)!;
+  //           img.Image monoLogo = img.grayscale(originalImage);
+  //           Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
+  //           await printer.printImageBytes(logoBytes);
+  //         }
+  //       }
+  //     } catch (e) {
+  //       print('Error printing logo: $e');
+  //     }
+  //     void printAlignedText(String leftText, String rightText) {
+  //       const int maxLineLength = 68;
+  //       int leftTextLength = leftText.length;
+  //       int rightTextLength = rightText.length;
+
+  //       int spaceLength = maxLineLength - (leftTextLength + rightTextLength);
+  //       String spaces = ' ' * spaceLength;
+  //       printer.printCustom('$leftText$spaces$rightText', 1,
+  //           0); // Print with left-aligned text
+  //     }
+  //   String formatDate(String date) {
+  // return DateHelper.displayDate(date);}
+  //     printer.printNewLine();
+  //     String companyName =
+  //         '${storeDetail.name}';
+  //     printer.printCustom(companyName, 3, 1);
+  //     printer.printCustom("Address: ${data.store!.address}", 1, 1);
+  //     printer.printCustom("TRN: ${data.store!.trn}", 1, 1);
+  //     printer.printCustom("CHEQUE RECEIPT", 1, 1);
+  //     printer.printNewLine();
+  //     printer.printCustom("-" * 72, 1, 1);
+  //     printAlignedText('Customer: ${data.paymentType == "Individual" ? data.customer[0].name  : data.customerGroup[0].name}', '',);
+  //     printAlignedText('', 'Date: ${formatDate(data.inDate)}');
+  //     printer.printNewLine();
+  //     printer.printCustom("-" * 72, 1, 1); // Centered
+  //     if (data.collectionType == 'Cheque') {
+  //       printAlignedText('Collection Type: Cheque', 'Cheque No: ${data.chequeNo}');
+  //       printAlignedText('Bank Name: ${data.bank}', 'Cheque Date: ${DateHelper.displayDate(data.chequeDate)}');
+  //     } else if (data.collectionType == 'Cash') {
+  //       printAlignedText('Collection Type: Cash', ' '); // Uncomment if needed
+  //     }
+  //     printAlignedText('Amount: ${data.amount}', ' ');
+  //     printer.printNewLine();
+  //     printer.printCustom("-" * 72, 1, 1);
+  //     printAlignedText("Van: ${data.vanId}", "");
+  //     printAlignedText("Salesman: ${data.user!.name}", "");
+  //     printer.printNewLine();
+
+  //     printer.paperCut();
+
+  //   } catch (e) {
+  //     print('Printing error: $e');
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('Printing failed: $e')),
+  //     );
+  //   }
+  // }
+
 
 
 class CollectionResponse {

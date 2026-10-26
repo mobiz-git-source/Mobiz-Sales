@@ -16,6 +16,7 @@ import '../Utilities/rest_ds.dart';
 import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
+import '../confg/apptextsizes.dart';
 import 'Group_Print.dart';
 
 class PaymentCollectionScreen extends StatefulWidget {
@@ -339,11 +340,11 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 8,
-                    color: Color(0xFF777777),
-                    fontWeight: FontWeight.w400,
-                  ),
+                 style: const TextStyle(
+  fontSize: AppFontSizes.payTileLabel,
+  color: Color(0xFF777777),
+  fontWeight: FontWeight.w400,
+),
                 ),
 
                 const SizedBox(height: 4),
@@ -372,8 +373,8 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
                         value,
                         maxLines: 1,
                         style: TextStyle(
-                          fontSize: 13,
-                          color: valueColor,
+  fontSize: AppFontSizes.payTileValueEditable,
+  color: valueColor,
                           fontWeight: bold
                               ? FontWeight.w600
                               : FontWeight.w500,
@@ -382,17 +383,20 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
                     ),
                   )
                 else
-                  Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: valueColor,
-                      fontWeight:
-                          bold ? FontWeight.w600 : FontWeight.w500,
-                    ),
-                  ),
+  FittedBox(
+    fit: BoxFit.scaleDown,
+    alignment: Alignment.centerLeft,
+    child: Text(
+      value,
+      maxLines: 1,
+      style: TextStyle(
+        fontSize: AppFontSizes.payTileValue,
+        color: valueColor,
+        fontWeight:
+            bold ? FontWeight.w600 : FontWeight.w500,
+      ),
+    ),
+  ),
               ],
             ),
           ),
@@ -594,9 +598,9 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
                       child: Text(
-                        'Outstanding Invoices / Returns',
-                        style: TextStyle(
-                          fontSize: 14,
+                       'Outstanding Invoices / Returns',
+style: TextStyle(
+  fontSize: AppFontSizes.paySectionTitle,
                           fontWeight: FontWeight.bold,
                           color: AppConfig.textBlack,
                         ),
@@ -747,11 +751,11 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF202020),
-                    height: 1.0,
-                  ),
+  fontSize: AppFontSizes.payRowHeader,
+  fontWeight: FontWeight.w500,
+  color: Color(0xFF202020),
+  height: 1.0,
+),
                 ),
 
                 const SizedBox(height: 6),
@@ -814,23 +818,24 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
 
-              const SizedBox(
-                width: double.infinity,
-                child: Text(
-                  'Allocate Amount',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
-                  style: TextStyle(
-                    fontSize: 7.5,
-                    color: Color(0xFF777777),
-                    fontWeight: FontWeight.w400,
-                    height: 1.0,
-                  ),
-                ),
-              ),
+             const SizedBox(
+  width: double.infinity,
+  child: FittedBox(
+    fit: BoxFit.scaleDown,
+    alignment: Alignment.centerRight,
+    child: Text(
+      'Allocate Amount',
+      maxLines: 1,
+      style: TextStyle(
+        fontSize: AppFontSizes.payColLabel,
+        color: Color(0xFF777777),
+        fontWeight: FontWeight.w400,
+        height: 1.0,
+      ),
+    ),
+  ),
+),
 
-              // Reference photo പോലെ header/value ഇടയിൽ space
               const SizedBox(height: 6),
 
               InkWell(
@@ -1014,7 +1019,7 @@ Widget _buildFixedInfoAndCollectionSection() {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 8.5,
+                   fontSize: AppFontSizes.payInfoTitle,
                           fontWeight: FontWeight.w400,
                           color: Color(0xFF222222),
                           height: 1.0,
@@ -1028,7 +1033,7 @@ Widget _buildFixedInfoAndCollectionSection() {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 7.5,
+                       fontSize: AppFontSizes.payInfoSub,
                           fontWeight: FontWeight.w400,
                           color: Color(0xFF777777),
                           height: 1.0,
@@ -1069,7 +1074,7 @@ Widget _buildFixedInfoAndCollectionSection() {
                   'Collection Type',
                   style: TextStyle(
                     color: Color(0xFF777777),
-                    fontSize: 11,
+                  fontSize: AppFontSizes.payFieldLabel,
                     fontWeight: FontWeight.w400,
                   ),
                 ),
@@ -1123,7 +1128,7 @@ Widget _buildFixedInfoAndCollectionSection() {
                             child: Text(
                               capitalizedItem,
                               style: const TextStyle(
-                                fontSize: 10,
+                          fontSize: AppFontSizes.payFieldValue,
                                 fontWeight: FontWeight.w400,
                                 color: Color(0xFF222222),
                               ),
@@ -1175,7 +1180,7 @@ Widget _buildFixedInfoAndCollectionSection() {
                       const Text(
                         'Bank',
                         style: TextStyle(
-                          fontSize: 10,
+                     fontSize: AppFontSizes.payFormLabel,
                           color: Color(0xFF777777),
                         ),
                       ),
@@ -1195,13 +1200,13 @@ Widget _buildFixedInfoAndCollectionSection() {
       controller: _bankController,
       keyboardType: TextInputType.name,
       textAlign: TextAlign.center,
-      style: const TextStyle(fontSize: 9, color: Color(0xFF333333)),
+  style: const TextStyle(fontSize: AppFontSizes.payFormInput, color: Color(0xFF333333)),
       decoration: const InputDecoration(
         border: InputBorder.none,
         isDense: true,
         contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         hintText: 'Bank',
-        hintStyle: TextStyle(fontSize: 9),
+     hintStyle: TextStyle(fontSize: AppFontSizes.payFormInput),
       ),
       onChanged: (value) {
         setState(() {
@@ -1218,7 +1223,7 @@ const SizedBox(width: 8),
 const Text(
   'Cheque Date',
   style: TextStyle(
-    fontSize: 10,
+ fontSize: AppFontSizes.payFormLabel,
     color: Color(0xFF777777),
   ),
 ),
@@ -1261,7 +1266,7 @@ Expanded(
     const Text(
       'Cheque No',
       style: TextStyle(
-        fontSize: 10,
+    fontSize: AppFontSizes.payFormLabel,
         color: Color(0xFF777777),
       ),
     ),
@@ -1394,7 +1399,7 @@ Expanded(
                 isSaving ? 'Saving...' : 'SAVE',
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 10,
+              fontSize: AppFontSizes.payButton,
                   fontWeight: FontWeight.w500,
                   letterSpacing: 0.2,
                 ),
@@ -1465,7 +1470,7 @@ Expanded(
                 child: Text(
                   'SKIP',
                   style: TextStyle(
-                    fontSize: 10,
+              fontSize: AppFontSizes.payButton,
                     color: AppConfig.colorPrimary,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1589,12 +1594,12 @@ Widget _amountColumn(
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 8,
-              fontWeight: FontWeight.w400,
-              color: Color(0xFF777777),
-              height: 1.0,
-            ),
+           style: const TextStyle(
+  fontSize: AppFontSizes.payColLabel,
+  fontWeight: FontWeight.w400,
+  color: Color(0xFF777777),
+  height: 1.0,
+),
           ),
         ),
 
@@ -1608,10 +1613,10 @@ Widget _amountColumn(
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w500,
-              color: isNegative
+           style: TextStyle(
+  fontSize: AppFontSizes.payColValue,
+  fontWeight: FontWeight.w500,
+  color: isNegative
                   ? const Color(0xFFE53935)
                   : const Color(0xFF202020),
               height: 1.0,
@@ -1850,12 +1855,12 @@ void _showDialog(BuildContext context, int index, Invoice invoice) {
         value,
         maxLines: 1,
         textAlign: TextAlign.center,
-        style: const TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w400,
-          color: Color(0xFF333333),
-          height: 1.0,
-        ),
+       style: const TextStyle(
+  fontSize: AppFontSizes.payInput,
+  fontWeight: FontWeight.w400,
+  color: Color(0xFF333333),
+  height: 1.0,
+),
       ),
     ),
   );

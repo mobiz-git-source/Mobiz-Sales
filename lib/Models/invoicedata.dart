@@ -1,3 +1,13 @@
+import 'package:flutter/material.dart';
+
+num? _toNum(dynamic v) {
+  if (v == null) return null;
+  if (v is num) return v;
+  return num.tryParse(v.toString());
+}
+
+int? _toInt(dynamic v) => _toNum(v)?.toInt();
+
 class InvoiceData {
   Data? data;
   bool? success;
@@ -43,7 +53,10 @@ class Data {
   int? storeId;
   int? status;
   String? createdAt;
-  String? discounted_amount;
+ String? discounted_amount;
+  String? discountType;
+  num? discountAmount;
+  num? discountPercentage;
   String? remarks;
   String? updatedAt;
   String? deletedAt;
@@ -96,14 +109,14 @@ class Data {
     inTime = json['in_time'];
     invoiceNo = json['invoice_no'];
     deliveryNo = json['delivery_no'];
-    otherCharge = json['other_charge'];
-    discount = json['discount'];
-    roundOff = json['round_off'];
-    total = json['total'];
-    totalTax = json['total_tax'];
-    grandTotal = json['grand_total'];
-    receipt = (json['receipt'] is double) ? json['receipt'].toInt() : json['receipt'];
-    balance = json['balance'];
+       otherCharge = _toNum(json['other_charge']);
+    discount = _toNum(json['discount']);
+    roundOff = json['round_off']?.toString();
+    total = _toNum(json['total']);
+    totalTax = _toNum(json['total_tax']);
+    grandTotal = _toNum(json['grand_total']);
+    receipt = _toInt(json['receipt']);
+    balance = _toNum(json['balance']);
     orderType = json['order_type'];
     ifVat = json['if_vat'];
     vanId = json['van_id'];
@@ -111,7 +124,13 @@ class Data {
     storeId = json['store_id'];
     status = json['status'];
     createdAt = json['created_at'];
-    discounted_amount = json['discounted_amount'];
+       discounted_amount = json['discounted_amount']?.toString();
+    discountType = json['discount_type']?.toString();
+       discountAmount = num.tryParse(json['discount_amount']?.toString() ?? '');
+    discountPercentage = _toNum(json['discount_percentage']);
+    debugPrint('DISC raw: discount=${json['discount']} type=${json['discount_type']} '
+        'amount=${json['discount_amount']} percentage=${json['discount_percentage']} '
+        'total=${json['total']} grand=${json['grand_total']}');
     remarks = json['remarks'];
     updatedAt = json['updated_at'];
     deletedAt = json['deleted_at'];
@@ -145,6 +164,51 @@ class Data {
         user!.add(new User.fromJson(v));
       });
     }
+  }
+
+  num get effectiveDiscount {
+  
+  final amt = discountAmount ?? 0;
+  if (amt > 0) return amt;
+
+  
+  final gt = grandTotal ?? 0;
+  if (gt > 0) {
+    final ro = num.tryParse(roundOff ?? '') ?? 0;
+    final implied =
+        (total ?? 0) + (totalTax ?? 0) + (otherCharge ?? 0) + ro - gt;
+    return implied > 0.05 ? num.parse(implied.toStringAsFixed(2)) : 0;
+  }
+  return _rawDiscount;
+}
+
+    num get _rawDiscount {
+    final amt = discountAmount ?? 0;
+    if (amt > 0) return amt;
+    final d = discount ?? 0;
+    if (d <= 0) return 0;
+    final t = (discountType ?? '').toLowerCase();
+    final isPercentage = t == '1' || t == 'percentage';
+    return isPercentage ? (total ?? 0) * d / 100 : d;
+  }
+
+   bool get isPercentageDiscount {
+    final t = (discountType ?? '').trim().toLowerCase();
+    return t == '1' || t == 'percentage';
+  }
+
+  num get discountPercent {
+    if (!isPercentageDiscount || effectiveDiscount <= 0) return 0;
+    final pct = (discountPercentage ?? 0) > 0
+        ? discountPercentage!
+        : (discount ?? 0);
+    return pct;
+  }
+  String get discountLabel {
+    final p = discountPercent;
+    if (p <= 0) return 'Discount';
+    final s = p.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
+    return 'Discount ($s%)';
   }
 
   Map<String, dynamic> toJson() {
@@ -445,14 +509,14 @@ class Detail {
     itemId = json['item_id'];
     productType = json['product_type'];
     unit = json['unit'];
-    convertQty = json['convert_qty'];
-    quantity = json['quantity'];
-    rate = json['rate'];
-    prodiscount = json['prodiscount'];
-    taxable = json['taxable'];
-    taxAmt = json['tax_amt'];
-    mrp = json['mrp'];
-    amount = json['amount'];
+       convertQty = _toNum(json['convert_qty']);
+    quantity = _toNum(json['quantity']);
+    rate = _toNum(json['rate']);
+    prodiscount = _toNum(json['prodiscount']);
+    taxable = _toNum(json['taxable']);
+    taxAmt = _toNum(json['tax_amt']);
+    mrp = _toNum(json['mrp']);
+    amount = _toNum(json['amount']);
     vanId = json['van_id'];
     userId = json['user_id'];
     storeId = json['store_id'];
@@ -468,35 +532,35 @@ class Detail {
     brandId = json['brand_id'];
     supplierId = json['supplier_id'];
     taxId = json['tax_id'];
-    taxPercentage = json['tax_percentage'];
-    taxInclusive = json['tax_inclusive'];
-    price = json['price'];
-    baseUnitId = json['base_unit_id'];
-    baseUnitQty = json['base_unit_qty'];
+       taxPercentage = _toNum(json['tax_percentage']);
+    taxInclusive = _toNum(json['tax_inclusive']);
+    price = _toNum(json['price']);
+    baseUnitId = _toNum(json['base_unit_id']);
+    baseUnitQty = _toNum(json['base_unit_qty']);
     baseUnitDiscount = json['base_unit_discount'];
     baseUnitBarcode = json['base_unit_barcode'];
     baseUnitOpStock = json['base_unit_op_stock'];
     secondUnitPrice = json['second_unit_price'];
-    secondUnitId = json['second_unit_id'];
-    secondUnitQty = json['second_unit_qty'];
+    secondUnitId = _toNum(json['second_unit_id']);
+    secondUnitQty = _toNum(json['second_unit_qty']);
     secondUnitDiscount = json['second_unit_discount'];
     secondUnitBarcode = json['second_unit_barcode'];
     secondUnitOpStock = json['second_unit_op_stock'];
     thirdUnitPrice = json['third_unit_price'];
-    thirdUnitId = json['third_unit_id'];
-    thirdUnitQty = json['third_unit_qty'];
+    thirdUnitId = _toInt(json['third_unit_id']);
+    thirdUnitQty = _toNum(json['third_unit_qty']);
     thirdUnitDiscount = json['third_unit_discount'];
     thirdUnitBarcode = json['third_unit_barcode'];
     thirdUnitOpStock = json['third_unit_op_stock'];
     fourthUnitPrice = json['fourth_unit_price'];
-    fourthUnitId = json['fourth_unit_id'];
-    fourthUnitQty = json['fourth_unit_qty'];
+       fourthUnitId = _toInt(json['fourth_unit_id']);
+    fourthUnitQty = _toNum(json['fourth_unit_qty']);
     fourthUnitDiscount = json['fourth_unit_discount'];
-    isMultipleUnit = json['is_multiple_unit'];
+         productQty = _toNum(json['product_qty']);
+    percentage = _toNum(json['percentage']);
     fourthUnitOpStock = json['fourth_unit_op_stock'];
     description = json['description'];
-    productQty = json['product_qty'];
-    percentage = json['percentage'];
+    
   }
 
   Map<String, dynamic> toJson() {

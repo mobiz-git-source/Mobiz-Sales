@@ -24,6 +24,9 @@ import '../Utilities/rest_ds.dart';
 import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
+import '../Utilities/cpcl_helper.dart';
+import '../Utilities/report_printer.dart';
+import '../Reports/sale_invoice_report.dart';
 import 'SaleInvoiceSearchPage.dart';
 
 class SaleInvoiceScrreen extends StatefulWidget {
@@ -37,10 +40,9 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
   List<VanSale> vanSales = [];
   List<VanSale> filteredVanSales = [];
   bool isLoading = false;
-  // ── NEW: caches store-logo bytes by filename so repeated PDF views
-  // for the same store don't re-download the same image every time ──
+
   final Map<String, Uint8List> _logoCache = {};
-  
+
   int currentPage = 1; // Track the current page number
   VanSaleResponse products = VanSaleResponse();
   bool hasNextPage = true; // Flag to check if there's another page to load
@@ -72,6 +74,48 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
       _onSearchChanged(_searchController.text.trim());
     });
   }
+ String _discountText(VanSale data) {
+  final dec = AppState().noOfDecimals ?? 2;
+
+  final num gt = data.grandTotal ?? 0;
+  final num ro = num.tryParse(data.roundOff ?? '') ?? 0;
+  num amount = 0;
+  if (gt > 0) {
+    final implied = (data.total ?? 0) +
+        (data.totalTax ?? 0) +
+        (data.otherCharge ?? 0) +
+        ro -
+        gt;
+    amount = implied > 0.05 ? num.parse(implied.toStringAsFixed(2)) : 0;
+  }
+
+   final t = (data.discount_type ?? '').trim().toLowerCase();
+  final isPct = t == '1' || t == 'percentage';
+  String label = 'Discount';
+  if (amount > 0 && isPct && (data.discount ?? 0) > 0) {
+    final s = data.discount!
+        .toStringAsFixed(2)
+        .replaceFirst(RegExp(r'\.?0+$'), '');
+    label = 'Discount ($s%)';
+  }
+  return '$label: ${amount.toStringAsFixed(dec)}';
+}
+  String _amountInWords(num amount) {
+    final dec = AppState().noOfDecimals ?? 2;
+    final parts = amount.toStringAsFixed(dec).split('.');
+    final whole = int.parse(parts[0]);
+    final minor = parts.length > 1 ? int.parse(parts[1]) : 0;
+
+    var words = "Amount in Words: ${AppState().code} "
+        "${NumberToWord().convert('en-in', whole).toUpperCase()}";
+
+    if (minor > 0) {
+      words += " AND ${NumberToWord().convert('en-in', minor).toUpperCase()} "
+          "${AppState().minor}";
+    }
+
+    return "$words ONLY";
+  }
 
   @override
   void dispose() {
@@ -81,6 +125,7 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
   }
 
   void _initPrinter() async {
+    await loadPrinterTypeCache();
     bool? isConnected = await printer.isConnected;
     if (isConnected!) {
       setState(() {
@@ -90,7 +135,7 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
     _getBluetoothDevices();
   }
 
-  void _getBluetoothDevices() async {
+  Future<void> _getBluetoothDevices() async {
     List<BluetoothDevice> devices = await printer.getBondedDevices();
     BluetoothDevice? defaultDevice;
     final prefs = await SharedPreferences.getInstance();
@@ -163,7 +208,7 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
 
       if (response.statusCode == 200) {
         print(response.request);
-        final Map<String, dynamic> responseData = jsonDecode(response.body);
+           final Map<String, dynamic> responseData = jsonDecode(response.body);
         final VanSaleResponse vanSaleResponse =
             VanSaleResponse.fromJson(responseData);
 
@@ -397,48 +442,50 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
-         trailing: SizedBox(
-  // ── FIX: widened to fit the bigger tap targets below without clipping ──
-  width: AppState().printer == "Wifi" ? 130 : 90,
-  child: Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      // ── FIX: wrapped in InkWell + Padding so the actual tappable
-      // area is ~40x40 instead of just the 24x24 icon glyph — the
-      // print icon (leftmost, closest to the list-tile edge) was the
-      // one most often missed since it had the least room around it. ──
-      InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () => _getInvoiceDataprint(data.id!, false),
-        child: const Padding(
-          padding: EdgeInsets.all(8.0),
-          child: Icon(Icons.print, color: Colors.blueAccent, size: 26),
-        ),
-      ),
-      if (AppState().printer == "Wifi")
-        InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () => _getwifiInvoiceData(data.id!, false),
-          child: const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Icon(
-              Icons.document_scanner,
-              color: Colors.green,
-              size: 26,
+            trailing: SizedBox(
+              // ── FIX: widened to fit the bigger tap targets below without clipping ──
+              width: AppState().printer == "Wifi" ? 130 : 90,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // ── FIX: wrapped in InkWell + Padding so the actual tappable
+                  // area is ~40x40 instead of just the 24x24 icon glyph — the
+                  // print icon (leftmost, closest to the list-tile edge) was the
+                  // one most often missed since it had the least room around it. ──
+                  InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => _getInvoiceDataprint(data.id!, false),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child:
+                          Icon(Icons.print, color: Colors.blueAccent, size: 26),
+                    ),
+                  ),
+                  if (AppState().printer == "Wifi")
+                    InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => _getwifiInvoiceData(data.id!, false),
+                      child: const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: Icon(
+                          Icons.document_scanner,
+                          color: Colors.green,
+                          size: 26,
+                        ),
+                      ),
+                    ),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => _getInvoiceData(data.id!, false),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: Icon(Icons.document_scanner,
+                          color: Colors.red, size: 26),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
-      InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () => _getInvoiceData(data.id!, false),
-        child: const Padding(
-          padding: EdgeInsets.all(8.0),
-          child: Icon(Icons.document_scanner, color: Colors.red, size: 26),
-        ),
-      ),
-    ],
-  ),
-),
             backgroundColor: AppConfig.backgroundColor,
             title: Column(
               mainAxisSize: MainAxisSize.min,
@@ -454,12 +501,8 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
                     ),
                   ),
                 ),
-                Text(
-                  (data.customer != null && data.customer!.isNotEmpty)
-                      ? data.customer![0].name ?? ''
-                      : (data.customerdata != null)
-                          ? data.customerdata![0].name ?? ''
-                          : '',
+                           Text(
+                  data.customer?.firstOrNull?.name ?? '',
                   style: TextStyle(
                     fontSize: AppConfig.textCaption3Size,
                     height: 1.15,
@@ -481,39 +524,29 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
                           height: 1.15,
                         ),
                       ),
-                data.discount_type == '0'
-                    ? Text(
-                        'Discount : ${data.discount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
-                        style: TextStyle(
-                          fontSize: AppConfig.textCaption3Size,
-                          height: 1.15,
-                        ),
-                      )
-                    : data.discount_type == '1'
-                        ? Text(
-                            'Discount(%): ${data.discount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}',
-                            style: TextStyle(
-                              fontSize: AppConfig.textCaption3Size,
-                              height: 1.15,
-                            ),
-                          )
-                        : const SizedBox.shrink(),
-                Text(
-                  'Round off: ${double.parse(data.roundOff ?? '0').toStringAsFixed(AppState().noOfDecimals ?? 2)}',
+                             Text(
+                  _discountText(data),
+                  style: TextStyle(
+                    fontSize: AppConfig.textCaption3Size,
+                    height: 1.15,
+                  ),
+                ),
+                             Text(
+                  'Round off: ${(double.tryParse(data.roundOff ?? '') ?? 0).toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                   style: TextStyle(
                     fontSize: AppConfig.textCaption3Size,
                     height: 1.15,
                   ),
                 ),
                 Text(
-                  'Total Vat: ${(data.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2)) ?? ''}',
+                  'Total ${AppState().taxLabel}: ${(data.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2)) ?? ''}',
                   style: TextStyle(
                     fontSize: AppConfig.textCaption3Size,
                     height: 1.15,
                   ),
                 ),
                 Text(
-                  'Grand Total: ${data.grandTotal}',
+                'Grand Total: ${(data.grandTotal ?? 0).toStringAsFixed(AppState().noOfDecimals ?? 2)}',
                   style: TextStyle(
                     fontSize: AppConfig.textCaption3Size,
                     height: 1.15,
@@ -637,11 +670,6 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
     );
   }
 
-  /// Renders Arabic text to a PNG image so it can be sent to the thermal
-  /// printer via printImageBytes(). ESC/POS text commands (printCustom)
-  /// only cover the printer's built-in codepage (Latin/ASCII) and can't
-  /// shape/join Arabic glyphs, so Arabic must always go through the
-  /// printer as a bitmap - same approach already used for the store logo.
   Future<Uint8List> _arabicTextToImageBytes(
     String text, {
     double fontSize = 26,
@@ -662,8 +690,6 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
     );
     textPainter.layout(maxWidth: maxWidth);
 
-// Thermal printers need bitmap width byte-aligned (multiple of 8),
-// otherwise printImageBytes can silently fail or corrupt subsequent output.
     double rawWidth = textPainter.width.ceilToDouble();
     final double width = (rawWidth / 8).ceil() * 8;
     final double height = textPainter.height.ceilToDouble();
@@ -690,291 +716,498 @@ class _SaleInvoiceScrreenState extends State<SaleInvoiceScrreen> {
     return byteData!.buffer.asUint8List();
   }
 
-  /// Loads a bundled Arabic-capable TTF font for the PDF.
-  /// PdfStandardFont (Helvetica/base-14 fonts) only supports Latin/WinAnsi
-  /// encoding - handing it Arabic Unicode text throws, which is why the
-  /// PDF button did nothing after name_ar was added (the exception was
-  /// never caught since _createPdf()/_wifiPdf() weren't awaited).
-  /// Add a font file (e.g. NotoNaskhArabic-Regular.ttf) under
-  /// assets/fonts/ and register it in pubspec.yaml's `assets:` section
   Future<PdfFont> _loadArabicPdfFont(
     double size, {
     PdfFontStyle style = PdfFontStyle.regular,
   }) async {
-    // Syncfusion's PdfTrueTypeFont can't parse Variable Fonts (gvar tables) -
-    // that's why the PDF button silently did nothing after this line was
-    // added. Use the STATIC weight file instead (not the "VariableFont" one).
     final ByteData fontData =
         await rootBundle.load('Assets/fonts/NotoNaskhArabic-Regular.ttf');
     return PdfTrueTypeFont(fontData.buffer.asUint8List(), size, style: style);
   }
 
-  void _print(Invoice.InvoiceData invoice, bool isPrint) async {
-    if (_connected) {
-      final String? name = invoice.data!.store![0].invoice_heading ?? '';
-      String cusAddress = invoice.data!.customer![0].address ?? 'N/A';
-      String companyName =
-          invoice.data!.store![0].invoice_company_name ?? 'N/A';
-      String companyNameAr = invoice.data!.store![0].name_ar ?? ''; // NEW
-      String companyAddress = invoice.data!.store![0].address ?? 'N/A';
-      String companyMail = invoice.data!.store![0].email ?? 'N/A';
-      String companyTRN = "TRN: ${invoice.data!.store![0].trn ?? 'N/A'}";
-      String billtype = "$name";
-      String customerName = "${invoice.data!.customer![0].name}";
-      List<String> nameWords = customerName.split(' ');
-      String firstLine = customerName;
-      String secondLine = "";
-      if (nameWords.length > 7) {
-        firstLine = nameWords.sublist(0, 7).join(' ');
-        secondLine = nameWords.sublist(7).join(' ');
-      }
-      String customerEmail = invoice.data!.customer![0].email ?? 'N/A';
-      String customerContact =
-          invoice.data!.customer![0].contactNumber ?? 'N/A';
-      String customerTRN = invoice.data?.customer?.firstOrNull?.trn ?? '';
-      num amount = invoice.data!.grandTotal ?? 0.0;
-      int wholePart = amount.floor();
-      int decimalPart =
-          ((amount - wholePart) * 1000).round(); // 3 decimal places
-      String invoiceNumber = invoice.data!.invoiceNo ?? 'N/A';
-      String invoiceDate = DateHelper.displayDate(invoice.data!.inDate);
-      String dueDate = DateHelper.displayDate(invoice.data!.inDate);
-      String Total =
-          invoice.data!.total?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
-              '0.00';
-      String tax = invoice.data!.totalTax
-              ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
-          '0.00';
-      String grandTotal = invoice.data!.grandTotal
-              ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
-          '0.00';
-      final remarks = invoice.data?.remarks;
-      String Discount;
-      if (invoice.data!.discount != null &&
-          double.tryParse(invoice.data!.discount!.toString()) != null &&
-          double.parse(invoice.data!.discount!.toString()) > 0) {
-        Discount =
-            "Discount: ${double.parse(invoice.data!.discount!.toString()).toStringAsFixed(AppState().noOfDecimals ?? 2)}";
-      } else {
-        Discount = '';
-      }
-      String amountInWords = "Amount in Words: ${AppState().code} "
-          "${NumberToWord().convert('en-in', wholePart).toUpperCase()}";
+  // Future<void> _print(Invoice.InvoiceData invoice, bool isPrint) async {
+  //   if (!_connected) await _connect();
+  //   if (!_connected) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Printer not connected')),
+  //     );
+  //     return;
+  //   }
 
-      if (decimalPart > 0) {
-        amountInWords +=
-            " AND ${NumberToWord().convert('en-in', decimalPart).toUpperCase()} ${AppState().minor}";
-      }
-
-      amountInWords += " ONLY";
-   String van = invoice.data?.van?.firstOrNull?.name ?? 'N/A';
-String salesman = invoice.data?.user?.firstOrNull?.name ?? 'N/A';
-
-      void printAlignedText(String leftText, String rightText) {
-        const int maxLineLength =
-            68; // Adjust the maximum line length as per your printer's character limit
-        int leftTextLength = leftText.length;
-        int rightTextLength = rightText.length;
-
-        // Calculate padding to ensure rightText is right-aligned
-        int spaceLength = maxLineLength - (leftTextLength + rightTextLength);
-        String spaces = ' ' * spaceLength;
-
-        printer.printCustom(
-            '$leftText$spaces$rightText', 1, 0); // Print with left-aligned text
-      }
-
-      String logoUrl =
-          'https://erpadmin.mobiz.ae/uploads/store/${invoice.data!.store![0].logo}';
-      if (logoUrl.isNotEmpty) {
-        final response = await http.get(Uri.parse(logoUrl));
-        if (response.statusCode == 200) {
-          Uint8List imageBytes = response.bodyBytes;
-
-          // Decode image and convert to monochrome bitmap if needed
-          img.Image? originalImage = img.decodeImage(imageBytes)!;
-          if (originalImage != null) {
-            // Resize image to fit thermal printer width (typically 384 or 576 pixels)
-            // 200-250px is a safe width for logos on most thermal printers.
-            img.Image resizedImage = img.copyResize(originalImage, width: 250);
-
-            // Convert to grayscale
-            img.Image monoLogo = img.grayscale(resizedImage);
-
-            // Encode the image to PNG
-            Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
-
-            // Print the logo image
-            await printer.printImageBytes(logoBytes);
-            // Small delay to allow printer to process image data
-            await Future.delayed(const Duration(milliseconds: 500));
-          }
-        } else {
-          print('Failed to load image: ${response.statusCode}');
-        }
-      }
-
-// Print company details
-      printer.printNewLine();
-      printer.printCustom(companyName, 3, 1); // Centered
-      if (companyNameAr.trim().isNotEmpty) {
-        // Arabic can't go through printCustom (see _arabicTextToImageBytes
-        // doc comment above) - render it as a bitmap and print like the logo.
-        try {
-          final Uint8List arabicNameBytes =
-              await _arabicTextToImageBytes(companyNameAr, fontSize: 30);
-          await printer.printImageBytes(arabicNameBytes);
-          await Future.delayed(const Duration(milliseconds: 300));
-        } catch (e) {
-          print('Failed to print Arabic company name: $e');
-        }
-      }
-          printer.printCustom(companyAddress, 1, 1); // Centered
-      printer.printCustom(companyMail, 1, 1);
-      printer.printNewLine();
-
-      printer.printCustom("TAX INVOICE", 2, 1); // ← Heading, centered (matches PDF)
-      printer.printNewLine();
-
-      printer.printCustom("-" * 72, 1, 1); // Centered
-      printAlignedText("Invoice No: ${invoiceNumber}", "Date: ${invoiceDate}");
-      printAlignedText("", "Time: ${invoice.data!.inTime}");
-      printAlignedText("", "${remarks != null ? remarks : ''}");
-      // printer.printCustom("Invoice No: ${invoiceNumber} | Date: ${invoiceDate}", 1, 1);
-      printer.printNewLine();
-      // Print customer details
-      printAlignedText("Customer: $firstLine", "");
-
-      if (secondLine.isNotEmpty) {
-        printAlignedText("         $secondLine", "");
-      }
-      printAlignedText("$cusAddress", " ");
-      // printAlignedText("Email: $customerEmail", "");
-      printAlignedText("Contact No: $customerContact", "");
-      printAlignedText(
-          "${invoice.data?.store?.firstOrNull?.vat_label}: $customerTRN", " ");
-      if (invoice.data!.cashCard != null &&
-          invoice.data!.cashCard!.isNotEmpty) {
-        printAlignedText("Bill Type: ${invoice.data!.cashCard}", " ");
-      }
-      printer.printNewLine();
-
-      // Print horizontal line
-      printer.printCustom("-" * 70, 1, 1); // Centered
-
-      // Define column widths for table
-      const int columnWidth1 = 5; // S.No
-      const int columnWidth2 = 20; // Product Description
-      const int columnWidth3 = 5; // Unit
-      const int columnWidth4 = 6; // Qty
-      // const int columnWidth5 = 7; // Type
-      const int columnWidth6 = 7; // Rate
-      const int columnWidth7 = 7; // Total
-      const int columnWidth8 = 6; // Tax
-      const int columnWidth9 = 8; // Amount
-
-      // Print table headers
-      String headers = "${'S.No'.padRight(columnWidth1)}"
-          "${'Product'.padRight(columnWidth2)}"
-          "${'Unit'.padRight(columnWidth3)}"
-          "${'Qty'.padRight(columnWidth4)}"
-          // "${'Type'.padRight(columnWidth5)}"
-          "${'Rate'.padRight(columnWidth6)}"
-          "${'Amount'.padRight(columnWidth7)}"
-          "  ${'Vat'.padRight(columnWidth8)}"
-          "${'Total'.padLeft(columnWidth9)}";
-      printer.printCustom(headers, 1, 0); // Left aligned
-
-      // Function to split text into lines of a given width
-      List<String> splitText(String text, int width) {
-        List<String> lines = [];
-        while (text.length > width) {
-          lines.add(text.substring(0, width));
-          text = text.substring(width);
-        }
-        lines.add(text); // Add remaining part
-        return lines;
-      }
-
-      // Print all product details
-      for (int i = 0; i < invoice.data!.detail!.length; i++) {
-        String productDescription = invoice.data!.detail![i].name ?? 'N/A';
-        String productUnit = invoice.data!.detail![i].unit ?? 'N/A';
-        String productQty =
-            invoice.data!.detail![i].quantity?.toString() ?? '0';
-        String productType =
-            invoice.data!.detail![i].productType?.toString() ?? '0';
-        String productRate = invoice.data!.detail![i].mrp
-                ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
-            '0.00';
-        String productTotal = invoice.data!.detail![i].taxable
-                ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
-            '0.00';
-        String productTax = invoice.data!.detail![i].taxAmt
-                ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
-            '0.00';
-        String productAmount = invoice.data!.detail![i].amount
-                ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
-            '0.00';
-
-        // Split the product description if it exceeds the column width
-        List<String> descriptionLines =
-            splitText(productDescription, columnWidth2);
-
-        for (int j = 0; j < descriptionLines.length; j++) {
-          String line;
-          if (j == 0) {
-            // For the first line, include all columns
-            line = "${(i + 1).toString().padRight(columnWidth1)}"
-                "${descriptionLines[j].padRight(columnWidth2)}"
-                "${productUnit.padRight(columnWidth3)}"
-                "${productQty.padRight(columnWidth4)}"
-                // "${productType.padRight(columnWidth5)}"
-                " ${productRate.padRight(columnWidth6)}"
-                "${productTotal.padRight(columnWidth7)} "
-                "${productTax.padRight(columnWidth8)}"
-                "${productAmount.padLeft(columnWidth9)}";
-          } else {
-            // For subsequent lines, only include the description, leaving other columns blank
-            line = "${''.padRight(columnWidth1)}"
-                "${descriptionLines[j].padRight(columnWidth2)}"
-                "${''.padRight(columnWidth3)}"
-                "${''.padRight(columnWidth4)}"
-                // "${''.padRight(columnWidth5)}"
-                "${''.padRight(columnWidth6)}"
-                "${''.padRight(columnWidth7)}";
-            "${''.padRight(columnWidth8)}";
-            "${''.padRight(columnWidth9)}";
-          }
-          printer.printCustom(line, 1, 0); // Left aligned
-        }
-      }
-      printer.printCustom("-" * 70, 1, 1); // Centered
-      double total = (invoice.data!.total ?? 0).toDouble();
-      double discount = (invoice.data!.discount ?? 0).toDouble();
-      double subTotal = total - discount;
-      printAlignedText(
-          "", "Total: ${total.toStringAsFixed(AppState().noOfDecimals ?? 2)}");
-      if (Discount.isNotEmpty) {
-        print(Discount);
-        printAlignedText("Van: $van", "$Discount");
-      } else {
-        printAlignedText("Van: $van", ""); // Skip printing Total
-      }
-      printAlignedText("Salesman: $salesman",
-          "Sub Total: ${subTotal.toStringAsFixed(AppState().noOfDecimals ?? 2)}");
-      printAlignedText("", "Vat: $tax");
-      printAlignedText("", "Grand Total: $grandTotal"); // Right aligned
-      printer.printNewLine();
-      printer.printCustom(amountInWords, 1, 0); // Centered
-
-      // Cut the paper
-      printer.paperCut();
-    } else {
+  //       try {
+  //     if (isZebraPrinter(_selectedDevice)) {
+  //       await _printZebra(invoice, isPrint);
+  //     } else {
+  //       await _printSewoo(invoice, isPrint);
+  //     }
+  //   } catch (e, st) {
+  //     print('Print error: $e\n$st');
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('Print failed: $e')),
+  //       );
+  //     }
+  //   }
+  // }
+   Future<void> _print(Invoice.InvoiceData invoice, bool isPrint) async {
+    await AppState().loadTaxName();
+    if (!_connected) await _connect();
+    if (!_connected) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Printer not connected')),
+        const SnackBar(content: Text('Printer not connected')),
       );
+      return;
     }
+
+    try {
+      if (isZebraPrinter(_selectedDevice)) {
+        final logoFile = invoice.data?.store?.firstOrNull?.logo;
+        final logo = (logoFile != null && logoFile.isNotEmpty)
+            ? await loadLogo('$kStoreLogoBaseUrl$logoFile')
+            : null;
+
+        await printReport(
+          printer,
+          _selectedDevice,
+          (builder) => drawSaleInvoice(builder, invoice, logo: logo),
+          widthDots: kLabelWidthDots,
+        );
+      } else {
+        await _printSewoo(invoice, isPrint);
+      }
+    } catch (e, st) {
+      print('Print error: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Print failed: $e')),
+        );
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 1. ZEBRA ENGINE (CPCL Mode)
+  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════
+  // 1. ZEBRA ENGINE (CPCL Mode - Clean 2-Line Layout, No Overlap)
+  // ═══════════════════════════════════════════════════════════════
+  Future<void> _printZebra(Invoice.InvoiceData invoice, bool isPrint) async {
+    final String? headingName = invoice.data!.store![0].invoice_heading ?? '';
+    String cusAddress = invoice.data!.customer![0].address ?? 'N/A';
+    String companyName = invoice.data!.store![0].invoice_company_name ?? 'N/A';
+    String companyNameAr = invoice.data!.store![0].name_ar ?? '';
+    String companyAddress = invoice.data!.store![0].address ?? 'N/A';
+    String companyMail = invoice.data!.store![0].email ?? 'N/A';
+    String companyTRN = "TRN: ${invoice.data!.store![0].trn ?? 'N/A'}";
+    String billtype = headingName!.isNotEmpty ? headingName : "TAX INVOICE";
+    String customerName = "${invoice.data!.customer![0].name}";
+    List<String> nameWords = customerName.split(' ');
+    String firstLine = customerName;
+    String secondLine = "";
+    if (nameWords.length > 5) {
+      firstLine = nameWords.sublist(0, 5).join(' ');
+      secondLine = nameWords.sublist(5).join(' ');
+    }
+    String customerContact = invoice.data!.customer![0].contactNumber ?? 'N/A';
+    String customerTRN = invoice.data?.customer?.firstOrNull?.trn ?? '';
+    num amount = invoice.data!.grandTotal ?? 0.0;
+    int wholePart = amount.floor();
+    int decimalPart = ((amount - wholePart) * 1000).round();
+    String invoiceNumber = invoice.data!.invoiceNo ?? 'N/A';
+    String invoiceDate = DateHelper.displayDate(invoice.data!.inDate);
+    String tax =
+        invoice.data!.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
+            '0.00';
+    String grandTotal = invoice.data!.grandTotal
+            ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
+        '0.00';
+    final remarks = invoice.data?.remarks;
+    String discount = '';
+    if (invoice.data!.discount != null &&
+        double.tryParse(invoice.data!.discount!.toString()) != null &&
+        double.parse(invoice.data!.discount!.toString()) > 0) {
+      discount =
+          "Discount: ${double.parse(invoice.data!.discount!.toString()).toStringAsFixed(AppState().noOfDecimals ?? 2)}";
+    }
+    String amountInWords = "Amount in Words: ${AppState().code} "
+        "${NumberToWord().convert('en-in', wholePart).toUpperCase()}";
+    if (decimalPart > 0) {
+      amountInWords +=
+          " AND ${NumberToWord().convert('en-in', decimalPart).toUpperCase()} ${AppState().minor}";
+    }
+    amountInWords += " ONLY";
+    String van = invoice.data?.van?.firstOrNull?.name ?? 'N/A';
+    String salesman = invoice.data?.user?.firstOrNull?.name ?? 'N/A';
+
+    final cpcl = CpclBuilder(kLabelWidthDots);
+
+    // ---- 1. Logo ----
+    if (invoice.data!.store != null &&
+        invoice.data!.store!.isNotEmpty &&
+        invoice.data!.store![0].logo != null &&
+        invoice.data!.store![0].logo!.isNotEmpty) {
+      try {
+        String logoUrl =
+            'https://erpadmin.mobiz.ae/uploads/store/${invoice.data!.store![0].logo}';
+        final logoResp = await http.get(Uri.parse(logoUrl));
+        if (logoResp.statusCode == 200) {
+          img.Image? original = img.decodeImage(logoResp.bodyBytes);
+          if (original != null) {
+            img.Image resized = img.copyResize(original, width: kLogoWidthPx);
+            final bytesPerRow = (resized.width / 8).ceil();
+            final packed = imageTo1BitCpcl(resized, invert: kInvertLogoBits);
+            cpcl.addLogo(packed, bytesPerRow, resized.height);
+          }
+        }
+      } catch (e) {
+        print('Logo error: $e');
+      }
+    }
+
+    // ---- 2. Company header ----
+    cpcl.centerText(companyName, font: 5, lineGap: 34);
+    if (companyNameAr.trim().isNotEmpty) {
+      try {
+        final Uint8List arPng =
+            await _arabicTextToImageBytes(companyNameAr, fontSize: 26);
+        img.Image? arImg = img.decodeImage(arPng);
+        if (arImg != null) {
+          final bytesPerRow = (arImg.width / 8).ceil();
+          final packed = imageTo1BitCpcl(arImg);
+          cpcl.addLogo(packed, bytesPerRow, arImg.height);
+        }
+      } catch (e) {
+        print('Arabic name print error: $e');
+      }
+    }
+    if (companyAddress != 'N/A')
+      cpcl.centerText(companyAddress, font: 4, lineGap: 24);
+    if (companyMail != 'N/A')
+      cpcl.centerText(companyMail, font: 4, lineGap: 24);
+    if (companyTRN != 'TRN: N/A')
+      cpcl.centerText(companyTRN, font: 4, lineGap: 24);
+    cpcl.hLine();
+    cpcl.centerText(billtype, font: 5, lineGap: 34);
+    cpcl.hLine();
+
+    // ---- 3. Invoice info ----
+    cpcl.twoColumn("Invoice No: $invoiceNumber", "Date: $invoiceDate");
+    cpcl.twoColumn("", "Time: ${invoice.data!.inTime}");
+    if (remarks != null && remarks.isNotEmpty) {
+      cpcl.text("Remarks: $remarks");
+    }
+    cpcl.feed(6);
+
+    // ---- 4. Customer block ----
+    cpcl.text("Customer: $firstLine");
+    if (secondLine.isNotEmpty) {
+      cpcl.text("         $secondLine");
+    }
+    if (cusAddress != 'N/A' && cusAddress.isNotEmpty) {
+      cpcl.text(cusAddress);
+    }
+    cpcl.text("Contact No: $customerContact");
+    if (customerTRN.isNotEmpty) {
+      cpcl.text(
+          "${invoice.data?.store?.firstOrNull?.vat_label ?? 'TRN'}: $customerTRN");
+    }
+    if (invoice.data!.cashCard != null && invoice.data!.cashCard!.isNotEmpty) {
+      cpcl.text("Bill Type: ${invoice.data!.cashCard}");
+    }
+    cpcl.hLine();
+
+    // ---- 5. Sales table Header (Max 42 characters) ----
+    // Format: S.No (4) | Product (16) | Qty (7) | Rate (7) | Total (8)
+    cpcl.text("S.No Product             Qty    Rate   Total",
+        font: 4, lineGap: 30);
+    cpcl.hLine(thickness: 1);
+
+    for (int i = 0; i < (invoice.data!.detail?.length ?? 0); i++) {
+      var d = invoice.data!.detail![i];
+      String sNo = (i + 1).toString().padRight(4);
+      String name = (d.name ?? 'N/A').toUpperCase();
+      if (name.length > 38) name = name.substring(0, 38);
+
+      String qty = "${d.quantity ?? 0} ${d.unit ?? ''}".trim().padLeft(6);
+      String rate =
+          (d.mrp?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00')
+              .padLeft(7);
+      String itemTotal =
+          (d.amount?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00')
+              .padLeft(8);
+
+      // Line 1: S.No + Product Name
+      cpcl.text('$sNo$name', font: 4, lineGap: 28);
+      // Line 2: Unit/Qty, Rate, Total (Clean, right-aligned, zero overlap!)
+      String details =
+          '     [${d.code ?? ""}]'.padRight(21) + '$qty $rate $itemTotal';
+      cpcl.text(details, font: 4, lineGap: 30);
+    }
+    cpcl.hLine(thickness: 1);
+
+    // ---- 6. Totals Section ----
+    double total = (invoice.data!.total ?? 0).toDouble();
+    double disc = (invoice.data!.discount ?? 0).toDouble();
+    double subTotal = total - disc;
+
+    if (discount.isNotEmpty) {
+      cpcl.twoColumn("Van: $van", discount);
+    } else {
+      cpcl.twoColumn("Van: $van", "");
+    }
+    cpcl.twoColumn("Salesman: $salesman",
+        "Total: ${total.toStringAsFixed(AppState().noOfDecimals ?? 2)}");
+    cpcl.twoColumn("",
+        "Sub Total: ${subTotal.toStringAsFixed(AppState().noOfDecimals ?? 2)}");
+    cpcl.twoColumn(
+      "",
+      "${AppState().taxLabel}: $tax",
+    );
+    cpcl.boldText("Grand Total: $grandTotal", font: 5, x: 220, lineGap: 36);
+
+    cpcl.feed(10);
+    for (final line in _splitText(amountInWords, 44)) {
+      cpcl.text(line, font: 4, lineGap: 26);
+    }
+    cpcl.feed(40);
+
+    final bytes = cpcl.build();
+    await sendCpcl(printer, bytes);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 2. SEWOO ENGINE (Original ESC/POS Mode - Your exact old code)
+  // ═══════════════════════════════════════════════════════════════
+  Future<void> _printSewoo(Invoice.InvoiceData invoice, bool isPrint) async {
+    final String? name = invoice.data!.store![0].invoice_heading ?? '';
+    String cusAddress = invoice.data!.customer![0].address ?? 'N/A';
+    String companyName = invoice.data!.store![0].invoice_company_name ?? 'N/A';
+    String companyNameAr = invoice.data!.store![0].name_ar ?? '';
+    String companyAddress = invoice.data!.store![0].address ?? 'N/A';
+    String companyMail = invoice.data!.store![0].email ?? 'N/A';
+    String companyTRN = "TRN: ${invoice.data!.store![0].trn ?? 'N/A'}";
+    String billtype = "$name";
+    String customerName = "${invoice.data!.customer![0].name}";
+    List<String> nameWords = customerName.split(' ');
+    String firstLine = customerName;
+    String secondLine = "";
+    if (nameWords.length > 7) {
+      firstLine = nameWords.sublist(0, 7).join(' ');
+      secondLine = nameWords.sublist(7).join(' ');
+    }
+    String customerEmail = invoice.data!.customer![0].email ?? 'N/A';
+    String customerContact = invoice.data!.customer![0].contactNumber ?? 'N/A';
+    String customerTRN = invoice.data?.customer?.firstOrNull?.trn ?? '';
+
+    final invoiceNumber = invoice.data!.invoiceNo ?? 'N/A';
+    final invoiceDate = DateHelper.displayDate(invoice.data!.inDate);
+    final remarks = invoice.data?.remarks;
+
+    final amountInWords = _amountInWords(invoice.data!.grandTotal ?? 0);
+    String van = invoice.data?.van?.firstOrNull?.name ?? 'N/A';
+    String salesman = invoice.data?.user?.firstOrNull?.name ?? 'N/A';
+
+    void printAlignedText(String leftText, String rightText) {
+      const int maxLineLength =
+          68; // Adjust the maximum line length as per your printer's character limit
+      int leftTextLength = leftText.length;
+      int rightTextLength = rightText.length;
+
+      // Calculate padding to ensure rightText is right-aligned
+      int spaceLength = maxLineLength - (leftTextLength + rightTextLength);
+      String spaces = ' ' * (spaceLength > 0 ? spaceLength : 1);
+
+      printer.printCustom(
+          '$leftText$spaces$rightText', 1, 0); // Print with left-aligned text
+    }
+
+    String logoUrl =
+        'https://erpadmin.mobiz.ae/uploads/store/${invoice.data!.store![0].logo}';
+    if (logoUrl.isNotEmpty) {
+      try {
+        final logoBytes = await buildSewooLogoBytes(logoUrl);
+        if (logoBytes != null) {
+          await printer.printImageBytes(logoBytes);
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      } catch (e) {
+        print('Sewoo logo error: $e');
+      }
+    }
+
+    // Print company details
+    printer.printNewLine();
+    printer.printCustom(companyName, 3, 1); // Centered
+    if (companyNameAr.trim().isNotEmpty) {
+      try {
+        final Uint8List arabicNameBytes =
+            await _arabicTextToImageBytes(companyNameAr, fontSize: 30);
+        await printer.printImageBytes(arabicNameBytes);
+        await Future.delayed(const Duration(milliseconds: 300));
+      } catch (e) {
+        print('Failed to print Arabic company name: $e');
+      }
+    }
+    printer.printCustom(companyAddress, 1, 1); // Centered
+    printer.printCustom(companyMail, 1, 1);
+    printer.printNewLine();
+
+    printer.printCustom(
+        "TAX INVOICE", 2, 1); // ← Heading, centered (matches PDF)
+    printer.printNewLine();
+
+    printer.printCustom("-" * 72, 1, 1); // Centered
+    printAlignedText("Invoice No: ${invoiceNumber}", "Date: ${invoiceDate}");
+    printAlignedText("", "Time: ${invoice.data!.inTime}");
+    printAlignedText("", "${remarks != null ? remarks : ''}");
+    printer.printNewLine();
+    // Print customer details
+    printAlignedText("Customer: $firstLine", "");
+
+    if (secondLine.isNotEmpty) {
+      printAlignedText("         $secondLine", "");
+    }
+    printAlignedText("$cusAddress", " ");
+    printAlignedText("Contact No: $customerContact", "");
+    printAlignedText(
+        "${invoice.data?.store?.firstOrNull?.vat_label}: $customerTRN", " ");
+    if (invoice.data!.cashCard != null && invoice.data!.cashCard!.isNotEmpty) {
+      printAlignedText("Bill Type: ${invoice.data!.cashCard}", " ");
+    }
+    printer.printNewLine();
+
+    // Print horizontal line
+    printer.printCustom("-" * 70, 1, 1); // Centered
+
+    const int columnWidth1 = 3; // #
+    const int columnWidth2 = 19; // Product
+    const int columnWidth3 = 4; // Unit
+    const int columnWidth4 = 5; // Qty
+    const int columnWidth6 = 9; // Rate
+    const int columnWidth7 = 9; // Amount
+    const int columnWidth8 = 8; // Tax
+    const int columnWidth9 = 9; // Total
+
+    debugPrint('SEWOO taxName=${AppState().taxName} taxLabel=${AppState().taxLabel}');
+    debugPrint('SEWOO header=${AppState().taxLabel.padLeft(columnWidth8)}');
+    // Print table headers
+    String headers = "${'#'.padRight(columnWidth1)}"
+        "${'Product'.padRight(columnWidth2)} "
+        "${'Unit'.padRight(columnWidth3)}"
+        "${'Qty'.padLeft(columnWidth4)}"
+        "${'Rate'.padLeft(columnWidth6)}"
+        "${'Amount'.padLeft(columnWidth7)}"
+        "${AppState().taxLabel.padLeft(columnWidth8)}"
+        "${'Total'.padLeft(columnWidth9)}";
+    printer.printCustom(headers, 1, 0); // Left aligned
+
+    // Print all product details
+    for (int i = 0; i < invoice.data!.detail!.length; i++) {
+      String productDescription = invoice.data!.detail![i].name ?? 'N/A';
+      String productUnit = invoice.data!.detail![i].unit ?? 'N/A';
+      String productQty = invoice.data!.detail![i].quantity?.toString() ?? '0';
+      String productRate = invoice.data!.detail![i].mrp
+              ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
+          '0.00';
+      String productTotal = invoice.data!.detail![i].taxable
+              ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
+          '0.00';
+      String productTax = invoice.data!.detail![i].taxAmt
+              ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
+          '0.00';
+      String productAmount = invoice.data!.detail![i].amount
+              ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
+          '0.00';
+
+      List<String> descriptionLines =
+          _wrapWords(productDescription, columnWidth2);
+
+      for (int j = 0; j < descriptionLines.length; j++) {
+        String line;
+        if (j == 0) {
+          line = "${(i + 1).toString().padRight(columnWidth1)}"
+              "${descriptionLines[j].padRight(columnWidth2)} "
+              "${productUnit.padRight(columnWidth3)}"
+              "${productQty.padLeft(columnWidth4)}"
+              "${productRate.padLeft(columnWidth6)}"
+              "${productTotal.padLeft(columnWidth7)}"
+              "${productTax.padLeft(columnWidth8)}"
+              "${productAmount.padLeft(columnWidth9)}";
+        } else {
+          line = "${''.padRight(columnWidth1)}"
+              "${descriptionLines[j].padRight(columnWidth2)}";
+        }
+        printer.printCustom(line, 1, 0); // Left aligned
+      }
+    }
+    printer.printCustom("-" * 70, 1, 1); // Centered
+    final decimals = AppState().noOfDecimals ?? 2;
+    final total = (invoice.data!.total ?? 0).toDouble();
+      final discount = invoice.data!.effectiveDiscount.toDouble();
+    final subTotal = total - discount;
+    final tax = (invoice.data!.totalTax ?? 0).toStringAsFixed(decimals);
+    final grandTotal =
+        (invoice.data!.grandTotal ?? 0).toStringAsFixed(decimals);
+
+    printAlignedText(
+        "Van      : $van", "Total: ${total.toStringAsFixed(decimals)}");
+
+    if (discount > 0) {
+      printAlignedText(
+        "Salesman : $salesman",
+          "${invoice.data!.discountLabel}: ${discount.toStringAsFixed(decimals)}",
+      );
+    } else {
+      printAlignedText("Salesman : $salesman", "");
+    }
+printAlignedText("", "Sub Total: ${subTotal.toStringAsFixed(decimals)}");
+debugPrint('SEWOO totals=${AppState().taxLabel}: $tax');
+printAlignedText("", "${AppState().taxLabel}: $tax");
+    printAlignedText("", "Grand Total: $grandTotal");
+    printer.printNewLine();
+    printer.printCustom(amountInWords, 1, 0); // Centered
+
+    // Cut the paper
+    printer.paperCut();
+  }
+
+  List<String> _splitText(String text, int width) {
+    List<String> lines = [];
+    while (text.length > width) {
+      lines.add(text.substring(0, width));
+      text = text.substring(width);
+    }
+    lines.add(text);
+    return lines;
+  }
+
+  List<String> _wrapWords(String text, int width) {
+    final lines = <String>[];
+    var current = '';
+    for (final word in text.trim().split(RegExp(r'\s+'))) {
+      if (word.isEmpty) continue;
+      if (word.length > width) {
+        if (current.isNotEmpty) {
+          lines.add(current);
+          current = '';
+        }
+        var w = word;
+        while (w.length > width) {
+          lines.add(w.substring(0, width));
+          w = w.substring(width);
+        }
+        current = w;
+      } else if (current.isEmpty) {
+        current = word;
+      } else if (current.length + 1 + word.length <= width) {
+        current = '$current $word';
+      } else {
+        lines.add(current);
+        current = word;
+      }
+    }
+    if (current.isNotEmpty) lines.add(current);
+    return lines.isEmpty ? [''] : lines;
   }
 
   Future<String> _getImageData(String url) async {
@@ -991,9 +1224,9 @@ String salesman = invoice.data?.user?.firstOrNull?.name ?? 'N/A';
       return '';
     }
   }
-
- Future<void> _createPdf(Invoice.InvoiceData invoice, bool isPrint) async {
-    PdfDocument document = PdfDocument();
+Future<void> _createPdf(Invoice.InvoiceData invoice, bool isPrint) async {
+  await AppState().loadTaxName();
+  PdfDocument document = PdfDocument();
     final page = document.pages.add();
     final Size pageSize = page.getClientSize();
     final double pageWidth = pageSize.width;
@@ -1065,76 +1298,75 @@ String salesman = invoice.data?.user?.firstOrNull?.name ?? 'N/A';
     }
 
     // Left-aligned company info
-    final String companyName = _sanitizeForPdfFont(
-        invoice.data!.store![0].invoice_company_name ?? '');
+    final String companyName =
+        _sanitizeForPdfFont(invoice.data!.store![0].invoice_company_name ?? '');
 
     final String companyNameAr = invoice.data!.store![0].name_ar ?? '';
     final String rawAddress =
         _sanitizeForPdfFont(invoice.data!.store![0].address ?? 'N/A');
 
     page.graphics.drawString(
-  companyName,
-  PdfStandardFont(PdfFontFamily.helvetica, 18, style: PdfFontStyle.bold),
-  bounds: Rect.fromLTWH(0, 30, pageWidth - 150, 30),
-);
+      companyName,
+      PdfStandardFont(PdfFontFamily.helvetica, 18, style: PdfFontStyle.bold),
+      bounds: Rect.fromLTWH(0, 30, pageWidth - 150, 30),
+    );
     double currentY = 60;
-print('companyNameAr value: "$companyNameAr"');
+    print('companyNameAr value: "$companyNameAr"');
 // AFTER
     if (companyNameAr.trim().isNotEmpty) {
       try {
         final String cleanNameAr = _sanitizeArabicText(companyNameAr);
         final PdfFont arabicFont =
             await _loadArabicPdfFont(14, style: PdfFontStyle.bold);
-     // AFTER
-page.graphics.drawString(
-  cleanNameAr,
-  arabicFont,
-  brush: PdfSolidBrush(PdfColor(0, 0, 0)),
-  bounds: Rect.fromLTWH(0, currentY, pageWidth - 200, 25),
-  format: PdfStringFormat(
-    alignment: PdfTextAlignment.left,
-    textDirection: PdfTextDirection.rightToLeft,
-  ),
-);
+        // AFTER
+        page.graphics.drawString(
+          cleanNameAr,
+          arabicFont,
+          brush: PdfSolidBrush(PdfColor(0, 0, 0)),
+          bounds: Rect.fromLTWH(0, currentY, pageWidth - 200, 25),
+          format: PdfStringFormat(
+            alignment: PdfTextAlignment.left,
+            textDirection: PdfTextDirection.rightToLeft,
+          ),
+        );
         currentY += 22;
-        print('Arabic name drawn: cleanNameAr="$cleanNameAr" length=${cleanNameAr.length}');
+        print(
+            'Arabic name drawn: cleanNameAr="$cleanNameAr" length=${cleanNameAr.length}');
       } catch (e) {
         print('Failed to draw Arabic company name in PDF: $e');
       }
     }
 
-  // AFTER
-final PdfFont detailsFont = PdfStandardFont(PdfFontFamily.helvetica, 10);
-final double addressWidth = pageWidth - 150;
+    // AFTER
+    final PdfFont detailsFont = PdfStandardFont(PdfFontFamily.helvetica, 10);
+    final double addressWidth = pageWidth - 150;
 
 // measureString with a layoutArea tells us the ACTUAL height the text
 // will occupy after word-wrap — fixes overlap when address is long.
-final Size addressSize = detailsFont.measureString(
-  rawAddress,
-  layoutArea: Size(addressWidth, 500), // generous max height cap
-);
+    final Size addressSize = detailsFont.measureString(
+      rawAddress,
+      layoutArea: Size(addressWidth, 500), // generous max height cap
+    );
 
-page.graphics.drawString(
-  rawAddress,
-  detailsFont,
-  bounds: Rect.fromLTWH(0, currentY, addressWidth, addressSize.height),
-);
-currentY += addressSize.height + 5;
-   final String? name = invoice.data!.store![0].invoice_heading ?? '';
+    page.graphics.drawString(
+      rawAddress,
+      detailsFont,
+      bounds: Rect.fromLTWH(0, currentY, addressWidth, addressSize.height),
+    );
+    currentY += addressSize.height + 5;
+    final String? name = invoice.data!.store![0].invoice_heading ?? '';
     final String text = '$name';
 
     final PdfFont font = PdfStandardFont(PdfFontFamily.helvetica, 15);
     final Size textSize = font.measureString(text);
-    String customerTRN =
-        invoice.data?.customer?.firstOrNull?.trn ?? '';
+    String customerTRN = invoice.data?.customer?.firstOrNull?.trn ?? '';
     final double xPosition = (pageWidth - textSize.width) / 2;
     // Dynamic instead of fixed 165 - stores with longer addresses (more
     // lines, or with the extra Arabic name line) push currentY further
     // down, and the heading needs to sit below that, not at a fixed spot.
     // 120 is the floor so short-address stores keep the old spacing.
-   // AFTER
-final double yPosition =
-    currentY + 15 > 150 ? currentY + 15 : 150.0;
+    // AFTER
+    final double yPosition = currentY + 15 > 150 ? currentY + 15 : 150.0;
     page.graphics.drawString(
       text,
       font,
@@ -1142,17 +1374,17 @@ final double yPosition =
           Rect.fromLTWH(xPosition, yPosition, textSize.width, textSize.height),
     );
 
-  // AFTER
-final remarks = invoice.data?.remarks;
-final double lineYPosition = yPosition + textSize.height + 10;
-page.graphics.drawLine(
-  PdfPen(PdfColor(0, 0, 0)),
-  Offset(0, lineYPosition),
-  Offset(pageWidth, lineYPosition),
-);
+    // AFTER
+    final remarks = invoice.data?.remarks;
+    final double lineYPosition = yPosition + textSize.height + 10;
+    page.graphics.drawLine(
+      PdfPen(PdfColor(0, 0, 0)),
+      Offset(0, lineYPosition),
+      Offset(pageWidth, lineYPosition),
+    );
 
 // ✅ wrapped with _sanitizeForPdfFont
-String address = _sanitizeForPdfFont('''
+    String address = _sanitizeForPdfFont('''
 Customer: ${invoice.data!.customer![0].code} | ${invoice.data!.customer![0].name}
 Email: ${invoice.data!.customer![0].email}
 Contact No: ${invoice.data!.customer![0].contactNumber}
@@ -1161,7 +1393,7 @@ ${invoice.data!.cashCard != null && invoice.data!.cashCard!.isNotEmpty ? 'Bill T
 ''');
 
 // ✅ wrapped with _sanitizeForPdfFont
-String invoiceDetails = _sanitizeForPdfFont('''
+    String invoiceDetails = _sanitizeForPdfFont('''
   Invoice No: ${invoice.data!.invoiceNo!}
   Date: ${DateHelper.displayDate(invoice.data!.inDate)}
   Due Date: ${DateHelper.displayDate(invoice.data!.inDate)}
@@ -1169,59 +1401,62 @@ String invoiceDetails = _sanitizeForPdfFont('''
   ${remarks != null ? remarks : ''}
   ''');
 
-final PdfFont detailsBlockFont = PdfStandardFont(PdfFontFamily.helvetica, 12);
+    final PdfFont detailsBlockFont =
+        PdfStandardFont(PdfFontFamily.helvetica, 12);
 
 // Starting Y for Customer/Invoice block is now BELOW the heading line,
 // not a fixed 200 — fixes overlap when address/heading pushed down.
-final double detailsBlockY = lineYPosition + 10;
+    final double detailsBlockY = lineYPosition + 10;
 
-final Size addressBlockSize = detailsBlockFont.measureString(
-  address,
-  layoutArea: Size(pageWidth / 2 - 10, 300),
-);
-final Size invoiceDetailsBlockSize = detailsBlockFont.measureString(
-  invoiceDetails,
-  layoutArea: Size(pageWidth / 2, 300),
-);
+    final Size addressBlockSize = detailsBlockFont.measureString(
+      address,
+      layoutArea: Size(pageWidth / 2 - 10, 300),
+    );
+    final Size invoiceDetailsBlockSize = detailsBlockFont.measureString(
+      invoiceDetails,
+      layoutArea: Size(pageWidth / 2, 300),
+    );
 
-page.graphics.drawString(
-  address,
-  detailsBlockFont,
-  bounds: Rect.fromLTWH(0, detailsBlockY, pageWidth / 2, addressBlockSize.height),
-);
+    page.graphics.drawString(
+      address,
+      detailsBlockFont,
+      bounds: Rect.fromLTWH(
+          0, detailsBlockY, pageWidth / 2, addressBlockSize.height),
+    );
 
-page.graphics.drawString(
-  invoiceDetails,
-  detailsBlockFont,
-  bounds: Rect.fromLTWH(pageWidth / 2, detailsBlockY, pageWidth / 2, invoiceDetailsBlockSize.height),
-  format: PdfStringFormat(alignment: PdfTextAlignment.right),
-);
+    page.graphics.drawString(
+      invoiceDetails,
+      detailsBlockFont,
+      bounds: Rect.fromLTWH(pageWidth / 2, detailsBlockY, pageWidth / 2,
+          invoiceDetailsBlockSize.height),
+      format: PdfStringFormat(alignment: PdfTextAlignment.right),
+    );
 
 // Second separator line now sits below whichever block (address or
 // invoice details) is taller — dynamic instead of fixed 290.
-final double secondLineY = detailsBlockY +
-    (addressBlockSize.height > invoiceDetailsBlockSize.height
-        ? addressBlockSize.height
-        : invoiceDetailsBlockSize.height) +
-    10;
+    final double secondLineY = detailsBlockY +
+        (addressBlockSize.height > invoiceDetailsBlockSize.height
+            ? addressBlockSize.height
+            : invoiceDetailsBlockSize.height) +
+        10;
 
-page.graphics.drawLine(
-  PdfPen(PdfColor(0, 0, 0)),
-  Offset(0, secondLineY),
-  Offset(pageWidth, secondLineY),
-);
+    page.graphics.drawLine(
+      PdfPen(PdfColor(0, 0, 0)),
+      Offset(0, secondLineY),
+      Offset(pageWidth, secondLineY),
+    );
 
     final PdfGrid grid = PdfGrid();
     grid.columns.add(count: 9);
-    grid.columns[0].width = 30;
-    grid.columns[1].width = 180;
-    grid.columns[2].width = 35;
-    grid.columns[3].width = 30;
-    grid.columns[4].width = 35;
-    grid.columns[5].width = 53;
-    grid.columns[6].width = 50;
-    grid.columns[7].width = 50;
-    grid.columns[8].width = 82;
+grid.columns[0].width = 30;   // Sl.No
+grid.columns[1].width = 135;  // Product
+grid.columns[2].width = 50;   // Unit
+grid.columns[3].width = 50;   // Qty
+grid.columns[4].width = 50;   // Type
+grid.columns[5].width = 50;   // Rate
+grid.columns[6].width = 50;   // Total
+grid.columns[7].width = 50;   // VAT
+grid.columns[8].width = 50;   // Amount
 
     final PdfGridRow headerRow = grid.headers.add(1)[0];
     headerRow.cells[0].value = 'Sl.No';
@@ -1231,30 +1466,46 @@ page.graphics.drawLine(
     headerRow.cells[4].value = 'Type';
     headerRow.cells[5].value = 'Rate';
     headerRow.cells[6].value = 'Total';
-    headerRow.cells[7].value = 'Vat';
-    headerRow.cells[8].value = 'Amount   ';
+    headerRow.cells[7].value = AppState().taxLabel;
+  headerRow.cells[8].value = 'Amount';
 // AFTER
-for (int k = 0; k < invoice.data!.detail!.length; k++) {
-  final PdfGridRow row = grid.rows.add();
-  row.cells[0].value = '${k + 1}';
-  row.cells[1].value = _sanitizeForPdfFont('${invoice.data!.detail![k].name}');
-  row.cells[2].value = _sanitizeForPdfFont('${invoice.data!.detail![k].unit}');
-  row.cells[3].value = '${invoice.data!.detail![k].quantity}';
-  row.cells[4].value = (invoice.data!.detail![k].productType!
+    for (int k = 0; k < invoice.data!.detail!.length; k++) {
+      final PdfGridRow row = grid.rows.add();
+      row.cells[0].value = '${k + 1}';
+      row.cells[1].value =
+          _sanitizeForPdfFont('${invoice.data!.detail![k].name}');
+      row.cells[2].value =
+          _sanitizeForPdfFont('${invoice.data!.detail![k].unit}');
+      row.cells[3].value = '${invoice.data!.detail![k].quantity}';
+      row.cells[4].value = (invoice.data!.detail![k].productType!
                       .toLowerCase() ==
                   "foc" ||
-          invoice.data!.detail![k].productType!.toLowerCase() == "FOC" ||
-          invoice.data!.detail![k].productType!.toLowerCase() == "Change")
-      ? 'Normal'
-      : 'Normal';
-  row.cells[5].value =
-      '${invoice.data!.detail![k].mrp?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
-  row.cells[6].value =
-      '${invoice.data!.detail![k].taxable?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
-  row.cells[7].value =
-      '${invoice.data!.detail![k].taxAmt?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
-  row.cells[8].value =
-      '${invoice.data!.detail![k].amount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
+              invoice.data!.detail![k].productType!.toLowerCase() == "FOC" ||
+              invoice.data!.detail![k].productType!.toLowerCase() == "Change")
+          ? 'Normal'
+          : 'Normal';
+      row.cells[5].value =
+          '${invoice.data!.detail![k].mrp?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
+      row.cells[6].value =
+          '${invoice.data!.detail![k].taxable?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
+      row.cells[7].value =
+          '${invoice.data!.detail![k].taxAmt?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
+          row.cells[8].value =
+          '${invoice.data!.detail![k].amount?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
+    }
+
+    // ── Alignment only: right-align numeric columns (Qty, Rate, Total, VAT, Amount) ──
+   final PdfStringFormat rightFormat =
+    PdfStringFormat(alignment: PdfTextAlignment.right);
+const List<int> numericCols = [2, 3, 4, 5, 6, 7, 8];
+
+for (final c in numericCols) {
+  headerRow.cells[c].style.stringFormat = rightFormat;
+}
+for (int r = 0; r < grid.rows.count; r++) {
+  for (final c in numericCols) {
+    grid.rows[r].cells[c].style.stringFormat = rightFormat;
+  }
 }
 
     final PdfBorders noBorder = PdfBorders(
@@ -1277,10 +1528,19 @@ for (int k = 0; k < invoice.data!.detail!.length; k++) {
     }
 
 // AFTER
+   // ── Gap between Qty (right-aligned) and Type (left-aligned) ──
+// headerRow.cells[4].style.cellPadding =
+//     PdfPaddings(left: 10, right: 0, top: 0, bottom: 0);
+// for (int r = 0; r < grid.rows.count; r++) {
+//   grid.rows[r].cells[4].style.cellPadding =
+//       PdfPaddings(left: 10, right: 0, top: 0, bottom: 0);
+// }
+
 final PdfLayoutResult result = grid.draw(
-  page: page,
-  bounds: Rect.fromLTWH(0, secondLineY + 10, pageSize.width, pageSize.height - (secondLineY + 10) - 20),
-)!;
+      page: page,
+      bounds: Rect.fromLTWH(0, secondLineY + 10, pageSize.width,
+          pageSize.height - (secondLineY + 10) - 20),
+    )!;
     PdfPage lastPage = result.page;
     double tableBottom = result.bounds.bottom;
 
@@ -1296,14 +1556,21 @@ final PdfLayoutResult result = grid.draw(
     );
 
     // ✅ wrapped with _sanitizeForPdfFont
-    String bottomInvoiceDetails = _sanitizeForPdfFont('''
-    ${invoice.data!.discount != null && invoice.data!.discount! > 0 ? 'Discount: ${invoice.data!.discount!.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : '\t'}
-  Sub Total: ${invoice.data!.total ?? ''}
-  Vat: ${invoice.data!.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2)}
-  ${'${invoice.data!.roundOff}' != 0 ? 'Round off:${double.parse(invoice.data!.roundOff ?? '').toStringAsFixed(AppState().noOfDecimals ?? 2)}\nGrand Total: ${invoice.data!.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : 'Grand Total: ${invoice.data!.grandTotal}'}
+       // ✅ wrapped with _sanitizeForPdfFont
+   final dec = AppState().noOfDecimals ?? 2;
+final inv = invoice.data!;
+final ro = num.tryParse(inv.roundOff?.toString() ?? '') ?? 0;
+final disc = inv.effectiveDiscount;
 
-
-  ''');
+final totalsLines = <String>[
+  'Total: ${(inv.total ?? 0).toStringAsFixed(dec)}',
+  if (disc > 0) '${inv.discountLabel}: ${disc.toStringAsFixed(dec)}',
+  'Sub Total: ${((inv.total ?? 0) - disc).toStringAsFixed(dec)}',
+  '${AppState().taxLabel}: ${(inv.totalTax ?? 0).toStringAsFixed(dec)}',
+  if (ro != 0) 'Round off: ${ro.toStringAsFixed(dec)}',
+  'Grand Total: ${(inv.grandTotal ?? 0).toStringAsFixed(dec)}',
+];
+String bottomInvoiceDetails = _sanitizeForPdfFont(totalsLines.join('\n'));
     print('invoice.data!.discounted_amount');
     print(invoice.data!.discounted_amount);
 
@@ -1322,13 +1589,38 @@ final PdfLayoutResult result = grid.draw(
     String numberToWords(int number) {
       if (number == 0) return "zero";
       const List<String> belowTwenty = [
-        "", "one", "two", "three", "four", "five", "six", "seven", "eight",
-        "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
-        "sixteen", "seventeen", "eighteen", "nineteen"
+        "",
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "ten",
+        "eleven",
+        "twelve",
+        "thirteen",
+        "fourteen",
+        "fifteen",
+        "sixteen",
+        "seventeen",
+        "eighteen",
+        "nineteen"
       ];
       const List<String> tens = [
-        "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy",
-        "eighty", "ninety"
+        "",
+        "",
+        "twenty",
+        "thirty",
+        "forty",
+        "fifty",
+        "sixty",
+        "seventy",
+        "eighty",
+        "ninety"
       ];
       const List<String> thousands = ["", "thousand", "million", "billion"];
       String words = "";
@@ -1369,9 +1661,9 @@ final PdfLayoutResult result = grid.draw(
     double vanDetailsTop = tableBottom + 20 + 100 + 10;
 
     // ✅ wrapped with _sanitizeForPdfFont
-   String vanName = invoice.data?.van?.firstOrNull?.name ?? 'N/A';
-String salesmanName = invoice.data?.user?.firstOrNull?.name ?? 'N/A';
-String bottomVanDetails = _sanitizeForPdfFont('''
+    String vanName = invoice.data?.van?.firstOrNull?.name ?? 'N/A';
+    String salesmanName = invoice.data?.user?.firstOrNull?.name ?? 'N/A';
+    String bottomVanDetails = _sanitizeForPdfFont('''
 Van: $vanName
 Salesman: $salesmanName
 ''');
@@ -1386,9 +1678,10 @@ Salesman: $salesmanName
     final PdfStandardFont sfont = PdfStandardFont(PdfFontFamily.helvetica, 12);
 
     // ✅ wrapped with _sanitizeForPdfFont
-    String textData = _sanitizeForPdfFont('Amount in Words: ${AppState().code} '
-        '${amountToWords(invoice.data!.grandTotal!.toDouble())} ONLY');
-    String? infoot = _sanitizeForPdfFont(invoice.data!.store![0].invoice_footer);
+  String textData = _sanitizeForPdfFont(
+    _amountInWords(invoice.data!.grandTotal ?? 0));
+    String? infoot =
+        _sanitizeForPdfFont(invoice.data!.store![0].invoice_footer);
 
     final double textDataHeight = sfont.measureString(textData).height;
     final double infootHeight = sfont.measureString(infoot).height;
@@ -1417,11 +1710,16 @@ Salesman: $salesmanName
     List<int> bytes = await document.save();
     document.dispose();
 
-  // AFTER (temporary test only)
-String file = await saveAndLaunchFile(
-    bytes, '${invoice.data!.invoiceNo!}_${DateTime.now().millisecondsSinceEpoch}.pdf', isPrint);
+    // AFTER (temporary test only)
+    String file = await saveAndLaunchFile(
+        bytes,
+        '${invoice.data!.invoiceNo!}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+        isPrint);
   }
-Future<void> _wifiPdf(Invoice.InvoiceData invoice, bool isPrint) async {
+
+ Future<void> _wifiPdf(Invoice.InvoiceData invoice, bool isPrint) async {
+  await AppState().loadTaxName();
+  // Same guard as _createPdf() - strips characters PdfStandardFont can't
     // Same guard as _createPdf() - strips characters PdfStandardFont can't
     // render. Declared here at the top since _wifiPdf() has its own scope.
     String _sanitizeForPdfFont(String? input) {
@@ -1501,7 +1799,7 @@ Future<void> _wifiPdf(Invoice.InvoiceData invoice, bool isPrint) async {
     page.graphics.drawString(
       address,
       PdfStandardFont(PdfFontFamily.helvetica, 12),
-     bounds: Rect.fromLTWH(0, 160, pageSize.width / 2, 100),
+      bounds: Rect.fromLTWH(0, 160, pageSize.width / 2, 100),
     );
 
     page.graphics.drawString(
@@ -1537,12 +1835,12 @@ Future<void> _wifiPdf(Invoice.InvoiceData invoice, bool isPrint) async {
     headerRow.cells[2].value = 'Unit';
     headerRow.cells[3].value = 'Qty';
     headerRow.cells[4].value = 'Rate';
-    headerRow.cells[5].value = 'Rate\nIncl Vat';
+    headerRow.cells[5].value = 'Rate\nIncl ${AppState().taxLabel}';
     headerRow.cells[6].value = 'Amount';
     headerRow.cells[7].value = 'Taxable\nAmount';
-    headerRow.cells[8].value = 'Vat\nRate';
-    headerRow.cells[9].value = 'Vat\nAmount';
-    headerRow.cells[10].value = 'Total\nIncl Vat';
+    headerRow.cells[8].value = '${AppState().taxLabel}\nRate';
+    headerRow.cells[9].value = '${AppState().taxLabel}\nAmount';
+    headerRow.cells[10].value = 'Total\nIncl ${AppState().taxLabel}';
 
     for (int i = 0; i < headerRow.cells.count; i++) {
       headerRow.cells[i].style = PdfGridCellStyle(
@@ -1560,9 +1858,11 @@ Future<void> _wifiPdf(Invoice.InvoiceData invoice, bool isPrint) async {
     for (int k = 0; k < invoice.data!.detail!.length; k++) {
       final PdfGridRow row = grid.rows.add();
       row.cells[0].value = '${k + 1}';
-     // AFTER
-row.cells[1].value = _sanitizeForPdfFont('${invoice.data!.detail![k].name}');
-row.cells[2].value = _sanitizeForPdfFont('${invoice.data!.detail![k].unit}');
+      // AFTER
+      row.cells[1].value =
+          _sanitizeForPdfFont('${invoice.data!.detail![k].name}');
+      row.cells[2].value =
+          _sanitizeForPdfFont('${invoice.data!.detail![k].unit}');
       row.cells[3].value = '${invoice.data!.detail![k].quantity}';
       row.cells[4].value =
           '${invoice.data!.detail![k].mrp?.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
@@ -1592,17 +1892,21 @@ row.cells[2].value = _sanitizeForPdfFont('${invoice.data!.detail![k].unit}');
             right: PdfPen(PdfColor(0, 0, 0)),
             bottom: PdfPen(PdfColor(255, 255, 255)),
           ),
-          format: (i == 1) ? null : centerFormat,
+               format: (i == 1)
+              ? null
+              : const [3, 4, 5, 6, 7, 9, 10].contains(i)
+                  ? PdfStringFormat(alignment: PdfTextAlignment.right)
+                  : centerFormat,
         );
       }
     }
 
-  // AFTER
+    // AFTER
 // AFTER
-final PdfLayoutResult result = grid.draw(
-  page: page,
-  bounds: Rect.fromLTWH(0, 270, pageSize.width, pageSize.height - 270 - 20),
-)!;
+    final PdfLayoutResult result = grid.draw(
+      page: page,
+      bounds: Rect.fromLTWH(0, 270, pageSize.width, pageSize.height - 270 - 20),
+    )!;
 
     PdfPage lastPage = result.page;
     double tableBottom = result.bounds.bottom;
@@ -1618,18 +1922,20 @@ final PdfLayoutResult result = grid.draw(
       tableBottom = 0;
     }
 
-    double total = (invoice.data!.total ?? 0).toDouble();
-    double discount = (invoice.data!.discount ?? 0).toDouble();
-    double subTotal = total - discount;
+   final dec = AppState().noOfDecimals ?? 2;
+final inv = invoice.data!;
+final ro = num.tryParse(inv.roundOff?.toString() ?? '') ?? 0;
+final disc = inv.effectiveDiscount;
 
-    // ✅ wrapped with _sanitizeForPdfFont
-    String bottomInvoiceDetails = _sanitizeForPdfFont('''
-Total: ${total.toStringAsFixed(AppState().noOfDecimals ?? 2)}    
-${(invoice.data!.discount ?? 0) > 0 ? 'Discount: ${(invoice.data!.discount ?? 0).toStringAsFixed(AppState().noOfDecimals ?? 2)}' : '\t'}
-Sub Total: ${subTotal.toStringAsFixed(AppState().noOfDecimals ?? 2)}
-Vat: ${invoice.data!.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2)}
-${'${invoice.data!.roundOff}' != '0' ? 'Round off: ${double.parse(invoice.data!.roundOff ?? '0').toStringAsFixed(AppState().noOfDecimals ?? 2)}\nGrand Total: ${invoice.data!.grandTotal?.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : 'Grand Total: ${invoice.data!.grandTotal}'}
-''');
+final totalsLines = <String>[
+  'Total: ${(inv.total ?? 0).toStringAsFixed(dec)}',
+  if (disc > 0) '${inv.discountLabel}: ${disc.toStringAsFixed(dec)}',
+  'Sub Total: ${((inv.total ?? 0) - disc).toStringAsFixed(dec)}',
+  '${AppState().taxLabel}: ${(inv.totalTax ?? 0).toStringAsFixed(dec)}',
+  if (ro != 0) 'Round off: ${ro.toStringAsFixed(dec)}',
+  'Grand Total: ${(inv.grandTotal ?? 0).toStringAsFixed(dec)}',
+];
+String bottomInvoiceDetails = _sanitizeForPdfFont(totalsLines.join('\n'));
 
     lastPage.graphics.drawString(
       bottomInvoiceDetails,
@@ -1661,13 +1967,38 @@ Salesman: ${invoice.data!.user![0].name}
     String numberToWords(int number) {
       if (number == 0) return "zero";
       const List<String> belowTwenty = [
-        "", "one", "two", "three", "four", "five", "six", "seven", "eight",
-        "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
-        "sixteen", "seventeen", "eighteen", "nineteen"
+        "",
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "ten",
+        "eleven",
+        "twelve",
+        "thirteen",
+        "fourteen",
+        "fifteen",
+        "sixteen",
+        "seventeen",
+        "eighteen",
+        "nineteen"
       ];
       const List<String> tens = [
-        "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy",
-        "eighty", "ninety"
+        "",
+        "",
+        "twenty",
+        "thirty",
+        "forty",
+        "fifty",
+        "sixty",
+        "seventy",
+        "eighty",
+        "ninety"
       ];
       const List<String> thousands = ["", "thousand", "million", "billion"];
       String words = "";
@@ -1698,9 +2029,10 @@ Salesman: ${invoice.data!.user![0].name}
     final PdfStandardFont sfont = PdfStandardFont(PdfFontFamily.helvetica, 12);
 
     // ✅ wrapped with _sanitizeForPdfFont
-    String textData = _sanitizeForPdfFont(
-        'Amount in Words: ${AppState().code} ${numberToWords(invoice.data!.grandTotal!.toInt()).toUpperCase()} ONLY');
-    String? infoot = _sanitizeForPdfFont(invoice.data!.store![0].invoice_footer);
+   String textData = _sanitizeForPdfFont(
+    _amountInWords(invoice.data!.grandTotal ?? 0));
+    String? infoot =
+        _sanitizeForPdfFont(invoice.data!.store![0].invoice_footer);
 
     final double textDataHeight = sfont.measureString(textData).height;
     final double infootHeight = sfont.measureString(infoot).height;
@@ -1733,98 +2065,100 @@ Salesman: ${invoice.data!.user![0].name}
     String file = await saveAndLaunchFile(
         bytes, '${invoice.data!.invoiceNo!}.pdf', isPrint);
   }
- Future<Uint8List> _readImageData(String? image) async {
-  if (image == null || image.isEmpty) return Uint8List(0);
 
-  // ── NEW: serve from cache if we've already downloaded this logo,
-  // instead of hitting the network again on every PDF tap ──
-  if (_logoCache.containsKey(image)) {
-    return _logoCache[image]!;
-  }
+  Future<Uint8List> _readImageData(String? image) async {
+    if (image == null || image.isEmpty) return Uint8List(0);
 
-  try {
-    final response = await http
-        .get(Uri.parse('${RestDatasource().Image_URL}/uploads/store/$image'));
-
-    print('Response Data $response');
-
-    if (response.statusCode == 200) {
-      _logoCache[image] = response.bodyBytes; // ── NEW: store in cache ──
-      return response.bodyBytes;
-    } else {
-      throw Exception('Failed to load image');
+    // ── NEW: serve from cache if we've already downloaded this logo,
+    // instead of hitting the network again on every PDF tap ──
+    if (_logoCache.containsKey(image)) {
+      return _logoCache[image]!;
     }
-  } catch (e) {
-    print('Error loading image: $e');
-    return Uint8List(0);
+
+    try {
+      final response = await http
+          .get(Uri.parse('${RestDatasource().Image_URL}/uploads/store/$image'));
+
+      print('Response Data $response');
+
+      if (response.statusCode == 200) {
+        _logoCache[image] = response.bodyBytes; // ── NEW: store in cache ──
+        return response.bodyBytes;
+      } else {
+        throw Exception('Failed to load image');
+      }
+    } catch (e) {
+      print('Error loading image: $e');
+      return Uint8List(0);
+    }
   }
-}
+
   Future<void> _getInvoiceData(int id, bool isPrint) async {
-  // ── NEW: immediate feedback the moment the icon is tapped, so the
-  // network fetch + PDF build time doesn't feel like the app froze ──
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) => const Center(child: CircularProgressIndicator()),
-  );
-  try {
-    Invoice.InvoiceData invoice = Invoice.InvoiceData();
-    RestDatasource api = RestDatasource();
-    dynamic response = await api.getDetails(
-        '/api/get_sales_invoice?id=$id', AppState().token);
-    print("IIDD$id");
-    debugPrint(jsonEncode(response));
-    if (response['data'] != null) {
-      print("DDDDDD${id}");
-      invoice = Invoice.InvoiceData.fromJson(response);
+    // ── NEW: immediate feedback the moment the icon is tapped, so the
+    // network fetch + PDF build time doesn't feel like the app froze ──
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      Invoice.InvoiceData invoice = Invoice.InvoiceData();
+      RestDatasource api = RestDatasource();
+      dynamic response = await api.getDetails(
+          '/api/get_sales_invoice?id=$id', AppState().token);
+      print("IIDD$id");
+      debugPrint(jsonEncode(response));
+      if (response['data'] != null) {
+        print("DDDDDD${id}");
+        invoice = Invoice.InvoiceData.fromJson(response);
         print('VAN LIST LENGTH: ${invoice.data?.van?.length}');
-  print('VAN LIST: ${invoice.data?.van}');
-      await _createPdf(invoice, isPrint);
+        print('VAN LIST: ${invoice.data?.van}');
+        await _createPdf(invoice, isPrint);
+      }
+    } catch (e, st) {
+      print('Error generating PDF: $e');
+      print(st);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error generating PDF: $e')),
+        );
+      }
+    } finally {
+      // ── NEW: always close the spinner, success or failure ──
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
     }
-  } catch (e, st) {
-    print('Error generating PDF: $e');
-    print(st);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error generating PDF: $e')),
-      );
-    }
-  } finally {
-    // ── NEW: always close the spinner, success or failure ──
-    if (mounted) Navigator.of(context, rootNavigator: true).pop();
   }
-}
 
-Future<void> _getwifiInvoiceData(int id, bool isPrint) async {
-  // ── NEW: same spinner pattern as _getInvoiceData ──
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) => const Center(child: CircularProgressIndicator()),
-  );
-  try {
-    Invoice.InvoiceData invoice = Invoice.InvoiceData();
-    RestDatasource api = RestDatasource();
-    dynamic response = await api.getDetails(
-        '/api/get_sales_invoice?id=$id', AppState().token);
-    if (response['data'] != null) {
-      print("DDDDDD${id}");
-      invoice = Invoice.InvoiceData.fromJson(response);
-      await _wifiPdf(invoice, isPrint);
+  Future<void> _getwifiInvoiceData(int id, bool isPrint) async {
+    // ── NEW: same spinner pattern as _getInvoiceData ──
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      Invoice.InvoiceData invoice = Invoice.InvoiceData();
+      RestDatasource api = RestDatasource();
+      dynamic response = await api.getDetails(
+          '/api/get_sales_invoice?id=$id', AppState().token);
+      if (response['data'] != null) {
+        print("DDDDDD${id}");
+        invoice = Invoice.InvoiceData.fromJson(response);
+        await _wifiPdf(invoice, isPrint);
+      }
+    } catch (e, st) {
+      print('Error generating WiFi PDF: $e');
+      print(st);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error generating PDF: $e')),
+        );
+      }
+    } finally {
+      // ── NEW: always close the spinner, success or failure ──
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
     }
-  } catch (e, st) {
-    print('Error generating WiFi PDF: $e');
-    print(st);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error generating PDF: $e')),
-      );
-    }
-  } finally {
-    // ── NEW: always close the spinner, success or failure ──
-    if (mounted) Navigator.of(context, rootNavigator: true).pop();
   }
-}
 
   Future<void> _getInvoiceDataprint(int id, bool isPrint) async {
     try {
@@ -1916,6 +2250,18 @@ class VanSaleData {
   }
 }
 
+List<Customer> _parseCustomers(dynamic raw) {
+  final out = <Customer>[];
+  if (raw is List) {
+    for (final c in raw) {
+      if (c is Map) out.add(Customer.fromJson(Map<String, dynamic>.from(c)));
+    }
+  } else if (raw is Map) {
+    out.add(Customer.fromJson(Map<String, dynamic>.from(raw)));
+  }
+  return out;
+}
+
 class VanSale {
   int? id;
   int? customerId;
@@ -1927,7 +2273,8 @@ class VanSale {
   num? otherCharge;
   num? discount;
   String? roundOff;
-  String? discount_type;
+   String? discount_type;
+  num? discount_amount;
   num? total;
   num? totalTax;
   num? grandTotal;
@@ -1954,6 +2301,7 @@ class VanSale {
       this.inTime,
       this.invoiceNo,
       this.discount_type,
+      this.discount_amount,
       this.deliveryNo,
       this.otherCharge,
       this.discount,
@@ -1974,7 +2322,7 @@ class VanSale {
       this.deletedAt,
       this.detail,
       this.customer,
-      this.customerdata});
+        this.customerdata});
 
   VanSale.fromJson(Map<String, dynamic> json) {
     id = json['id'];
@@ -1986,7 +2334,9 @@ class VanSale {
     deliveryNo = json['delivery_no'] ?? '';
     otherCharge = json['other_charge'] ?? 0;
     discount = json['discount'] ?? 0;
-    discount_type = json['discount_type'] ?? '';
+       discount_type = json['discount_type']?.toString() ?? '';
+    discount_amount =
+        num.tryParse(json['discount_amount']?.toString() ?? '') ?? 0;
     roundOff = json['round_off'] ?? '';
     total = json['total'] ?? 0;
     totalTax = json['total_tax'] ?? 0;
@@ -2010,15 +2360,16 @@ class VanSale {
       });
     }
 
-    if (json['customer'] != null) {
-      customer = <Customer>[];
-      json['customer'].forEach((v) {
-        customer!.add(new Customer.fromJson(v));
-      });
-    } else if (json['customerdata'] != null) {
-      customer = <Customer>[];
-      customer!.add(new Customer.fromJson(json['customerdata']));
-    }
+var custList = _parseCustomers(json['customer']);
+if (custList.isEmpty) custList = _parseCustomers(json['customerdata']);
+if (custList.isEmpty) custList = _parseCustomers(json['customerdetail']);
+if (custList.isEmpty) {
+  final n = json['customer_name'] ?? json['customerName'];
+  if (n != null && n.toString().isNotEmpty) {
+    custList = [Customer(name: n.toString())];
+  }
+}
+if (custList.isNotEmpty) customer = custList;
   }
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = new Map<String, dynamic>();

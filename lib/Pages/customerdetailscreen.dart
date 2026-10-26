@@ -17,6 +17,7 @@ import 'package:mobizapp/confg/appconfig.dart';
 import 'package:mobizapp/confg/sizeconfig.dart';
 import 'package:mobizapp/vanstockselactpro_tst.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../Utilities/rest_ds.dart';
 import 'Copy/Copy.dart';
@@ -39,15 +40,13 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
   Timer? _timer;
   bool _isFirstLoad = true;
   bool _isArgsLoaded = false;
-
-
+// AFTER
   void initState() {
-    // TODO: implement initState
     super.initState();
-    // fetchData();
-    _fetchData();
-    fetchCustomerIcons();
-    // _timer = Timer.periodic(Duration(seconds: 10), (Timer t) => fetchData());
+    // NOTE: args (id, storeId-dependent calls) are only available once
+    // didChangeDependencies() has fired, so all initial API calls happen
+    // there — calling them here too was causing every request to fire
+    // twice on screen open.
   }
 
   void dispose() {
@@ -61,7 +60,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
 
     if (!_isArgsLoaded) {
       final args =
-      ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
       if (args != null) {
         name = args['name'];
@@ -74,8 +73,9 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
         creditBalance = args['balance'];
         totalOutstanding = args['total'];
         trn = args['trn'];
-        img = args['cust_image'];
-        paymentTerms = args['paymentTerms'];
+  // AFTER
+      img = args['cust_image'];
+paymentTerms = args['paymentTerms'];
         provinceId = args['provinceId'];
         routeId = args['routeId'];
         creditLimit = args['creditLimit'];
@@ -84,7 +84,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
         code = args['code'];
         pricegroupId = args['price_group_id'];
 
-        fetchData();          // ✅ SAFE
+        fetchData(); // ✅ SAFE
         fetchCustomerIcons(); // optional
         _fetchData();
         _isArgsLoaded = true;
@@ -108,8 +108,8 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
   int? routeId;
   int? pricegroupId;
   int? id;
-  String? img;
-  String? code;
+String? img;
+String? code;
   String? trn;
   int? creditDays;
   String? creditBalance;
@@ -132,28 +132,35 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
+ // AFTER
   Future<void> fetchCustomerIcons() async {
-    final response = await http.get(Uri.parse(
-        'http://68.183.92.8:3699/api/store_app_icons_customer?store_id=${AppState().storeId}'));
+    try {
+      final response = await http
+          .get(Uri.parse(
+              '${RestDatasource().BASE_URL}/api/store_app_icons_customer?store_id=${AppState().storeId}'))
+          .timeout(const Duration(seconds: 15));
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-
-      setState(() {
-        // Extracting the values of the `success` map
-        final successData = data['success'] as Map<String, dynamic>? ?? {};
-
-        // Flatten the map into a list of values
-        appIcons = successData.values.map((e) => e).toList();
-
-        // Paginate the icons
-        paginatedIcons = _paginateList(appIcons, 9);
-      });
-    } else {
-      throw Exception('Failed to load app icons');
+          if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print("ICONS API: ${response.body}");
+        if (!mounted) return;
+        setState(() {
+          final successData = data['success'] as Map<String, dynamic>? ?? {};
+          appIcons = successData.values.map((e) => e).toList();
+          paginatedIcons = _paginateList(appIcons, 9);
+        });
+      }
+    } catch (e) {
+      print('Error fetching customer icons: $e');
+      // Prevent the icon grid from being permanently stuck on the
+      // Shimmer placeholder if this request fails.
+      if (mounted) {
+        setState(() {
+          paginatedIcons = [];
+        });
+      }
     }
   }
-
   List<List<dynamic>> _paginateList(List<dynamic> list, int chunkSize) {
     List<List<dynamic>> chunks = [];
     for (var i = 0; i < list.length; i += chunkSize) {
@@ -191,8 +198,10 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
         return Icons.local_mall;
       case 'water_drop':
         return Icons.water_drop;
-        case 'quora':
+          case 'quora':
         return Icons.quora;
+      case 'request_quote':
+        return Icons.request_quote;
       default:
         return Icons.help;
     }
@@ -225,45 +234,19 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
     return balance.toStringAsFixed(AppState().noOfDecimals ?? 2);
   }
 
-Future<String> _loadImage(String img) async {
  
-  final cacheBuster = DateTime.now().millisecondsSinceEpoch;
-  String productUrl = '${RestDatasource().Product_URL}/uploads/customer/$img?v=$cacheBuster';
-  String baseUrl = '${RestDatasource().BASE_URL}/uploads/customer/$img?v=$cacheBuster';
-  
 
-  try {
-    final response = await http
-        .head(Uri.parse(productUrl))
-        .timeout(const Duration(seconds: 5));
-    if (response.statusCode == 200) {
-      return productUrl;
-    }
-  } catch (e) {}
-
-  try {
-    final response = await http
-        .head(Uri.parse(baseUrl))
-        .timeout(const Duration(seconds: 5));
-    if (response.statusCode == 200) {
-      return baseUrl;
-    }
-  } catch (e) {}
-  throw Exception('Image not found');
-}
   @override
   Widget build(BuildContext context) {
-
-
     // print("uggug$img");
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppConfig.colorPrimary,
-       title: const Text(
-  'Customers',
-  style: AppConfig.pageTitleStyle,
-),
+        title: const Text(
+          'Customers',
+          style: AppConfig.pageTitleStyle,
+        ),
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
       ),
       body: SingleChildScrollView(
@@ -279,36 +262,34 @@ Future<String> _loadImage(String img) async {
                     fontSize: AppConfig.headLineSize,
                     fontWeight: AppConfig.headLineWeight),
               ),
-            Row(
-  children: [
-SizedBox(
-  width: SizeConfig.blockSizeHorizontal * 35,
-  height: SizeConfig.blockSizeVertical * 20,
-  child: ClipRRect(
-    borderRadius: BorderRadius.circular(10.0),
-    child: (img != null && img!.isNotEmpty)
-        ? FutureBuilder<String>(
-            future: _loadImage(img!),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-              } else if (snapshot.hasError || !snapshot.hasData) {
-                return Image.asset('Assets/Images/no_image.jpg', fit: BoxFit.contain);
-              } else {
-            return Image.network(
-  snapshot.data!,
-  fit: BoxFit.contain,
-  filterQuality: FilterQuality.high,
-  errorBuilder: (context, error, stackTrace) {
-    return Image.asset('Assets/Images/no_image.jpg', fit: BoxFit.contain);
-  },
-);
-              }
+              Row(
+                children: [
+                  SizedBox(
+                    width: SizeConfig.blockSizeHorizontal * 35,
+                    height: SizeConfig.blockSizeVertical * 20,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10.0),
+          // AFTER
+                child: (img != null && img!.isNotEmpty)
+    ? Image.network(
+        '${RestDatasource().Product_URL}/uploads/customer/$img',
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+        errorBuilder: (context, error, stackTrace) {
+          return Image.network(
+            '${RestDatasource().BASE_URL}/uploads/customer/$img',
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+            errorBuilder: (context, error, stackTrace) {
+              return Image.asset('Assets/Images/no_image.jpg',
+                  fit: BoxFit.contain);
             },
-          )
-        : Image.asset('Assets/Images/no_image.jpg', fit: BoxFit.contain),
-  ),
-),
+          );
+        },
+      )
+    : Image.asset('Assets/Images/no_image.jpg', fit: BoxFit.contain),
+                    ),
+                  ),
                   CommonWidgets.horizontalSpace(2),
                   Container(
                     constraints: BoxConstraints(
@@ -412,7 +393,6 @@ SizedBox(
                       color: Colors.black.withOpacity(0.7),
                     ),
                   ),
-
                 ],
               ),
               CommonWidgets.verticalSpace(2),
@@ -425,7 +405,6 @@ SizedBox(
                       color: Colors.black.withOpacity(0.7),
                     ),
                   ),
-
                   CommonWidgets.horizontalSpace(2),
                   Text(
                     totalOutstanding ?? '',
@@ -747,43 +726,44 @@ SizedBox(
   //   );
   // }
 
-Widget _iconButtons({
-  IconData? icon,
-  required String title,
-  String? image,
-  String? routeName,
-}) {
-  return GestureDetector(
-    onTap: () async {
-      if (routeName != null) {
-        switch (routeName) {
-          case 'CustomerRegistration':
-            final result = await Navigator.pushNamed(
-                context, CustomerRegistration.routeName,
-                arguments: {
-                  'name': name,
-                  'address': address,
-                  'building': building,
-                  'flat_no': flat_no,
-                  'phone': phone,
-                  'whatsappNumber': whatsappNumber,
-                  'email': email,
-                  'location': location,
-                  'payment_terms': customerType,
-                  'credit_days': creditDays,
-                  'credit_limit': creditLimit,
-                  'paymentTerms': paymentTerms,
-                  'trn': trn,
-                  'cust_image': img,
-                  'code': code,
-                  'provinceId': provinceId,
-                  'routeId': routeId,
-                  'id': id,
-                });
-            if (result == true && mounted) {
-              Navigator.pop(context, true); // 🆕 Shops list-നെ refresh ചെയ്യാൻ അറിയിക്കുന്നു
-            }
-            break;
+  Widget _iconButtons({
+    IconData? icon,
+    required String title,
+    String? image,
+    String? routeName,
+  }) {
+    return GestureDetector(
+      onTap: () async {
+        if (routeName != null) {
+          switch (routeName) {
+            case 'CustomerRegistration':
+              final result = await Navigator.pushNamed(
+                  context, CustomerRegistration.routeName,
+                  arguments: {
+                    'name': name,
+                    'address': address,
+                    'building': building,
+                    'flat_no': flat_no,
+                    'phone': phone,
+                    'whatsappNumber': whatsappNumber,
+                    'email': email,
+                    'location': location,
+                    'payment_terms': customerType,
+                    'credit_days': creditDays,
+                    'credit_limit': creditLimit,
+                    'paymentTerms': paymentTerms,
+                    'trn': trn,
+                    'cust_image': img,
+                    'code': code,
+                    'provinceId': provinceId,
+                    'routeId': routeId,
+                    'id': id,
+                  });
+              if (result == true && mounted) {
+                Navigator.pop(context,
+                    true); // 🆕 Shops list-നെ refresh ചെയ്യാൻ അറിയിക്കുന്നു
+              }
+              break;
             case 'SOA':
               Navigator.pushNamed(context, SOA.routeName, arguments: {
                 'customerId': id,
@@ -856,7 +836,37 @@ Widget _iconButtons({
                 'id': id,
               });
               break;
-            case 'Customerorderdetail':
+                  case 'Customerorderdetail':
+  final orderPrefs = await SharedPreferences.getInstance();
+  await orderPrefs.setBool('is_proforma_order', false);
+  await orderPrefs.setBool('is_merchandise_order', false);
+  if (!mounted) return;
+              Navigator.pushNamed(context, Customerorderdetail.routeName,
+                  arguments: {
+                    'customerId': id,
+                    'name': name,
+                    'code': code,
+                    'paymentTerms': paymentTerms
+                  });
+              break;
+      case 'ProformaOrder':
+  final proformaPrefs = await SharedPreferences.getInstance();
+  await proformaPrefs.setBool('is_proforma_order', true);
+  await proformaPrefs.setBool('is_merchandise_order', false);
+  if (!mounted) return;
+              Navigator.pushNamed(context, Customerorderdetail.routeName,
+                  arguments: {
+                    'customerId': id,
+                    'name': name,
+                    'code': code,
+                    'paymentTerms': paymentTerms
+                  });
+                         break;
+            case 'MerchandiseOrder':
+              final merchPrefs = await SharedPreferences.getInstance();
+              await merchPrefs.setBool('is_merchandise_order', true);
+              await merchPrefs.setBool('is_proforma_order', false);
+              if (!mounted) return;
               Navigator.pushNamed(context, Customerorderdetail.routeName,
                   arguments: {
                     'customerId': id,
@@ -912,14 +922,25 @@ Widget _iconButtons({
             SizedBox(
               width: SizeConfig.blockSizeHorizontal * 18,
               child: Center(
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppConfig.backgroundColor,
-                    fontSize: AppConfig.textCaption3Size,
-                  ),
-                ),
+                              child: title.contains(' ')
+                    ? Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppConfig.backgroundColor,
+                          fontSize: AppConfig.textCaption3Size,
+                        ),
+                      )
+                    : FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            color: AppConfig.backgroundColor,
+                            fontSize: AppConfig.textCaption3Size,
+                          ),
+                        ),
+                      ),
               ),
             ),
           ],
@@ -928,45 +949,53 @@ Widget _iconButtons({
     );
   }
 
+ // AFTER
   Future<void> _fetchData() async {
     final url =
         '${RestDatasource().BASE_URL}/api/vanoffloadrequest.pending?store_id=${AppState().storeId}&van_id=${AppState().vanId}';
     try {
-      final response = await http.get(Uri.parse(url));
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
-        print(response.request);
         final data = json.decode(response.body);
-        setState(() {
-          _showButton = data['success'] ?? false;
-          _message = _showButton ? "" : "Button is hidden due to API response.";
-        });
+        if (mounted) {
+          setState(() {
+            _showButton = data['success'] ?? false;
+            _message = _showButton ? "" : "Button is hidden due to API response.";
+          });
+        }
       } else {
-        // Handle server errors or other HTTP errors
-        setState(() {
-          _showButton = false;
-          _message = "Failed to fetch data.";
-        });
+        if (mounted) {
+          setState(() {
+            _showButton = false;
+            _message = "Failed to fetch data.";
+          });
+        }
       }
     } catch (e) {
-      // Handle other errors, such as network issues
-      setState(() {
-        _showButton = false;
-        _message = "An error occurred: $e";
-      });
+      if (mounted) {
+        setState(() {
+          _showButton = false;
+          _message = "An error occurred: $e";
+        });
+      }
     }
   }
 
+// AFTER
   Future<void> fetchData() async {
     try {
-      var response = await http.get(Uri.parse(
-          '${RestDatasource().BASE_URL}/api/get_sales_pending_outstanding?customer_id=$id&store_id=${AppState().storeId}'));
+      var response = await http
+          .get(Uri.parse(
+              '${RestDatasource().BASE_URL}/api/get_sales_pending_outstanding?customer_id=$id&store_id=${AppState().storeId}'))
+          .timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
-        print(response.request);
         Map<String, dynamic> jsonResponse = jsonDecode(response.body);
-        setState(() {
-          _data = jsonResponse['data'].toString();
-        });
+        if (mounted) {
+          setState(() {
+            _data = jsonResponse['data'].toString();
+          });
+        }
       } else {
         print('Request failed with status: ${response.statusCode}.');
       }

@@ -339,8 +339,13 @@ class _LoginScreenState extends State<LoginScreen> {
           print(
               "Settings object dateFormat = ${loginResp.settings?.dateFormat}");
           print("AppState dateFormat = ${appState.dateFormat}");
-          appState.noOfDecimals = loginResp.currency?.noOfDecimals;
-          // Round off cap - parse from system_setup array in raw response
+ appState.noOfDecimals = loginResp.currency?.noOfDecimals;
+appState.taxName = loginResp.tax?.name?.trim();
+appState.code = loginResp.currency?.code;
+appState.minor = loginResp.currency?.minor;
+appState.loginState = 'LOGGED_IN';
+
+// Round off cap - parse from system_setup array in raw response
 try {
   final systemSetup = resJson['system_setup'] as List?;
   if (systemSetup != null) {
@@ -351,10 +356,10 @@ try {
       } else if (item['key'] == 'negative_roundoff') {
         appState.roundOffNegative =
             double.tryParse(item['number_value']?.toString() ?? '0') ?? 0;
-      } else if (item['key'] == 'roundoff_alllowed_in_invoice') {   // ✅ new
-        appState.roundOffAllowedInInvoice =                          // ✅ new
-            item['flag_value']?.toString().toLowerCase() != 'no'; 
-            print("Round off allowed: ${appState.roundOffAllowedInInvoice}");   // ✅ new - default true unless explicitly "no"
+      } else if (item['key'] == 'roundoff_alllowed_in_invoice') {
+        appState.roundOffAllowedInInvoice =
+            item['flag_value']?.toString().toLowerCase() != 'no';
+        print("Round off allowed: ${appState.roundOffAllowedInInvoice}");
       }
     }
   }
@@ -362,38 +367,35 @@ try {
   print("Round off parse failed (non-blocking): $e");
   appState.roundOffPositive = 0;
   appState.roundOffNegative = 0;
-  appState.roundOffAllowedInInvoice = true;   // ✅ new - safe default on error
+  appState.roundOffAllowedInInvoice = true;
 }
-          appState.code = loginResp.currency?.code;
-          appState.minor = loginResp.currency?.minor;
-          appState.loginState = 'LOGGED_IN';
 
-          bool appStateRetrieved = await sharedPref.containsKey('app_state');
-          if (appStateRetrieved == true) {
-            sharedPref.removeAll();
-          }
+// Pazhaya session clear cheythu, pinne ONNU thavana mathram save
+await sharedPref.removeAll();
+await sharedPref.save("app_state", appState);
+await appState.saveTaxName(); // removeAll-inu SESHAM thanne venam
 
-          sharedPref.save("app_state", appState);
+   if (mounted) {
+  final rolId = loginResp.user!.rolId;
+  print("Navigating with Role ID: $rolId");
 
-      if (mounted) {
-  if (loginResp.user!.rolId == 2 ||
-      loginResp.user!.rolId == 5 ||
-      loginResp.user!.rolId == 29) {
+  if (rolId == 2 || rolId == 5 || rolId == 29) {
     Navigator.of(context).pushReplacementNamed(HomeScreen.routeName);
-  } else if (loginResp.user!.rolId == 4) {
-    Navigator.of(context)
-        .pushReplacementNamed(HomepageDriver.routeName);
-  } else if (loginResp.user!.rolId == 3) {
-    Navigator.of(context)
-        .pushReplacementNamed(TransferOptionsPage.routeName);
-  } else if (loginResp.user!.rolId == 7) {
-    Navigator.of(context)
-        .pushReplacementNamed(DashboardScreen.routeName);
+  } else if (rolId == 4) {
+    Navigator.of(context).pushReplacementNamed(HomepageDriver.routeName);
+  } else if (rolId == 3) {
+    Navigator.of(context).pushReplacementNamed(TransferOptionsPage.routeName);
+  } else if (rolId == 7) {
+    Navigator.of(context).pushReplacementNamed(DashboardScreen.routeName);
   } else {
+    // unsupported role: don't leave the user "logged in"
+    appState.loginState = 'LOGGED_OUT';
+    await sharedPref.removeAll();
+
     CommonWidgets.showDialogueBox(
       context: context,
-      title: "Access Restricted",
-      msg: "Your account access has been restricted. Please contact support.",
+      title: "Unsupported Role",
+      msg: "This app does not support role ID: $rolId. Please contact support.",
     );
   }
 }

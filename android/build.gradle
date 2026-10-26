@@ -45,7 +45,7 @@ buildscript {
     }
     dependencies {
         classpath 'com.google.gms:google-services:4.4.4'
-        classpath 'com.android.tools.build:gradle:8.4.0'
+    
     }
 }
 

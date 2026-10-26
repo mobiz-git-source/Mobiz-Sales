@@ -73,8 +73,15 @@ class _SplashScreenState extends State<SplashScreen> {
   appState.isEmailVerified = json['is_email_verified'];
   appState.isMobileVerified = json['is_mobile_verified'];
   appState.dateFormat = json['date_format'] ?? 'dd-MM-yyyy';                 // ✅ new — was also missing
-  appState.vanId = json['van_id'];                                          // ✅ new — was also missing
+   appState.vanId = json['van_id'];                                          // ✅ new — was also missing
   appState.routeId = json['route_id'];                                      // ✅ new — was also missing
+
+  // ✅ NEW: restore tax label after app restart / auto-login
+  appState.vatLabel = json['vat_label'] ?? 'VAT';
+  final savedTaxName = json['tax_name']?.toString().trim();
+  appState.taxName =
+      (savedTaxName == null || savedTaxName.isEmpty) ? null : savedTaxName;
+
   appState.roundOffPositive =                                               // ✅ new
       double.tryParse(json['round_off_positive']?.toString() ?? '0') ?? 0;  // ✅ new
   appState.roundOffNegative =                                               // ✅ new
@@ -99,16 +106,19 @@ class _SplashScreenState extends State<SplashScreen> {
   print("ROLE = ${appState.rolId}");
 
       if (appState.loginState == 'LOGGED_IN') {
-        if (mounted)
+        if (mounted) {
           Navigator.of(context)
               .pushReplacementNamed(ErrorHandlingScreen.routeName);
+        }
       } else {
-        if (mounted)
+        if (mounted) {
           Navigator.pushReplacementNamed(context, LoginScreen.routeName);
+        }
       }
     } else {
-      if (mounted)
+      if (mounted) {
         Navigator.pushReplacementNamed(context, LoginScreen.routeName);
+      }
     }
   }
 

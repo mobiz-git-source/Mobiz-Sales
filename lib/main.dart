@@ -241,17 +241,28 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return ScreenUtilInit(
+       return ScreenUtilInit(
       designSize: const Size(360, 690),
       minTextAdapt: true,
       splitScreenMode: true,
-      child: MaterialApp(
+            builder: (context, child) => MaterialApp(
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
             colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
             useMaterial3: true,
           ),
-          // home: DashboardScreen(),
+      builder: (context, widget) {
+            final mq = MediaQuery.of(context);
+            return MediaQuery(
+              data: mq.copyWith(
+                textScaler: mq.textScaler.clamp(
+                  minScaleFactor: 0.9,
+                  maxScaleFactor: 1.15,
+                ),
+              ),
+              child: widget!,
+            );
+          },
           initialRoute: SplashScreen.routeName,
           routes: {
             // '/': (context) => Home(),

@@ -57,31 +57,7 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
     });
   }
 
- Future<String> _loadImage(String img) async {
-  // 🆕 cache-buster ചേർക്കുന്നു, browser/CDN/flutter cache-നെ bypass ചെയ്യാൻ
-  final cacheBuster = DateTime.now().millisecondsSinceEpoch;
-  String productUrl = '${RestDatasource().Product_URL}/uploads/customer/$img?v=$cacheBuster';
-  String baseUrl = '${RestDatasource().BASE_URL}/uploads/customer/$img?v=$cacheBuster';
-  
-  try {
-    final response = await http
-        .head(Uri.parse(productUrl))
-        .timeout(const Duration(seconds: 5));
-    if (response.statusCode == 200) {
-      return productUrl;
-    }
-  } catch (e) {}
 
-  try {
-    final response = await http
-        .head(Uri.parse(baseUrl))
-        .timeout(const Duration(seconds: 5));
-    if (response.statusCode == 200) {
-      return baseUrl;
-    }
-  } catch (e) {}
-  throw Exception('Image not found');
-}
 
   void _getLocation() async {
     Position position = await Geolocator.getCurrentPosition(
@@ -132,7 +108,7 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
   String? _customercode;
   String? _location;
   String? img;
-  int? id;
+int? id;
   String? _selectedRoute;
   String? _selectCuCode;
   int? _selectedProvinceid;
@@ -166,8 +142,8 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
           _contactNumberController.text = params['phone'] ?? '';
           _whatsappNumberController.text = params['whatsappNumber'] ?? '';
           _trnController.text = params['trn'] ?? '';
-          img = params['cust_image'];
-          _location = params['location'] ?? 'Click the icon to fetch the data';
+   img = params['cust_image'];
+_location = params['location'] ?? 'Click the icon to fetch the data';
           _selectPaymentTerms =
               params['paymentTerms'] == '' ? null : params['paymentTerms'];
           _selectedProvinceid =
@@ -194,23 +170,9 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
     flatfocus = FocusNode();
     trnfocus = FocusNode();
 
-    super.initState();
+  super.initState();
     loadVatLabel();
-    _getRoutes()
-        .then((value) => _getProvince())
-        .then((value) => _getCodeData())
-        .then((value) => fetchStoreDetail())
-        .then((storeDetail) {
-      if (storeDetail != null && storeDetail.comapny_id == 5) {
-        setState(() {
-          showFields = true;
-        });
-      } else {
-        setState(() {
-          showFields = false;
-        });
-      }
-    });
+    _loadInitialData();
   }
 
   @override
@@ -310,43 +272,29 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
                                             )
                                           : null,
                                     ),
+                             // AFTER
                                     child: _image == null
                                         ? (img != null && img!.isNotEmpty)
-                                            ? FutureBuilder(
-                                                future: _loadImage(img!),
-                                                builder: (context, snapshot) {
-                                                  if (snapshot
-                                                          .connectionState ==
-                                                      ConnectionState.waiting) {
-                                                    return const Center(
-                                                        child:
-                                                            CircularProgressIndicator());
-                                                  } else if (snapshot
-                                                      .hasError) {
-                                                    return const Center(
-                                                        child: Text(
-                                                            'Select Image'));
-                                                  } else {
-                                                    return ClipRRect(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              20),
-                                                      child: Image.network(
-                                                        snapshot.data!,
-                                                        width: 150,
-                                                        height: 150,
-                                                        fit: BoxFit.cover,
-                                                        errorBuilder: (context,
-                                                            error, stackTrace) {
-                                                          return const Center(
-                                                              child: Text(
-                                                                  'Select Image'));
-                                                        },
-                                                      ),
-                                                    );
-                                                  }
+                                          ? ClipRRect(
+                                              borderRadius: BorderRadius.circular(20),
+                                              child: Image.network(
+                                                '${RestDatasource().Product_URL}/uploads/customer/$img',
+                                                width: 150,
+                                                height: 150,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (context, error, stackTrace) {
+                                                  return Image.network(
+                                                    '${RestDatasource().BASE_URL}/uploads/customer/$img',
+                                                    width: 150,
+                                                    height: 150,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (context, error, stackTrace) {
+                                                      return const Center(child: Text('Select Image'));
+                                                    },
+                                                  );
                                                 },
-                                              )
+                                              ),
+                                            )
                                             : const Center(
                                                 child: Text('Select Image'))
                                         : null,
@@ -963,7 +911,28 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
       });
     }
   }
-
+// ADD (new method — not present before)
+Future<void> _loadInitialData() async {
+  try {
+    await _getRoutes();
+    await _getProvince();
+    await _getCodeData();
+    final storeDetail = await fetchStoreDetail();
+    if (mounted) {
+      setState(() {
+        showFields = (storeDetail != null && storeDetail.comapny_id == 5);
+        _initDone = true;
+      });
+    }
+  } catch (e) {
+    print('Registration load error: $e');
+    if (mounted) {
+      setState(() {
+        _initDone = true;
+      });
+    }
+  }
+}
   void _clearForm() {
     _formKey.currentState?.reset();
 

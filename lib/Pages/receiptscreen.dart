@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui' as ui;                                    // NEW
+import 'dart:ui' as ui; // NEW
 
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +25,9 @@ import '../Models/receiptdatamodel.dart';
 import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
 import '../confg/sizeconfig.dart';
+import '../Utilities/cpcl_helper.dart';
+import '../Utilities/report_printer.dart';
+import '../Reports/receipt_report.dart';
 import 'TestReceipt.dart';
 
 class ReceiptScreen extends StatefulWidget {
@@ -76,6 +79,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   }
 
   void _initPrinter() async {
+    await loadPrinterTypeCache();
     bool? isConnected = await printer.isConnected;
     if (isConnected!) {
       setState(() {
@@ -93,8 +97,30 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
       });
     }
   }
+Future<void> _printReceiptImage(ReportData data) async {
+  final outstanding = await _getOutstanding(data.customerId);
+  final response = await http.get(Uri.parse(
+    '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}',
+  ));
 
-  void _getBluetoothDevices() async {
+  if (response.statusCode != 200) {
+    throw Exception('Failed to load store details');
+  }
+
+  final storeDetail = StoreDetail.fromJson(json.decode(response.body));
+  final logoFile = storeDetail.logos;
+  final logo = logoFile != null && logoFile.isNotEmpty
+      ? await loadLogo('$kStoreLogoBaseUrl$logoFile')
+      : null;
+
+  await printReport(
+    printer,
+    _selectedDevice,
+    (b) => drawReceipt(b, data, storeDetail, outstanding, logo: logo),
+    widthDots: kLabelWidthDots,
+  );
+}
+  Future<void> _getBluetoothDevices() async {
     List<BluetoothDevice> devices = await printer.getBondedDevices();
     BluetoothDevice? defaultDevice;
     final prefs = await SharedPreferences.getInstance();
@@ -206,59 +232,62 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     }
     return '0.00';
   }
+
   // NEW: Renders Arabic text to a PNG bitmap for thermal printing — same
 // approach as the invoice screen's _arabicTextToImageBytes(). ESC/POS
 // text commands only cover Latin/ASCII, so Arabic must go as an image.
-Future<Uint8List> _arabicTextToImageBytes(
-  String text, {
-  double fontSize = 26,
-  double maxWidth = 380,
-}) async {
-  final TextPainter textPainter = TextPainter(
-    text: TextSpan(
-      text: text,
-      style: TextStyle(
-        color: Colors.black,
-        fontSize: fontSize,
-        fontWeight: FontWeight.bold,
-        fontFamily: 'NotoNaskhArabic',
+  Future<Uint8List> _arabicTextToImageBytes(
+    String text, {
+    double fontSize = 26,
+    double maxWidth = 380,
+  }) async {
+    final TextPainter textPainter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: Colors.black,
+          fontSize: fontSize,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'NotoNaskhArabic',
+        ),
       ),
-    ),
-    textDirection: ui.TextDirection.rtl,
-    textAlign: TextAlign.center,
-  );
-  textPainter.layout(maxWidth: maxWidth);
+      textDirection: ui.TextDirection.rtl,
+      textAlign: TextAlign.center,
+    );
+    textPainter.layout(maxWidth: maxWidth);
 
-  // Thermal printers need bitmap width byte-aligned (multiple of 8).
-  double rawWidth = textPainter.width.ceilToDouble();
-  final double width = (rawWidth / 8).ceil() * 8;
-  final double height = textPainter.height.ceilToDouble();
+    // Thermal printers need bitmap width byte-aligned (multiple of 8).
+    double rawWidth = textPainter.width.ceilToDouble();
+    final double width = (rawWidth / 8).ceil() * 8;
+    final double height = textPainter.height.ceilToDouble();
 
-  final ui.PictureRecorder recorder = ui.PictureRecorder();
-  final Canvas canvas = Canvas(
-    recorder,
-    Rect.fromLTWH(0, 0, width, height),
-  );
+    final ui.PictureRecorder recorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(
+      recorder,
+      Rect.fromLTWH(0, 0, width, height),
+    );
 
-  canvas.drawRect(
-    Rect.fromLTWH(0, 0, width, height),
-    Paint()..color = Colors.white,
-  );
-  textPainter.paint(canvas, Offset.zero);
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, width, height),
+      Paint()..color = Colors.white,
+    );
+    textPainter.paint(canvas, Offset.zero);
 
-  final ui.Image image = await recorder.endRecording().toImage(
-        width.toInt(),
-        height.toInt(),
-      );
-  final ByteData? byteData =
-      await image.toByteData(format: ui.ImageByteFormat.png);
-  return byteData!.buffer.asUint8List();
-}
-Future<pw.Font> _loadArabicPwFont() async {
-  final fontData =
-      await rootBundle.load('Assets/fonts/NotoNaskhArabic-Regular.ttf');
-  return pw.Font.ttf(fontData);
-}
+    final ui.Image image = await recorder.endRecording().toImage(
+          width.toInt(),
+          height.toInt(),
+        );
+    final ByteData? byteData =
+        await image.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  Future<pw.Font> _loadArabicPwFont() async {
+    final fontData =
+        await rootBundle.load('Assets/fonts/NotoNaskhArabic-Regular.ttf');
+    return pw.Font.ttf(fontData);
+  }
+
   Future<void> generatePdf(ReportData data) async {
     String outstanding = await _getOutstanding(data.customerId);
     final response = await http.get(Uri.parse(
@@ -292,37 +321,39 @@ Future<pw.Font> _loadArabicPwFont() async {
                 pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                                              pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                children: [
-                                  pw.SizedBox(height: 10),
-                                  pw.Text(
-                                    storeDetail.name,
-                                    style: pw.TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: pw.FontWeight.bold,
-                                    ),
-                                  ),
-                              pw.SizedBox(height: 3),
+                      pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.SizedBox(height: 10),
+                            pw.Text(
+                              storeDetail.name,
+                              style: pw.TextStyle(
+                                fontSize: 18,
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                            pw.SizedBox(height: 3),
 // NEW: Arabic company name — same size/weight/color as English name
-if (arabicFont != null)
-  pw.Text(
-    storeDetail.name_ar!,
-    textDirection: pw.TextDirection.rtl,
-    textAlign: pw.TextAlign.right,
-    style: pw.TextStyle(
-      font: arabicFont,
-      fontSize: 18,                          // was 14 → now matches English name's 18
-      fontWeight: pw.FontWeight.bold,
-      color: PdfColors.black,                // was default grey → now solid black
-    ),
-  ),
-pw.SizedBox(height: 3),
-                                  pw.Text('${storeDetail.address ?? 'N/A'}'),
-                                  pw.SizedBox(height: 3),
-                                  pw.Text('TRN: ${storeDetail.trn ?? 'N/A'}'),
-                                  pw.SizedBox(height: 3),
-                                ]),
+                            if (arabicFont != null)
+                              pw.Text(
+                                storeDetail.name_ar!,
+                                textDirection: pw.TextDirection.rtl,
+                                textAlign: pw.TextAlign.right,
+                                style: pw.TextStyle(
+                                  font: arabicFont,
+                                  fontSize:
+                                      18, // was 14 → now matches English name's 18
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColors
+                                      .black, // was default grey → now solid black
+                                ),
+                              ),
+                            pw.SizedBox(height: 3),
+                            pw.Text('${storeDetail.address ?? 'N/A'}'),
+                            pw.SizedBox(height: 3),
+                            pw.Text('TRN: ${storeDetail.trn ?? 'N/A'}'),
+                            pw.SizedBox(height: 3),
+                          ]),
                       pw.Image(
                         pw.MemoryImage(logoBytes),
                         height: 100,
@@ -376,9 +407,11 @@ pw.SizedBox(height: 3),
                           'Reference: ${data.sales![0].voucherNo ?? 'N/A'}',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                         ),
-                      pw.Text('Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
+                        pw.Text(
+                            'Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
                         pw.Text('Time: ${data.sales![0].inTime}'),
-                        pw.Text('Due Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
+                        pw.Text(
+                            'Due Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
                       ],
                     ),
                   ],
@@ -386,19 +419,22 @@ pw.SizedBox(height: 3),
                 pw.SizedBox(height: 10),
                 pw.Divider(color: PdfColors.grey, height: 1, thickness: .5),
                 pw.SizedBox(height: 10),
-              pw.Column(
-  crossAxisAlignment: pw.CrossAxisAlignment.start,
-  children: [
-    if ((data.collectionType ?? '').toLowerCase() == 'cheque') ...[
-      pw.Text('Collection Type: Cheque'),
-      pw.Text('Bank Name: ${data.bank ?? 'N/A'}'),
-      pw.Text('Cheque No: ${data.chequeNo ?? 'N/A'}'),
-      pw.Text('Cheque Date: ${data.chequeDate != null ? DateHelper.displayDate(data.chequeDate) : 'N/A'}'),
-    ] else ...[
-      pw.Text('Collection Type: ${data.collectionType ?? 'Cash'}'),
-    ]
-  ],
-),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    if ((data.collectionType ?? '').toLowerCase() ==
+                        'cheque') ...[
+                      pw.Text('Collection Type: Cheque'),
+                      pw.Text('Bank Name: ${data.bank ?? 'N/A'}'),
+                      pw.Text('Cheque No: ${data.chequeNo ?? 'N/A'}'),
+                      pw.Text(
+                          'Cheque Date: ${data.chequeDate != null ? DateHelper.displayDate(data.chequeDate) : 'N/A'}'),
+                    ] else ...[
+                      pw.Text(
+                          'Collection Type: ${data.collectionType ?? 'Cash'}'),
+                    ]
+                  ],
+                ),
                 pw.SizedBox(height: 10),
                 pw.SizedBox(height: 10),
               ],
@@ -434,7 +470,7 @@ pw.SizedBox(height: 3),
     }
   }
 
-   Future<void> generateWifiPdf(ReportData data) async {
+  Future<void> generateWifiPdf(ReportData data) async {
     String outstanding = await _getOutstanding(data.customerId);
     final response = await http.get(Uri.parse(
         '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
@@ -541,8 +577,10 @@ pw.SizedBox(height: 3),
                           'Reference: ${data.sales![0].voucherNo ?? 'N/A'}',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                         ),
-                       pw.Text('Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
-                        pw.Text('Due Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
+                        pw.Text(
+                            'Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
+                        pw.Text(
+                            'Due Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
                       ],
                     ),
                   ],
@@ -553,14 +591,17 @@ pw.SizedBox(height: 3),
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                if ((data.collectionType ?? '').toLowerCase() == 'cheque') ...[
-  pw.Text('Collection Type: Cheque'),
-  pw.Text('Bank Name: ${data.bank ?? 'N/A'}'),
-  pw.Text('Cheque No: ${data.chequeNo ?? 'N/A'}'),
-  pw.Text('Cheque Date: ${data.chequeDate != null ? DateHelper.displayDate(data.chequeDate) : 'N/A'}'),
-] else ...[
-  pw.Text('Collection Type: ${data.collectionType ?? 'Cash'}'),
-]
+                    if ((data.collectionType ?? '').toLowerCase() ==
+                        'cheque') ...[
+                      pw.Text('Collection Type: Cheque'),
+                      pw.Text('Bank Name: ${data.bank ?? 'N/A'}'),
+                      pw.Text('Cheque No: ${data.chequeNo ?? 'N/A'}'),
+                      pw.Text(
+                          'Cheque Date: ${data.chequeDate != null ? DateHelper.displayDate(data.chequeDate) : 'N/A'}'),
+                    ] else ...[
+                      pw.Text(
+                          'Collection Type: ${data.collectionType ?? 'Cash'}'),
+                    ]
                   ],
                 ),
                 pw.SizedBox(height: 10),
@@ -780,7 +821,7 @@ pw.SizedBox(height: 3),
     );
   }
 
- Widget _productsCard(ReportData data) {
+  Widget _productsCard(ReportData data) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
       child: Container(
@@ -814,46 +855,48 @@ pw.SizedBox(height: 3),
             // This is what was forcing the extra vertical gap around
             // "Round Off" — the title Column was being stretched by a
             // sibling Row(spaceBetween) that wrapped the trailing icons.
-        // ── FIX: same pattern as Sale Invoice screen — widened tap targets
+            // ── FIX: same pattern as Sale Invoice screen — widened tap targets
 // (~40x40 via InkWell + Padding) instead of just the bare icon glyph,
 // and widened the SizedBox to fit them without clipping. ──
-trailing: SizedBox(
-  width: AppState().printer == "Wifi" ? 130 : 90,
-  child: Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () => _print(data),
-        child: const Padding(
-          padding: EdgeInsets.all(8.0),
-          child: Icon(Icons.print, color: Colors.blueAccent, size: 26),
-        ),
-      ),
-      if (AppState().printer == "Wifi")
-        InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () => generateWifiPdf(data),
-          child: const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Icon(
-              Icons.document_scanner,
-              color: Colors.green,
-              size: 26,
+            trailing: SizedBox(
+              width: AppState().printer == "Wifi" ? 130 : 90,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => _print(data),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child:
+                          Icon(Icons.print, color: Colors.blueAccent, size: 26),
+                    ),
+                  ),
+                  if (AppState().printer == "Wifi")
+                    InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => generateWifiPdf(data),
+                      child: const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: Icon(
+                          Icons.document_scanner,
+                          color: Colors.green,
+                          size: 26,
+                        ),
+                      ),
+                    ),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => generatePdf(data),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: Icon(Icons.document_scanner,
+                          color: Colors.red, size: 26),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
-      InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () => generatePdf(data),
-        child: const Padding(
-          padding: EdgeInsets.all(8.0),
-          child: Icon(Icons.document_scanner, color: Colors.red, size: 26),
-        ),
-      ),
-    ],
-  ),
-),
             backgroundColor: AppConfig.backgroundColor,
             // title is now just the Column directly — no wrapping Row that
             // used to be forced to spaceBetween against the trailing icons.
@@ -861,7 +904,7 @@ trailing: SizedBox(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                  SizedBox(
+                SizedBox(
                   child: Text(
                     '${DateHelper.displayDate(data.inDate)} ${data.inTime} | ${data.voucherNo}',
                     style: TextStyle(
@@ -901,12 +944,12 @@ trailing: SizedBox(
                   ),
                 ),
                 Text(
-  'Type:  ${(data.collectionType ?? '').toLowerCase() == 'cheque' ? 'Cheque | ${data.bank} | ${data.chequeNo} \nCheque Date: ${DateHelper.displayDate(data.chequeDate)}' : (data.collectionType ?? 'Cash')}',
-  style: TextStyle(
-    fontSize: AppConfig.textCaption3Size,
-    height: 1.15,
-  ),
-),
+                  'Type:  ${(data.collectionType ?? '').toLowerCase() == 'cheque' ? 'Cheque | ${data.bank} | ${data.chequeNo} \nCheque Date: ${DateHelper.displayDate(data.chequeDate)}' : (data.collectionType ?? 'Cash')}',
+                  style: TextStyle(
+                    fontSize: AppConfig.textCaption3Size,
+                    height: 1.15,
+                  ),
+                ),
                 Row(
                   children: [
                     Text(
@@ -978,222 +1021,365 @@ trailing: SizedBox(
     );
   }
 
-  void _print(ReportData data) async {
-    if (_connected) {
-      // Print Store Details Header
-      // String logoUrl =`
-      //     '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
-      // if (logoUrl.isNotEmpty) {
-      //   final response = await http.get(Uri.parse(logoUrl));
-      //   if (response.statusCode == 200) {
-      //     Uint8List imageBytes = response.bodyBytes;
-      //
-      //     // Decode image and convert to monochrome bitmap if needed
-      //     img.Image originalImage = img.decodeImage(imageBytes)!;
-      //     img.Image monoLogo = img.grayscale(originalImage);
-      //
-      //     // Encode the image to the required format (e.g., PNG)
-      //     Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
-      //
-      //     // Print the logo image
-      //     printer.printImageBytes(logoBytes);
-      //   } else {
-      //     print('Failed to load image: ${response.statusCode}');
-      //   }
-      // }
-      String outstanding = await _getOutstanding(data.customerId);
-      final response = await http.get(Uri.parse(
-          '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
-      if (response.statusCode == 200) {
-        // Parse JSON response into StoreDetail object
-        StoreDetail storeDetail =
-            StoreDetail.fromJson(json.decode(response.body));
-        final String api =
-            '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
-        final logoResponse = await http.get(Uri.parse(api));
-        if (logoResponse.statusCode != 200) {
-          throw Exception('Failed to load logo image');
-        }
+  
+void _print(ReportData data) async {
+  // Printer must be known BEFORE choosing Zebra/Sewoo
+  if (_selectedDevice == null) await _getBluetoothDevices();
+  if (_selectedDevice == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Default printer not found')),
+    );
+    return;
+  }
+  await loadPrinterTypeCache();
+  final bool zebra = isZebraPrinter(_selectedDevice);
+  print('PRINT route: zebra=$zebra name=${_selectedDevice?.name} '
+      'addr=${_selectedDevice?.address}');
 
-        void printAlignedText(String leftText, String rightText) {
-          const int maxLineLength = 68;
-          int leftTextLength = leftText.length;
-          int rightTextLength = rightText.length;
+  if (!_connected) await _connect();
+  if (!_connected) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Printer not connected')),
+    );
+    return;
+  }
 
-          // Calculate padding to ensure rightText is right-aligned
-          int spaceLength = maxLineLength - (leftTextLength + rightTextLength);
-          String spaces = ' ' * spaceLength;
-
-          printer.printCustom('$leftText$spaces$rightText', 1,
-              0); // Print with left-aligned text
-        }
-
-        String logoUrl =
-            'https://erpadmin.mobiz.ae/uploads/store/${storeDetail.logos}';
-        if (logoUrl.isNotEmpty) {
-          final response = await http.get(Uri.parse(logoUrl));
-          if (response.statusCode == 200) {
-            Uint8List imageBytes = response.bodyBytes;
-            img.Image? originalImage = img.decodeImage(imageBytes)!;
-            if (originalImage != null) {
-              img.Image resizedImage =
-                  img.copyResize(originalImage, width: 250);
-              img.Image monoLogo = img.grayscale(resizedImage);
-              Uint8List logoBytes = Uint8List.fromList(img.encodePng(monoLogo));
-              await printer.printImageBytes(logoBytes);
-              await Future.delayed(const Duration(milliseconds: 500));
-            }
-          } else {
-            print('Failed to load image: ${response.statusCode}');
-          }
-        }
-
-               printer.printNewLine();
-        String companyName = '${storeDetail.name}';
-        printer.printCustom(companyName, 3, 1);
-
-        // NEW: Arabic company name — Arabic can't go through printCustom
-        // (ESC/POS only covers Latin/ASCII), so print it as a bitmap.
-        String companyNameAr = storeDetail.name_ar ?? '';
-        if (companyNameAr.trim().isNotEmpty) {
-          try {
-            final Uint8List arabicNameBytes =
-                await _arabicTextToImageBytes(companyNameAr, fontSize: 30);
-            await printer.printImageBytes(arabicNameBytes);
-            await Future.delayed(const Duration(milliseconds: 300));
-          } catch (e) {
-            print('Failed to print Arabic company name: $e');
-          }
-        }
-
-        printer.printNewLine();
-
-        printer.printCustom("${storeDetail.address ?? 'N/A'}", 1, 1);
-        printer.printCustom("RECEIPT VOUCHER", 3, 1);
-        printer.printNewLine();
-        printer.printCustom("-" * 72, 1, 1);
-
-        // Print Customer Details
-        if (data.customer != null && data.customer!.isNotEmpty) {
-          printAlignedText('Customer: ${data.customer![0].name}',
-              'Reference: ${data.sales![0].voucherNo ?? 'N/A'}');
-          // printer.printLeftRight('Customer: ${data.customer![0].name}', '', 1);
-         printAlignedText(
-              // 'Market:  ${data.customer![0].address}',
-              '',
-              'Date: ${DateHelper.displayDate(data.sales![0].inDate)}');
-          printAlignedText(
-              // 'Market:  ${data.customer![0].address}',
-              '',
-              'Time: ${data.sales![0].inTime}');
-          printAlignedText(
-            (data.customer![0].trn != null && data.customer![0].trn!.isNotEmpty)
-                ? '${data.store![0].vatLabel}: ${data.customer![0].trn}'
-                : '',
-            'Due Date: ${DateHelper.displayDate(data.sales![0].inDate)}',
-          );
-          // printer.printLeftRight('TRN: ${data.customer![0].trn}', '', 1);
-        }
-        printer.printNewLine();
-        printer.printCustom("-" * 72, 1, 1); // Centered
-
-        // Print Sales Details
-        // printer.printLeftRight(
-        //     'Reference:', '${data.sales![0].voucherNo ?? 'N/A'}', 1);
-        // printer.printLeftRight('Date:', '${data.sales![0].inDate}', 1);
-        // printer.printLeftRight('Due Date:', '${data.sales![0].inDate}', 1);
-        // printer.printNewLine();
-
-        // Collection Information
-       if ((data.collectionType ?? '').toLowerCase() == 'cheque') {
-  printAlignedText('Collection Type: Cheque', ' ');
-  printAlignedText('Bank Name: ${data.bank}', ' ');
-  printAlignedText('Cheque No: ${data.chequeNo}', ' ');
-  printAlignedText(
-    'Cheque Date: ${data.chequeDate != null ? DateHelper.displayDate(data.chequeDate) : 'N/A'}',
-    ' ',
-  );
-} else {
-  printAlignedText('Collection Type: ${data.collectionType ?? 'Cash'}', ' ');
-}
-        printAlignedText('Amount: ${data.totalAmount}', ' ');
-        // printer.printLeftRight('Collection Type:', '${data.collectionType}', 1);
-        // printer.printLeftRight('Bank Name:', '${data.bank}', 1);
-        // printer.printLeftRight('Cheque No:', '${data.chequeNo}', 1);
-        // printer.printLeftRight('Cheque Date:', '${data.chequeDate}', 1);
-        // printer.printLeftRight('Amount:', '${data.totalAmount}', 1);
-        printer.printNewLine();
-        printer.printCustom("-" * 72, 1, 1);
-        const int columnWidth0 = 4;
-        const int columnWidth1 = 14; // S.No
-        const int columnWidth2 = 20; // Product Description
-        const int columnWidth3 = 14; // Unit
-        const int columnWidth4 = 5;
-        String line;
-        String headers = "${''.padRight(columnWidth0)}"
-            "${'SI.NO'.padRight(columnWidth1)}"
-            " ${'Reference NO'.padRight(columnWidth2)}"
-            " ${'Type'.padRight(columnWidth3)}"
-            "${'Amount'.padRight(columnWidth4)}";
-        printer.printCustom(headers, 1, 0);
-        printer.printCustom("-" * 72, 1, 1);
-        // Sales List Header
-        // printer.printCustom('SI NO   Reference No   Type   Amount', 1, 0);
-        // printer.printCustom('---------------------------', 1, 0);
-
-        // Iterate and print each sales item
-
-        String formatInvoiceType(String? invoiceType) {
-          if (invoiceType == null)
-            return 'N/A'; // Return N/A if invoiceType is null
-
-          // Capitalize the first letter and check for specific cases
-          switch (invoiceType.toLowerCase()) {
-            case 'salesreturn':
-              return 'Sales Return';
-            case 'payment_voucher':
-              return 'Payment';
-            default:
-              return invoiceType[0].toUpperCase() +
-                  invoiceType.substring(1).toLowerCase();
-          }
-        }
-
-        for (var i = 0; i < data.sales!.length; i++) {
-          var sale = data.sales![i];
-          line = "${('').padRight(columnWidth0)}"
-              "${(i + 1).toString().padRight(columnWidth1)}"
-              " ${sale.invoiceNo?.padRight(columnWidth2) ?? 'N/A'.padRight(columnWidth2)}"
-              "${formatInvoiceType(sale.invoiceType)?.padRight(columnWidth3) ?? 'N/A'.padRight(columnWidth3)}"
-              "${sale.amount?.padRight(columnWidth4) ?? 'N/A'.padRight(columnWidth4)}";
-          printer.printCustom(line, 1, 0);
-        }
-        printer.printNewLine();
-        printer.printCustom("-" * 72, 1, 1);
-        if (data.roundoff != null && double.parse(data.roundoff!) != 0) {
-          printAlignedText('',
-              'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(AppState().noOfDecimals ?? 2)}');
-        }
-        printAlignedText('', 'Total: ${data.totalAmount}');
-        printAlignedText('', 'Total Outstanding: $outstanding');
-        printAlignedText("Van: ${data.van![0].name}", "");
-        printAlignedText("Salesman: ${data.user![0].name}", "");
-        // printer.printLeftRight('Van:', '${data.vanId}', 1);
-        // printer.printLeftRight('Salesman:', 'N/A', 1);
-        printer.printNewLine();
-
-        printer.paperCut();
-      } // Cut paper after printing
+  try {
+    if (zebra) {
+      await _printReceiptImage(data);
     } else {
+      await _printSewoo(data);
+    }
+  } catch (e, st) {
+    print('Print error: $e\n$st');
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Printer not connected')),
+        SnackBar(content: Text('Print failed: $e')),
       );
     }
-    if (!_connected) {
-      await _connect();
+  }
+}
+  // ═══════════════════════════════════════════════════════════════
+  // 1. SEWOO (ESC/POS)
+  // ═══════════════════════════════════════════════════════════════
+  Future<void> _printSewoo(ReportData data) async { 
+    String outstanding = await _getOutstanding(data.customerId);
+    final response = await http.get(Uri.parse(
+        '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
+    if (response.statusCode == 200) {
+      StoreDetail storeDetail =
+          StoreDetail.fromJson(json.decode(response.body));
+      final String api =
+          '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
+      final logoResponse = await http.get(Uri.parse(api));
+      if (logoResponse.statusCode != 200) {
+        throw Exception('Failed to load logo image');
+      }
+
+      void printAlignedText(String leftText, String rightText) {
+        const int maxLineLength = 68;
+        int leftTextLength = leftText.length;
+        int rightTextLength = rightText.length;
+
+        int spaceLength = maxLineLength - (leftTextLength + rightTextLength);
+        String spaces = ' ' * (spaceLength > 0 ? spaceLength : 1);
+
+        printer.printCustom('$leftText$spaces$rightText', 1, 0);
+      }
+
+         String logoUrl =
+          'https://erpadmin.mobiz.ae/uploads/store/${storeDetail.logos}';
+      if (logoUrl.isNotEmpty) {
+        final logoBytes = await buildSewooLogoBytes(logoUrl);
+        if (logoBytes != null) {
+          await printer.printImageBytes(logoBytes);
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      }
+
+      printer.printNewLine();
+      String companyName = '${storeDetail.name}';
+      printer.printCustom(companyName, 3, 1);
+
+      String companyNameAr = storeDetail.name_ar ?? '';
+      if (companyNameAr.trim().isNotEmpty) {
+        try {
+          final Uint8List arabicNameBytes =
+              await _arabicTextToImageBytes(companyNameAr, fontSize: 30);
+          await printer.printImageBytes(arabicNameBytes);
+          await Future.delayed(const Duration(milliseconds: 300));
+        } catch (e) {
+          print('Failed to print Arabic company name: $e');
+        }
+      }
+
+      printer.printNewLine();
+      printer.printCustom("${storeDetail.address ?? 'N/A'}", 1, 1);
+      printer.printCustom("RECEIPT VOUCHER", 3, 1);
+      printer.printNewLine();
+      printer.printCustom("-" * 72, 1, 1);
+
+      // Customer Details
+      if (data.customer != null && data.customer!.isNotEmpty) {
+        printAlignedText('Customer: ${data.customer![0].name}',
+            'Reference: ${data.sales![0].voucherNo ?? 'N/A'}');
+        printAlignedText(
+            '',
+            'Date: ${DateHelper.displayDate(data.sales![0].inDate)}');
+        printAlignedText(
+            '',
+            'Time: ${data.sales![0].inTime}');
+        printAlignedText(
+          (data.customer![0].trn != null && data.customer![0].trn!.isNotEmpty)
+              ? '${data.store![0].vatLabel}: ${data.customer![0].trn}'
+              : '',
+          'Due Date: ${DateHelper.displayDate(data.sales![0].inDate)}',
+        );
+      }
+      printer.printNewLine();
+      printer.printCustom("-" * 72, 1, 1);
+
+      // Collection Information
+      if ((data.collectionType ?? '').toLowerCase() == 'cheque') {
+        printAlignedText('Collection Type: Cheque', ' ');
+        printAlignedText('Bank Name: ${data.bank}', ' ');
+        printAlignedText('Cheque No: ${data.chequeNo}', ' ');
+        printAlignedText(
+          'Cheque Date: ${data.chequeDate != null ? DateHelper.displayDate(data.chequeDate) : 'N/A'}',
+          ' ',
+        );
+      } else {
+        printAlignedText(
+            'Collection Type: ${data.collectionType ?? 'Cash'}', ' ');
+      }
+      printAlignedText('Amount: ${data.totalAmount}', ' ');
+      printer.printNewLine();
+      printer.printCustom("-" * 72, 1, 1);
+
+      const int columnWidth0 = 4;
+      const int columnWidth1 = 14;
+      const int columnWidth2 = 20;
+      const int columnWidth3 = 14;
+      const int columnWidth4 = 5;
+
+      String headers = "${''.padRight(columnWidth0)}"
+          "${'SI.NO'.padRight(columnWidth1)}"
+          " ${'Reference NO'.padRight(columnWidth2)}"
+          " ${'Type'.padRight(columnWidth3)}"
+          "${'Amount'.padRight(columnWidth4)}";
+      printer.printCustom(headers, 1, 0);
+      printer.printCustom("-" * 72, 1, 1);
+
+      String formatInvoiceType(String? invoiceType) {
+        if (invoiceType == null) return 'N/A';
+        switch (invoiceType.toLowerCase()) {
+          case 'salesreturn':
+            return 'Sales Return';
+          case 'payment_voucher':
+            return 'Payment';
+          default:
+            return invoiceType[0].toUpperCase() +
+                invoiceType.substring(1).toLowerCase();
+        }
+      }
+
+      for (var i = 0; i < data.sales!.length; i++) {
+        var sale = data.sales![i];
+        String line = "${('').padRight(columnWidth0)}"
+            "${(i + 1).toString().padRight(columnWidth1)}"
+            " ${sale.invoiceNo?.padRight(columnWidth2) ?? 'N/A'.padRight(columnWidth2)}"
+            "${formatInvoiceType(sale.invoiceType)?.padRight(columnWidth3) ?? 'N/A'.padRight(columnWidth3)}"
+            "${sale.amount?.padRight(columnWidth4) ?? 'N/A'.padRight(columnWidth4)}";
+        printer.printCustom(line, 1, 0);
+      }
+      printer.printNewLine();
+      printer.printCustom("-" * 72, 1, 1);
+      if (data.roundoff != null && (double.tryParse(data.roundoff!) ?? 0) != 0) {
+        printAlignedText('',
+            'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(AppState().noOfDecimals ?? 2)}');
+      }
+      printAlignedText('', 'Total: ${data.totalAmount}');
+      printAlignedText('', 'Total Outstanding: $outstanding');
+      printAlignedText(
+          "Van: ${(data.van != null && data.van!.isNotEmpty) ? data.van![0].name : 'N/A'}",
+          "");
+      printAlignedText(
+          "Salesman: ${(data.user != null && data.user!.isNotEmpty) ? data.user![0].name : 'N/A'}",
+          "");
+      printer.printNewLine();
+
+      printer.paperCut();
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  // 2. ZEBRA (CPCL)
+  // ═══════════════════════════════════════════════════════════════
+ // ═══════════════════════════════════════════════════════════════
+  // 2. ZEBRA (CPCL - Clean Alignment, No Overlap)
+  // ═══════════════════════════════════════════════════════════════
+  Future<void> _printZebra(ReportData data) async {
+    String outstanding = await _getOutstanding(data.customerId);
+    final response = await http.get(Uri.parse(
+        '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
+    if (response.statusCode != 200) return;
+    StoreDetail storeDetail = StoreDetail.fromJson(json.decode(response.body));
+
+    final cpcl = CpclBuilder(kLabelWidthDots);
+
+    // ---- 1. Logo ----
+    if (storeDetail.logos != null && storeDetail.logos!.isNotEmpty) {
+      try {
+        final logoUrl =
+            'https://erpadmin.mobiz.ae/uploads/store/${storeDetail.logos}';
+        final logoResp = await http.get(Uri.parse(logoUrl));
+        if (logoResp.statusCode == 200) {
+          img.Image? original = img.decodeImage(logoResp.bodyBytes);
+          if (original != null) {
+            img.Image resized = img.copyResize(original, width: kLogoWidthPx);
+            final bytesPerRow = (resized.width / 8).ceil();
+            final packed = imageTo1BitCpcl(resized, invert: kInvertLogoBits);
+             cpcl.addLogo(packed, bytesPerRow, resized.height);
+          }
+        }
+      } catch (e) {
+        print('Logo error: $e');
+      }
+    }
+
+    // ---- 2. Company name ----
+    cpcl.centerText(storeDetail.name ?? '', font: 5, lineGap: 34);
+
+    // ---- 3. Arabic company name (as bitmap) ----
+    String companyNameAr = storeDetail.name_ar ?? '';
+    if (companyNameAr.trim().isNotEmpty) {
+      try {
+        final Uint8List arPng =
+            await _arabicTextToImageBytes(companyNameAr, fontSize: 26);
+        img.Image? arImg = img.decodeImage(arPng);
+        if (arImg != null) {
+          final bytesPerRow = (arImg.width / 8).ceil();
+          final packed = imageTo1BitCpcl(arImg);
+          // cpcl.addLogo(packed, bytesPerRow, arImg.height);
+        }
+      } catch (e) {
+        print('Arabic name print error: $e');
+      }
+    }
+
+    if (storeDetail.address != null && storeDetail.address != 'N/A') {
+      cpcl.centerText(storeDetail.address!, font: 4, lineGap: 24);
+    }
+    if (storeDetail.trn != null && storeDetail.trn!.isNotEmpty && storeDetail.trn != 'N/A') {
+      cpcl.centerText('TRN: ${storeDetail.trn}', font: 4, lineGap: 24);
+    }
+    cpcl.hLine();
+    cpcl.centerText('RECEIPT VOUCHER', font: 5, lineGap: 34);
+    cpcl.hLine();
+
+    // ---- 4. Customer info block ----
+    String voucherNo = (data.sales != null && data.sales!.isNotEmpty)
+        ? (data.sales![0].voucherNo ?? 'N/A')
+        : 'N/A';
+    String inDate = (data.sales != null && data.sales!.isNotEmpty)
+        ? DateHelper.displayDate(data.sales![0].inDate)
+        : 'N/A';
+    String inTime = (data.sales != null && data.sales!.isNotEmpty)
+        ? (data.sales![0].inTime ?? '')
+        : '';
+
+    if (data.customer != null && data.customer!.isNotEmpty) {
+      String custName = data.customer![0].name ?? '';
+      List<String> nameParts = _splitText(custName, 36);
+      cpcl.text('Customer: ${nameParts.isNotEmpty ? nameParts[0] : ""}');
+      for (int i = 1; i < nameParts.length; i++) {
+        cpcl.text('          ${nameParts[i]}');
+      }
+    }
+    cpcl.twoColumn("Voucher: $voucherNo", "Date: $inDate");
+    if (inTime.isNotEmpty) {
+      cpcl.twoColumn("", "Time: $inTime");
+    }
+
+    if (data.customer != null && data.customer!.isNotEmpty) {
+      final trn = data.customer![0].trn;
+      if (trn != null && trn.isNotEmpty) {
+        String vatLabel = (data.store != null && data.store!.isNotEmpty)
+            ? (data.store![0].vatLabel ?? 'VAT')
+            : 'VAT';
+        cpcl.text('$vatLabel: $trn');
+      }
+    }
+    cpcl.hLine();
+
+    // ---- 5. Collection info ----
+    if ((data.collectionType ?? '').toLowerCase() == 'cheque') {
+      cpcl.twoColumn("Type: Cheque", "Bank: ${data.bank ?? 'N/A'}");
+      cpcl.twoColumn("Cheque No: ${data.chequeNo ?? 'N/A'}", 
+          "Date: ${data.chequeDate != null ? DateHelper.displayDate(data.chequeDate) : 'N/A'}");
+    } else {
+      cpcl.twoColumn("Type: ${data.collectionType ?? 'Cash'}", "");
+    }
+    cpcl.twoColumn("Amount: ${data.totalAmount ?? '0.00'}", "");
+    cpcl.hLine();
+
+    // ---- 6. Sales table Header (Max 42 characters) ----
+    // Format: Sl (4) | Reference No (16) | Type (12) | Amount (8)
+    cpcl.text("Sl   Reference No     Type           Amount", font: 4, lineGap: 30);
+    cpcl.hLine(thickness: 1);
+
+    String formatInvoiceType(String? t) {
+      if (t == null) return 'N/A';
+      switch (t.toLowerCase()) {
+        case 'salesreturn':
+          return 'Sales Return';
+        case 'payment_voucher':
+        case 'paymentvoucher':
+          return 'Payment';
+        case 'sales':
+          return 'Sales';
+        default:
+          return t.length > 12 ? t.substring(0, 12) : t;
+      }
+    }
+
+    for (int i = 0; i < (data.sales?.length ?? 0); i++) {
+      var sale = data.sales![i];
+      String sno = (i + 1).toString().padRight(4);
+      String ref = (sale.invoiceNo ?? 'N/A').padRight(16);
+      if (ref.length > 16) ref = ref.substring(0, 16);
+      String type = formatInvoiceType(sale.invoiceType).padRight(13);
+      String amt = (sale.amount?.toString() ?? '0.00').padLeft(8);
+
+      cpcl.text('$sno$ref$type$amt', font: 4, lineGap: 28);
+    }
+    cpcl.hLine();
+
+    // ---- 7. Totals ----
+    if (data.roundoff != null && (double.tryParse(data.roundoff!) ?? 0) != 0) {
+      cpcl.twoColumn('',
+          'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(AppState().noOfDecimals ?? 2)}');
+    }
+    cpcl.twoColumn('', 'Total: ${data.totalAmount ?? "0.00"}');
+    cpcl.twoColumn('', 'Total Outstanding: $outstanding');
+    cpcl.feed(10);
+    cpcl.twoColumn(
+        'Van: ${(data.van != null && data.van!.isNotEmpty) ? data.van![0].name : 'N/A'}',
+        'Salesman: ${(data.user != null && data.user!.isNotEmpty) ? data.user![0].name : 'N/A'}');
+    cpcl.feed(40);
+
+    final bytes = cpcl.build();
+    await sendCpcl(printer, bytes);
+  }
+  List<String> _splitText(String text, int width) {
+    List<String> lines = [];
+    while (text.length > width) {
+      lines.add(text.substring(0, width));
+      text = text.substring(width);
+    }
+    lines.add(text);
+    return lines;
+  }
   // Future _getRecentData() async {
   //   RestDatasource api = RestDatasource();
   //   Map<String, dynamic> response = await api.getDetails(

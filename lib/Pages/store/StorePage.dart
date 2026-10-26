@@ -29,7 +29,6 @@ class _TransferOptionsPageState extends State<TransferOptionsPage> {
   bool noData = false;
   String _appVersion = 'Loading...';
 
-
   @override
   void initState() {
     super.initState();
@@ -39,10 +38,14 @@ class _TransferOptionsPageState extends State<TransferOptionsPage> {
 
   Future<void> fetchTransferIcons() async {
     try {
-      final response = await http.get(
-        Uri.parse('http://68.183.92.8:3699/api/store_app_icons_store?store_id=9'),
-      );
-
+      // final response = await http.get(
+      //   Uri.parse(
+      //       'http://68.183.92.8:3699/api/store_app_icons_store?store_id=9'),
+      // );
+final response = await http.get(
+  Uri.parse(
+      'http://68.183.92.8:3699/api/store_app_icons_store?store_id=${AppState().storeId}'),
+);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
 
@@ -58,7 +61,8 @@ class _TransferOptionsPageState extends State<TransferOptionsPage> {
           if (data['success'] is List) {
             appIcons = data['success'];
           } else if (data['success'] is Map) {
-            appIcons = (data['success'] as Map<String, dynamic>).values.toList();
+            appIcons =
+                (data['success'] as Map<String, dynamic>).values.toList();
           } else {
             appIcons = [];
           }
@@ -258,7 +262,7 @@ class _TransferOptionsPageState extends State<TransferOptionsPage> {
         title: RichText(
           text: TextSpan(
             text: 'Hello ',
-           style: AppConfig.pageTitleStyle,
+            style: AppConfig.pageTitleStyle,
             children: <TextSpan>[
               TextSpan(
                 text: '${AppState().name}',
@@ -325,42 +329,42 @@ class _TransferOptionsPageState extends State<TransferOptionsPage> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : noData
-          ? const Center(
-        child: Text(
-          "No data found",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-        ),
-      )
-          : Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate:
-          const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            crossAxisSpacing: 13,
-            childAspectRatio: .95,
-            mainAxisSpacing: 10,
-          ),
-          itemCount: appIcons.length,
-          itemBuilder: (context, index) {
-            final iconData = appIcons[index];
-            final iconList =
-                iconData['icon'] as List<dynamic>? ?? [];
-            final firstIcon = iconList.isNotEmpty ? iconList[0] : null;
-            final iconName = firstIcon?['icon'] as String? ?? '';
-            final name = firstIcon?['name'] as String? ?? 'Unknown';
-            final url = firstIcon?['url'] as String? ?? '';
+              ? const Center(
+                  child: Text(
+                    "No data found",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                )
+              : Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 13,
+                      childAspectRatio: .95,
+                      mainAxisSpacing: 10,
+                    ),
+                    itemCount: appIcons.length,
+                    itemBuilder: (context, index) {
+                      final iconData = appIcons[index];
+                      final iconList = iconData['icon'] as List<dynamic>? ?? [];
+                      final firstIcon =
+                          iconList.isNotEmpty ? iconList[0] : null;
+                      final iconName = firstIcon?['icon'] as String? ?? '';
+                      final name = firstIcon?['name'] as String? ?? 'Unknown';
+                      final url = firstIcon?['url'] as String? ?? '';
 
-            return _iconButtons(
-              title: name,
-              routeName: url,
-              icon: getIconData(iconName)!,
-            );
-          },
-        ),
-      ),
+                      return _iconButtons(
+                        title: name,
+                        routeName: url,
+                        icon: getIconData(iconName)!,
+                      );
+                    },
+                  ),
+                ),
     );
   }
 }

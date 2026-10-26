@@ -69,11 +69,13 @@ class _PickingScannerScreenState extends State<PickingScannerScreen> {
       }
     } catch (e) {
       _showError("Error: $e");
-    } finally {
-      setState(() {
-        isLoading = false;
-        _isFetching = false;
-      });
+ } finally {
+  if (mounted) {
+    setState(() {
+      isLoading = false;
+      _isFetching = false;
+    });
+  }
       // 🔹 Restart the camera feed after every scan (unless popped)
       if (mounted) {
         _cameraController.start();

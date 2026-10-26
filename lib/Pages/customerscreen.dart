@@ -26,20 +26,23 @@ class CustomersDataScreen extends StatefulWidget {
 }
 
 class _CustomersDataScreenState extends State<CustomersDataScreen> {
-  CustomerData customer = CustomerData();
-  bool _initDone = false;
+// AFTER
+CustomerData customer = CustomerData();
+bool _initDone = false;
   bool _nodata = false;
   List<Data> filteredCustomers = [];
   String searchQuery = '';
   bool _isSearching = false;
   bool showFields = false;
 
+  // AFTER
   @override
   void initState() {
     super.initState();
     getCustomerDetails();
     requestLocationPermission();
     fetchStoreDetail().then((storeDetail) {
+      if (!mounted) return;
       if (storeDetail != null && storeDetail.comapny_id == 5) {
         setState(() {
           showFields = true;
@@ -136,18 +139,20 @@ class _CustomersDataScreenState extends State<CustomersDataScreen> {
               size: 30,
               color: AppConfig.backgroundColor,
             ),
-          onPressed: () async {
-  final result = await Navigator.pushNamed(
-    context,
-    CustomerRegistration.routeName,
-    arguments: {
-      'customerList': customer.data ?? CustomersDataScreen.loadedCustomerList,
-    },
-  );
-  if (result == true) {
-    getCustomerDetails(); // 🆕 CHANGED: list fresh ആയി reload ചെയ്യുന്നു
-  }
-},
+            onPressed: () async {
+              final result = await Navigator.pushNamed(
+                context,
+                CustomerRegistration.routeName,
+                arguments: {
+                  'customerList':
+                      customer.data ?? CustomersDataScreen.loadedCustomerList,
+                },
+              );
+     // AFTER
+           if (result == true) {
+  getCustomerDetails();
+}
+            },
           ),
           CommonWidgets.horizontalSpace(3),
         ],
@@ -205,33 +210,7 @@ class _CustomersDataScreenState extends State<CustomersDataScreen> {
       ),
     );
   }
-// 🆕 PUTHIYA METHOD - class-il add cheyyuka
-Future<String> _loadImage(String img) async {
- 
-  final cacheBuster = DateTime.now().millisecondsSinceEpoch;
-  String productUrl = '${RestDatasource().Product_URL}/uploads/customer/$img?v=$cacheBuster';
-  String baseUrl = '${RestDatasource().BASE_URL}/uploads/customer/$img?v=$cacheBuster';
-  
 
-  try {
-    final response = await http
-        .head(Uri.parse(productUrl))
-        .timeout(const Duration(seconds: 5));
-    if (response.statusCode == 200) {
-      return productUrl;
-    }
-  } catch (e) {}
-
-  try {
-    final response = await http
-        .head(Uri.parse(baseUrl))
-        .timeout(const Duration(seconds: 5));
-    if (response.statusCode == 200) {
-      return baseUrl;
-    }
-  } catch (e) {}
-  throw Exception('Image not found');
-}
   Widget _customersCard(Data data) {
     void _openMapScreen() async {
       String coordinates = data.location ?? '';
@@ -261,34 +240,36 @@ Future<String> _loadImage(String img) async {
       );
     }
 
-  return InkWell(
-  onTap: () async {
-    final result = await Navigator.of(context).pushNamed(CustomerDetailsScreen.routeName, arguments: {
-      'name': data.name!,
-      'address': data.address,
-      'phone': data.contactNumber,
-      'mail': data.email,
-      'location': data.location,
-      'cust_image': data.img,
-      'customerType': '',
-      'days': data.creditDays,
-      'creditLimit': data.creditLimit,
-      'paymentTerms': data.paymentTerms,
-      'provinceId': data.provinceId,
-      'routeId': data.routeId,
-      'price_group_id': data.pricegroupId,
-      'trn': data.trn,
-      'whatsappNumber': data.whatsappNumber,
-      'code': data.code,
-      'balance': '',
-      'total': '',
-      'id': data.id,
-    });
-    if (result == true) {
-      getCustomerDetails(); // 🆕 list fresh ആയി reload ചെയ്യുന്നു
-    }
-  },
-  child: Card(
+    return InkWell(
+      onTap: () async {
+        final result = await Navigator.of(context)
+            .pushNamed(CustomerDetailsScreen.routeName, arguments: {
+          'name': data.name!,
+          'address': data.address,
+          'phone': data.contactNumber,
+          'mail': data.email,
+          'location': data.location,
+          'cust_image': data.img,
+          'customerType': '',
+          'days': data.creditDays,
+          'creditLimit': data.creditLimit,
+          'paymentTerms': data.paymentTerms,
+          'provinceId': data.provinceId,
+          'routeId': data.routeId,
+          'price_group_id': data.pricegroupId,
+          'trn': data.trn,
+          'whatsappNumber': data.whatsappNumber,
+          'code': data.code,
+          'balance': '',
+          'total': '',
+          'id': data.id,
+        });
+   // AFTER
+     if (result == true) {
+  getCustomerDetails();
+}
+      },
+      child: Card(
         elevation: 3,
         margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 0),
         child: Container(
@@ -301,34 +282,31 @@ Future<String> _loadImage(String img) async {
             padding: const EdgeInsets.all(5.0),
             child: Row(
               children: [
-               SizedBox(
-  width: 50,
-  height: 50,
-  child: ClipRRect(
-    borderRadius: BorderRadius.circular(15.0),
-  child: (data.img != null && data.img!.isNotEmpty)
-    ? FutureBuilder<String>(
-        future: _loadImage(data.img!),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-          } else if (snapshot.hasError || !snapshot.hasData) {
-            return Image.asset('Assets/Images/no_image.jpg', fit: BoxFit.cover);
-          } else {
+                SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(15.0),
+         // AFTER
+                child: (data.img != null && data.img!.isNotEmpty)
+    ? Image.network(
+        '${RestDatasource().Product_URL}/uploads/customer/${data.img}',
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.high,
+        errorBuilder: (context, error, stackTrace) {
           return Image.network(
-  snapshot.data!,
-  fit: BoxFit.cover,
-  filterQuality: FilterQuality.high,
-  errorBuilder: (context, error, stackTrace) {
-    return Image.asset('Assets/Images/no_image.jpg', fit: BoxFit.cover);
-  },
-);
-          }
+            '${RestDatasource().BASE_URL}/uploads/customer/${data.img}',
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.high,
+            errorBuilder: (context, error, stackTrace) {
+              return Image.asset('Assets/Images/no_image.jpg', fit: BoxFit.cover);
+            },
+          );
         },
       )
     : Image.asset('Assets/Images/no_image.jpg', fit: BoxFit.cover),
-  ),
-),
+                  ),
+                ),
                 CommonWidgets.horizontalSpace(3),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -351,7 +329,8 @@ Future<String> _loadImage(String img) async {
                             width: SizeConfig.blockSizeHorizontal * 60,
                             child: Text(
                               'Address:${data.address ?? ''}',
-                              style: TextStyle(fontSize: AppConfig.textCaption3Size),
+                              style: TextStyle(
+                                  fontSize: AppConfig.textCaption3Size),
                             ),
                           ),
                           const Spacer(),
@@ -378,14 +357,16 @@ Future<String> _loadImage(String img) async {
                             width: SizeConfig.blockSizeHorizontal * 72,
                             child: Text(
                               'Building: ${data.building ?? 'N/A'}',
-                              style: TextStyle(fontSize: AppConfig.textCaption3Size),
+                              style: TextStyle(
+                                  fontSize: AppConfig.textCaption3Size),
                             ),
                           ),
                           SizedBox(
                             width: SizeConfig.blockSizeHorizontal * 72,
                             child: Text(
                               'Flat Number: ${data.flatNo ?? 'N/A'}',
-                              style: TextStyle(fontSize: AppConfig.textCaption3Size),
+                              style: TextStyle(
+                                  fontSize: AppConfig.textCaption3Size),
                             ),
                           ),
                         ],
@@ -402,7 +383,8 @@ Future<String> _loadImage(String img) async {
   }
 
   Future<StoreDetail?> fetchStoreDetail() async {
-    final url = Uri.parse('${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}');
+    final url = Uri.parse(
+        '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}');
 
     try {
       final response = await http.get(url);
@@ -429,27 +411,48 @@ Future<String> _loadImage(String img) async {
     }
   }
 
+// AFTER
   Future<void> getCustomerDetails() async {
-    RestDatasource api = RestDatasource();
+    try {
+      RestDatasource api = RestDatasource();
 
-    dynamic resJson = await api.getDetails(
-        '/api/get_customer?store_id=${AppState().storeId}&route_id=${AppState().routeId}',
-        AppState().token);
-    print('Cust $resJson');
-    if (resJson['data'] != null && resJson['data'].length > 0) {
-      customer = CustomerData.fromJson(resJson);
-      CustomersDataScreen.loadedCustomerList = customer.data ?? [];
+      dynamic resJson = await api.getDetails(
+          '/api/get_customer?store_id=${AppState().storeId}&route_id=${AppState().routeId}',
+          AppState().token);
+      print('Cust $resJson');
 
-      setState(() {
+      if (resJson != null &&
+          resJson['data'] != null &&
+          resJson['data'].length > 0) {
         customer = CustomerData.fromJson(resJson);
-        filteredCustomers = customer.data!;
-        _initDone = true;
-      });
-    } else {
-      setState(() {
-        _nodata = true;
-        _initDone = true;
-      });
+        CustomersDataScreen.loadedCustomerList = customer.data ?? [];
+
+        if (mounted) {
+          setState(() {
+            filteredCustomers = customer.data!;
+            _nodata = false;
+            _initDone = true;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _nodata = true;
+            _initDone = true;
+          });
+        }
+      }
+    } catch (e) {
+      print('Cust Error: $e');
+      // Network/server failure — stop the shimmer from being stuck
+      // forever; show "No Data" instead so the user isn't left staring
+      // at a permanent loading state.
+      if (mounted) {
+        setState(() {
+          _nodata = true;
+          _initDone = true;
+        });
+      }
     }
   }
 }

@@ -26,6 +26,8 @@ import 'package:mobizapp/Pages/newvanstockrequests.dart';
 import 'package:mobizapp/Pages/van_transfer.dart';
 import 'package:mobizapp/Pages/vanstockdata.dart';
 import 'package:mobizapp/Pages/vanstockrequest.dart';
+import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+import 'package:mobizapp/Utilities/cpcl_helper.dart';
 import 'package:mobizapp/Utilities/rest_ds.dart';
 import 'package:mobizapp/Utilities/sharepref.dart';
 import 'package:mobizapp/confg/appconfig.dart';
@@ -46,7 +48,11 @@ import '../Models/userDetails.dart';
 import '../selectproduct.dart';
 import 'Customer Dues/Customer Dues.dart';
 import 'Picking/pickingList.dart';
+import 'Picking/pickingList.dart';
 import 'Production/ProductionOrder.dart';
+// import 'Picking/pickingList.dart';
+// import 'Picking/AddPicking.dart'; // TEMP
+// import 'Production/ProductionOrder.dart';
 import 'Quotation/QuotationHome.dart';
 import 'Stock/StockTransfer_Page.dart';
 import 'TestExpensePage.dart';
@@ -78,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // NEW: lets us open the drawer via the custom menu icon now that there's
   // no AppBar auto-generating one.
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-
+ final BlueThermalPrinter _testPrinter = BlueThermalPrinter.instance;
   List<Map<String, dynamic>> savedCartItems = [];
   bool _restrict = false;
   bool isLoading = true;
@@ -127,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.clear();
   }
 
-  @override
+   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -139,6 +145,18 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     print("Validate qty${AppState().validate_qtySales}");
     print("Validate salesoo${AppState().validate_qtySO}");
+    _restoreTaxName();
+  }
+
+  Future<void> _restoreTaxName() async {
+    if ((AppState().taxName ?? '').trim().isNotEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('tax_name');
+    if (saved != null && saved.trim().isNotEmpty) {
+      AppState().taxName = saved.trim();
+      if (mounted) setState(() {});
+    }
+    print('TAX NAME AT HOME: ${AppState().taxName}');
   }
 
   Map<String, double> dataMap = {};
@@ -351,8 +369,10 @@ class _HomeScreenState extends State<HomeScreen> {
         return Icons.transfer_within_a_station;
       case 'production_quantity_limits_outlined':
         return Icons.production_quantity_limits_outlined;
-      case 'quora':
+       case 'quora':
         return Icons.quora;
+      case 'request_quote':
+        return Icons.request_quote;
       default:
         return Icons.help;
     }
@@ -364,15 +384,13 @@ class _HomeScreenState extends State<HomeScreen> {
     Colors.white,
   ];
 
- @override
-Widget build(BuildContext context) {
-  final bool isTablet =
-      MediaQuery.of(context).size.shortestSide >= 600;
+  @override
+  Widget build(BuildContext context) {
+    final bool isTablet = MediaQuery.of(context).size.shortestSide >= 600;
 
-  String currentDate =
-      DateFormat('dd-MMM-yyyy').format(DateTime.now());
+    String currentDate = DateFormat('dd-MMM-yyyy').format(DateTime.now());
 
-  return AnnotatedRegion<SystemUiOverlayStyle>(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
@@ -423,9 +441,27 @@ Widget build(BuildContext context) {
                             ));
                       },
                     ),
+                                                 //               ListTile(
+                    //   leading: Icon(Icons.inventory),
+                    //   title: const Text('Picking Add (TEST)'),
+                    //   onTap: () {
+                    //     Navigator.push(
+                    //       context,
+                    //       MaterialPageRoute(
+                    //         builder: (_) => const PickingAddPage(
+                    //           picklistId: 0,
+                    //           picklistDetailIds: [],
+                    //         ),
+                    //       ),
+                    //     );
+                    //   },
+                    // ),
+                    // ListTile(
+                    //   leading: Icon(Icons.logout),
+                    //   title: Text('Log Out'),
                     ListTile(
-                      leading: Icon(Icons.logout),
-                      title: Text('Log Out'),
+  leading: Icon(Icons.logout),
+  title: Text('Log Out'),
                       onTap: () {
                         conformation(context);
                         clearSharedPreferences();
@@ -438,80 +474,78 @@ Widget build(BuildContext context) {
               ),
             ),
           ),
-   body: Column(
-  children: [
-    isLoading
-        ? const SizedBox.shrink()
-        : storeDetail == null
-            ? const Center(
-                child: Text("No data found"),
-              )
-            : _buildDashboardHeader(),
+          body: Column(
+            children: [
+              isLoading
+                  ? const SizedBox.shrink()
+                  : storeDetail == null
+                      ? const Center(
+                          child: Text("No data found"),
+                        )
+                      : _buildDashboardHeader(),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    14,
+                    0,
+                    14,
+                    isTablet ? 10 : 18,
+                  ),
+                  child: appIcons.isNotEmpty
+                      ? PageView.builder(
+                          itemCount: paginatedIcons.length,
+                          itemBuilder: (context, pageIndex) {
+                            final pageData = paginatedIcons[pageIndex];
 
- Expanded(
-  child: Padding(
-    padding: EdgeInsets.fromLTRB(
-      14,
-      0,
-      14,
-      isTablet ? 10 : 18,
-    ),
-    child: appIcons.isNotEmpty
-        ? PageView.builder(
-            itemCount: paginatedIcons.length,
-            itemBuilder: (context, pageIndex) {
-              final pageData = paginatedIcons[pageIndex];
+                            return GridView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.only(bottom: 10),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 4,
+                                crossAxisSpacing: 12,
 
-              return GridView.builder(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.only(bottom: 10),
-                gridDelegate:
-                    SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 12,
+                                // Phone = old layout
+                                // Tablet = slightly smaller rows so all 16 can fit,
+                                // and the page can still scroll if needed.
+                                mainAxisSpacing: isTablet ? 8 : 14,
 
-                  // Phone = old layout
-                  // Tablet = slightly smaller rows so all 16 can fit,
-                  // and the page can still scroll if needed.
-                  mainAxisSpacing: isTablet ? 8 : 14,
+                                childAspectRatio: isTablet ? 1.45 : 0.8,
+                              ),
+                              itemCount: pageData.length,
+                              itemBuilder: (context, index) {
+                                final iconData = pageData[index];
 
-                 childAspectRatio: isTablet ? 1.45 : 0.8,
+                                final iconList =
+                                    iconData['icon'] as List<dynamic>?;
+
+                                final firstIconObject =
+                                    iconList != null && iconList.isNotEmpty
+                                        ? iconList[0]
+                                        : null;
+
+                                final iconName =
+                                    firstIconObject?['icon'] as String?;
+
+                                final name =
+                                    firstIconObject?['name'] as String?;
+
+                                final url = firstIconObject?['url'] as String?;
+
+                                return _iconButtons(
+                                  title: name ?? 'Unknown',
+                                  routeName: url ?? '',
+                                  icon: getIconData(iconName),
+                                );
+                              },
+                            );
+                          },
+                        )
+                      : const SizedBox.shrink(),
                 ),
-                itemCount: pageData.length,
-                itemBuilder: (context, index) {
-                  final iconData = pageData[index];
-
-                  final iconList =
-                      iconData['icon'] as List<dynamic>?;
-
-                  final firstIconObject =
-                      iconList != null && iconList.isNotEmpty
-                          ? iconList[0]
-                          : null;
-
-                  final iconName =
-                      firstIconObject?['icon'] as String?;
-
-                  final name =
-                      firstIconObject?['name'] as String?;
-
-                  final url =
-                      firstIconObject?['url'] as String?;
-
-                  return _iconButtons(
-                    title: name ?? 'Unknown',
-                    routeName: url ?? '',
-                    icon: getIconData(iconName),
-                  );
-                },
-              );
-            },
-          )
-        : const SizedBox.shrink(),
-  ),
-),
-  ],
-),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -551,80 +585,129 @@ Widget build(BuildContext context) {
                   onTap: () => _scaffoldKey.currentState?.openDrawer(),
                   child: const Icon(Icons.menu, color: Colors.white, size: 26),
                 ),
+                // Expanded(
+                //   child: Padding(
+                //     padding: const EdgeInsets.symmetric(horizontal: 12),
+                //     child: LayoutBuilder(
+                //       builder: (context, constraints) {
+                //         final companyName = storeDetail?.name ?? 'Mobiz';
+
+                //         double titleSize;
+
+                //         if (companyName.length <= 20) {
+                //           titleSize = 24;
+                //         } else if (companyName.length <= 35) {
+                //           titleSize = 21;
+                //         } else if (companyName.length <= 50) {
+                //           titleSize = 18;
+                //         } else {
+                //           titleSize = 16;
+                //         }
+
+                //         return Text(
+                //           companyName,
+                //           maxLines: 3,
+                //           softWrap: true,
+                //           textAlign: TextAlign.left,
+                //           style: AppConfig.pageTitleStyle.copyWith(
+                //             color: Colors.white,
+                //             fontSize: titleSize,
+                //             height: 1.15,
+                //             fontWeight: FontWeight.w400,
+                //           ),
+                //         );
+                //       },
+                //     ),
+                //   ),
+                // ),
+                // InkWell(
+                //   onTap: () {
+                //     Navigator.pushNamed(context, NotificationPage.routeName);
+                //   },
+                //   child: Stack(
                 Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final companyName = storeDetail?.name ?? 'Mobiz';
+  child: Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final companyName = storeDetail?.name ?? 'Mobiz';
 
-                        double titleSize;
+        double titleSize;
 
-                        if (companyName.length <= 20) {
-                          titleSize = 24;
-                        } else if (companyName.length <= 35) {
-                          titleSize = 21;
-                        } else if (companyName.length <= 50) {
-                          titleSize = 18;
-                        } else {
-                          titleSize = 16;
-                        }
+        if (companyName.length <= 20) {
+          titleSize = 24;
+        } else if (companyName.length <= 35) {
+          titleSize = 21;
+        } else if (companyName.length <= 50) {
+          titleSize = 18;
+        } else {
+          titleSize = 16;
+        }
 
-                        return Text(
-                          companyName,
-                          maxLines: 3,
-                          softWrap: true,
-                          textAlign: TextAlign.left,
-                          style: AppConfig.pageTitleStyle.copyWith(
-                            color: Colors.white,
-                            fontSize: titleSize,
-                            height: 1.15,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                InkWell(
-                  onTap: () {
-                    Navigator.pushNamed(context, NotificationPage.routeName);
-                  },
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      const Icon(Icons.notifications,
-                          color: Colors.white, size: 24),
-                      if (notificationCount > 0)
-                        Positioned(
-                          right: -4,
-                          top: -3,
-                          child: Container(
-                            padding: const EdgeInsets.all(3),
-                            constraints: const BoxConstraints(
-                                minWidth: 15, minHeight: 15),
-                            decoration: const BoxDecoration(
-                              color: Colors.redAccent,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              notificationCount > 9
-                                  ? '9+'
-                                  : '$notificationCount',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
+                return Text(
+          companyName,
+          maxLines: 3,
+          softWrap: true,
+          textAlign: TextAlign.left,
+          style: AppConfig.pageTitleStyle.copyWith(
+            color: Colors.white,
+            fontSize: titleSize,
+            height: 1.15,
+            fontWeight: FontWeight.w400,
+          ),
+        );
+      },
+    ),
+  ),
+),
+
+// ── NEW: Zebra test print icon ──
+InkWell(
+  onTap: _runZebraTestPrint,
+  child: const Padding(
+    padding: EdgeInsets.symmetric(horizontal: 10),
+    child: Icon(Icons.print, color: Colors.white, size: 24),
+  ),
+),
+
+Stack(
+  clipBehavior: Clip.none,
+  children: [
+    const Icon(
+      Icons.notifications,
+      color: Colors.white,
+      size: 24,
+    ),
+    if (notificationCount > 0)
+      Positioned(
+        right: -4,
+        top: -3,
+        child: Container(
+          padding: const EdgeInsets.all(3),
+          constraints: const BoxConstraints(
+            minWidth: 15,
+            minHeight: 15,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.redAccent,
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            notificationCount > 9
+                ? '9+'
+                : '$notificationCount',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
             ),
+          ),
+        ),
+      ),
+  ],
+),
+             ]   ),
             const SizedBox(height: 18),
             Text(
               'Hello, ${AppState().name}',
@@ -821,55 +904,56 @@ Widget build(BuildContext context) {
   // NEW: `amount` is the plain number (e.g. "3,922.00") — "AED" is rendered
   // smaller/lighter in front of it so the value never gets cramped or
   // truncated inside the card.
- Widget _summaryTile({
-  required IconData icon,
-  required String label,
-  required String amount,
-}) {
-  return Row(                               // ✅ Expanded ഒഴിവാക്കി, Row മാത്രം
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        width: 40,
-        height: 40,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          color: _brandColor,
+  Widget _summaryTile({
+    required IconData icon,
+    required String label,
+    required String amount,
+  }) {
+    return Row(
+    
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: _brandColor,
+          ),
+          child: Icon(icon, color: Colors.white, size: 20),
         ),
-        child: Icon(icon, color: Colors.white, size: 20),
-      ),
-      const SizedBox(width: 8),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '$label (AED)',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 3),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                amount,
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$label (AED)',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
                 maxLines: 1,
-                style: const TextStyle(
-                  color: _darkText,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 3),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  amount,
+                  maxLines: 1,
+                  style: const TextStyle(
+                    color: _darkText,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    ],
-  );                                        // ✅ Row-ന്റെ closing bracket മാത്രം
-}
+      ],
+    );
+  }
 
   // ── NEW: light rounded card with a soft-purple circular icon, same tap logic as before ──
   Widget _iconButtons({
@@ -963,8 +1047,16 @@ Widget build(BuildContext context) {
             case 'VantransferOption':
               Navigator.pushNamed(context, VantransferOption.routeName);
               break;
-            case 'HomeorderScreen':
+              case 'HomeorderScreen':
               Navigator.pushNamed(context, HomeorderScreen.routeName);
+              break;
+            case 'ProformaOrderList':
+              Navigator.pushNamed(context, HomeorderScreen.routeName,
+                  arguments: {'listType': 'proforma'});
+              break;
+            case 'MerchandiseOrderList':
+              Navigator.pushNamed(context, HomeorderScreen.routeName,
+                  arguments: {'listType': 'merchandise'});
               break;
             case 'QuotationHome':
               Navigator.pushNamed(context, QuotationHome.routeName);
@@ -1155,7 +1247,74 @@ Widget build(BuildContext context) {
       }
     }
   }
+Future<void> _runZebraTestPrint() async {
+    try {
+      List<BluetoothDevice> devices = await _testPrinter.getBondedDevices();
+      if (!mounted) return;
+      if (devices.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No paired Bluetooth printers found')),
+        );
+        return;
+      }
 
+      // Pick printer
+      final BluetoothDevice? picked = await showDialog<BluetoothDevice>(
+        context: context,
+        builder: (_) => SimpleDialog(
+          title: const Text('Select Zebra Printer to test'),
+          children: devices.map((d) {
+            return SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, d),
+              child: Text('${d.name ?? "Unknown"} (${d.address})'),
+            );
+          }).toList(),
+        ),
+      );
+      if (picked == null) return;
+
+      // Connect if not already connected
+      bool? already = await _testPrinter.isConnected;
+      if (already != true) {
+        await _testPrinter.connect(picked);
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      // ✅ CRITICAL: Save this device as ZEBRA so all other 9 screens know it's Zebra!
+      // if (picked.address != null) {
+      //   await savePrinterTypeForDevice(picked.address!, true);
+      //   final prefs = await SharedPreferences.getInstance();
+      //   await prefs.setString('selected_device_address', picked.address!);
+      // }
+
+      final cpcl = CpclBuilder(kLabelWidthDots);
+
+      cpcl.boldText('ZEBRA TEST PRINT', font: 5, lineGap: 36);
+      cpcl.hLine();
+      cpcl.text('Device: ${picked.name ?? "Unknown"}', font: 4, lineGap: 30);
+      cpcl.text('Address: ${picked.address}', font: 4, lineGap: 30);
+      cpcl.text('Time: ${DateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.now())}', font: 4, lineGap: 30);
+      cpcl.hLine();
+      cpcl.text('CPCL Mode is working cleanly!', font: 4, lineGap: 30);
+      cpcl.text('Ready for Sales & Invoice Prints.', font: 4, lineGap: 30);
+      cpcl.hLine();
+      cpcl.feed(40);
+
+      final bytes = cpcl.build();
+      // Send using sendCpcl to prevent Bluetooth buffer choke
+      await sendCpcl(_testPrinter, bytes);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✓ Test print sent successfully!')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Test print failed: $e')),
+      );
+    }
+  }
   Future<bool> _onWillPop() async {
     return (await showDialog(
           context: context,

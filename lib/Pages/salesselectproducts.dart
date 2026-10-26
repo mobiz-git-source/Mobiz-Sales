@@ -343,7 +343,12 @@ class _SalesSelectProductsScreenState extends State<SalesSelectProductsScreen> {
     );
   }
 
-  void showProductDetailsDialog(BuildContext context, Products product) async {
+void showProductDetailsDialog(BuildContext context, Products product) async {
+    // Outer (screen) context — used to show the SnackBar AFTER the dialog
+    // closes, so the alert is fully visible instead of hidden behind the
+    // modal dialog.
+    final BuildContext screenContext = context;
+
     List<TextEditingController> serialTextControllers = [];
     final response = await http.get(Uri.parse(
         '${RestDatasource().BASE_URL}/api/get_product_with_units_by_products?store_id=${AppState().storeId}&van_id=${AppState().vanId}&id=${product.id}&customer_id=$id'));
@@ -362,6 +367,28 @@ final List<dynamic> units = rawData is List
         ? rawData.values.toList()
         : [];
 final lastsale = data['lastsale'];
+
+    // ---- Already-in-cart quantity (for this product), per unit ----
+    final prefsForStock = await SharedPreferences.getInstance();
+    final List<String> cartItemsForStock =
+        prefsForStock.getStringList('selected_products') ?? [];
+    double alreadyInCartQtyForUnit(String? unitId) {
+      double total = 0.0;
+      for (var item in cartItemsForStock) {
+        try {
+          final decoded = jsonDecode(item);
+          if (decoded['id'].toString() == product.id.toString() &&
+              decoded['unit_id'].toString() == (unitId ?? '')) {
+            total +=
+                double.tryParse(decoded['quantity']?.toString() ?? '0') ??
+                    0.0;
+          }
+        } catch (_) {}
+      }
+      return total;
+    }
+    // ---- end already-in-cart helper ----
+
 final typeData = jsonDecode(typeResponse.body);
 final rawTypeData = typeData['data'];
 final List<dynamic> productTypes = rawTypeData is List
@@ -391,8 +418,10 @@ if (units.isNotEmpty) {
   selectedUnitId = units[0]['id'].toString();
   selectedUnit = units[0];
   amountController.text = formatRate(selectedUnit?['price']);
-  availableStock =
-      double.tryParse(selectedUnit?['stock']?.toString() ?? '0');
+  final double _rawStock0 =
+      double.tryParse(selectedUnit?['stock']?.toString() ?? '0') ?? 0.0;
+  final double _inCart0 = alreadyInCartQtyForUnit(selectedUnitId);
+  availableStock = (_rawStock0 - _inCart0) < 0 ? 0 : (_rawStock0 - _inCart0);
   rateMatrix = parseRateMatrix(selectedUnit?['minimum_rate_matrix']);
 }
       bool isQuantityValid(String? value) {
@@ -672,9 +701,9 @@ Map<String, double>? matchedSlab;
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 1),
+                                                                      const SizedBox(height: 1),
                                     Text(
-                                      '${selectedUnit!['stock'] ?? '0'}',
+                                      '${(availableStock ?? 0) % 1 == 0 ? (availableStock ?? 0).toInt().toString() : (availableStock ?? 0).toString()}',
                                       style: const TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
@@ -1169,7 +1198,7 @@ Container(
                                                 child: Text(unit['name']),
                                               );
                                             }).toList(),
-                                            onChanged: (value) {
+                                                                        onChanged: (value) {
                                               setDialogState(() {
                                                 selectedUnitId = value;
                                                 selectedUnit = units.firstWhere(
@@ -1182,12 +1211,19 @@ Container(
                                                     formatRate(
                                                         selectedUnit?[
                                                             'price']);
-                                                availableStock =
+                                                final double _rawStock =
                                                     double.tryParse(
                                                   selectedUnit?['stock']
                                                           ?.toString() ??
                                                       '0',
-                                                );
+                                                ) ?? 0.0;
+                                                final double _inCart =
+                                                    alreadyInCartQtyForUnit(
+                                                        selectedUnitId);
+                                                availableStock =
+                                                    (_rawStock - _inCart) < 0
+                                                        ? 0
+                                                        : (_rawStock - _inCart);
                                                 rateMatrix = parseRateMatrix(
                                                   selectedUnit?[
                                                       'minimum_rate_matrix'],
@@ -1500,7 +1536,7 @@ if (!isFOC &&
                                         vertical: 11),
                                     elevation: 0,
                                   ),
-                                  onPressed: canSave
+                                                                   onPressed: canSave
                                       ? () async {
                                           final prefs = await SharedPreferences
                                               .getInstance();
@@ -1508,6 +1544,45 @@ if (!isFOC &&
                                               prefs.getStringList(
                                                   'selected_products');
                                           selectedProducts ??= [];
+
+                                          // ---- Duplicate check (Safest Version) ----
+                                          bool alreadyExists = false;
+                                          try {
+                                            alreadyExists =
+                                                selectedProducts.any((item) {
+                                              final decoded =
+                                                  jsonDecode(item);
+                                              return decoded['id']
+                                                          .toString() ==
+                                                      product.id.toString() &&
+                                                  decoded['unit_id']
+                                                          .toString() ==
+                                                      selectedUnitId
+                                                          .toString();
+                                            });
+                                          } catch (e) {
+                                            alreadyExists = false;
+                                          }
+
+                                          if (alreadyExists) {
+                                            Navigator.of(context)
+                                                .pop(); // close the product dialog first
+                                            if (screenContext.mounted) {
+                                              ScaffoldMessenger.of(
+                                                      screenContext)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                      'This product is already in the cart. Please edit it from the cart.'),
+                                                  backgroundColor:
+                                                      Colors.orange,
+                                                ),
+                                              );
+                                            }
+                                            return;
+                                          }
+                                          // ---- end duplicate check ----
+
                                           final serialNumber = DateTime.now()
                                                   .millisecondsSinceEpoch
                                                   .toString() +

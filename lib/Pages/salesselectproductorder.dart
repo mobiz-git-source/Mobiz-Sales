@@ -442,7 +442,12 @@ class _SalesSelectProductsorderScreenState
     );
   }
 
-  void showProductDetailsDialog(BuildContext context, Products product) async {
+ void showProductDetailsDialog(BuildContext context, Products product) async {
+    // Outer (screen) context — used to show the SnackBar AFTER the dialog
+    // closes, so the alert is fully visible instead of hidden behind the
+    // modal dialog.
+    final BuildContext screenContext = context;
+
     // int? id;
     final String url =
         '${RestDatasource().BASE_URL}/api/get_product_with_units_for_order?store_id=${AppState().storeId}&van_id=${AppState().vanId}&id=${product.id}&customer_id=$id';
@@ -455,6 +460,28 @@ class _SalesSelectProductsorderScreenState
       final data = jsonDecode(response.body);
       final units = data['data'] as List?;
       final lastsale = data['lastsale'];
+
+      // ---- Already-in-cart quantity (for this product), per unit ----
+      final prefsForStock = await SharedPreferences.getInstance();
+      final List<String> cartItemsForStock =
+          prefsForStock.getStringList('selected_products') ?? [];
+      double alreadyInCartQtyForUnit(String? unitId) {
+        double total = 0.0;
+        for (var item in cartItemsForStock) {
+          try {
+            final decoded = jsonDecode(item);
+            if (decoded['id'].toString() == product.id.toString() &&
+                decoded['unit_id'].toString() == (unitId ?? '')) {
+              total +=
+                  double.tryParse(decoded['quantity']?.toString() ?? '0') ??
+                      0.0;
+            }
+          } catch (_) {}
+        }
+        return total;
+      }
+      // ---- end already-in-cart helper ----
+double roundQty(double v) => double.parse(v.toStringAsFixed(3));
       final typeData = jsonDecode(typeResponse.body);
       final productTypes = typeData['data'] as List;
 
@@ -471,12 +498,16 @@ class _SalesSelectProductsorderScreenState
 
       final amountController = TextEditingController();
       final descriptionController = TextEditingController();
-      if (units != null && units.any((unit) => unit != null)) {
+          if (units != null && units.any((unit) => unit != null)) {
         selectedUnitId = units[0]['id'].toString();
         selectedUnit = units[0];
         amountController.text = selectedUnit?['price']?.toString() ?? '';
-        availableStock =
-            double.tryParse(selectedUnit?['stock']?.toString() ?? '0');
+        final double _rawStock0 =
+            double.tryParse(selectedUnit?['stock']?.toString() ?? '0') ??
+                0.0;
+         final double _inCart0 = alreadyInCartQtyForUnit(selectedUnitId);
+        final double _remaining0 = _rawStock0 - _inCart0;
+        availableStock = _remaining0 < 0 ? 0 : roundQty(_remaining0);
       }
       bool isQuantityValid(String? value) {
         final quantityValue = double.tryParse(value ?? '') ?? 0;
@@ -488,16 +519,26 @@ class _SalesSelectProductsorderScreenState
             : quantityValue > 0;
       }
 
-      bool isAmountValid() {
-        // ✅ ADDED
-        final enteredAmount = // ✅ ADDED
-            double.tryParse(amountController.text.trim()) ?? 0; // ✅ ADDED
-        final minPrice = double.tryParse(// ✅ ADDED
-                selectedUnit?['min_price']?.toString() ?? '0') ?? // ✅ ADDED
-            0; // ✅ ADDED
-        return minPrice == 0 || enteredAmount >= minPrice; // ✅ ADDED
-      } // ✅ ADDED
+ 
+bool isFocSelected() {
+  try {
+    final t = productTypes.firstWhere(
+      (t) => t['id'].toString() == selectedProductTypeId,
+      orElse: () => null,
+    );
+    return t != null && t['is_foc'].toString() == '1';
+  } catch (_) {
+    return false;
+  }
+}
 
+bool isAmountValid() {
+  if (isFocSelected()) return true; // is_foc = 1 aanenkil 0 allow
+  final enteredAmount = double.tryParse(amountController.text.trim()) ?? 0;
+  final minPrice =
+      double.tryParse(selectedUnit?['min_price']?.toString() ?? '0') ?? 0;
+  return minPrice == 0 || enteredAmount >= minPrice;
+}
       if (ModalRoute.of(context)!.settings.arguments != null) {
         final Map<String, dynamic>? params =
             ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
@@ -591,9 +632,9 @@ class _SalesSelectProductsorderScreenState
                         // AVAILABLE QTY
                         // =========================================================
 
-                        if (selectedUnit != null) ...[
+                                             if (selectedUnit != null) ...[
                           Text(
-                            'Available Qty: ${selectedUnit!['stock']}',
+                            'Available Qty: ${(availableStock ?? 0) % 1 == 0 ? (availableStock ?? 0).toInt().toString() : (availableStock ?? 0).toString()}',
                             style: const TextStyle(
                               fontSize: AppFontSizes.dialogHighlight,
                               fontWeight: FontWeight.w700,
@@ -780,11 +821,21 @@ class _SalesSelectProductsorderScreenState
                                                         ?.toString() ??
                                                     '';
 
-                                            availableStock = double.tryParse(
+                                            final double _rawStock =
+                                                double.tryParse(
                                               selectedUnit?['stock']
                                                       ?.toString() ??
                                                   '0',
-                                            );
+                                            ) ??
+                                                0.0;
+                                                                                final double _inCart =
+                                                alreadyInCartQtyForUnit(
+                                                    selectedUnitId);
+                                            final double _remaining =
+                                                _rawStock - _inCart;
+                                            availableStock = _remaining < 0
+                                                ? 0
+                                                : roundQty(_remaining);
                                           });
                                         },
                                       ),
@@ -1069,29 +1120,73 @@ class _SalesSelectProductsorderScreenState
                                     vertical: 14,
                                   ),
                                 ),
-                                onPressed: isQuantityValid(quantity) &&
+                                                             onPressed: isQuantityValid(quantity) &&
                                         isAmountValid()
                                     ? () async {
-                                        final newProduct = {
-                                          'id': product.id,
-                                          'serial_number': DateTime.now()
-                                              .millisecondsSinceEpoch
-                                              .toString(),
-                                          'code': product.code,
-                                          'name': product.name,
-                                          'unit_id': selectedUnitId,
-                                          'unit_name': selectedUnit?['name'],
-                                          'type_id': selectedProductTypeId,
-                                          'type_name': productTypes.firstWhere(
-                                            (type) =>
-                                                type['id'].toString() ==
-                                                selectedProductTypeId,
-                                          )['name'],
-                                          'quantity': quantity,
-                                          'amount': amountController.text,
-                                          'description':
-                                              descriptionController.text,
-                                        };
+                                        final prefsCheck =
+                                            await SharedPreferences
+                                                .getInstance();
+                                        final existingCheckList =
+                                            prefsCheck.getStringList(
+                                                    'selected_products') ??
+                                                [];
+
+                                        // ---- Duplicate check (Safest Version) ----
+                                        bool alreadyExists = false;
+                                        try {
+                                          alreadyExists =
+                                              existingCheckList.any((item) {
+                                            final decoded = jsonDecode(item);
+                                            return decoded['id'].toString() ==
+                                                    product.id.toString() &&
+                                                decoded['unit_id']
+                                                        .toString() ==
+                                                    selectedUnitId.toString();
+                                          });
+                                        } catch (e) {
+                                          alreadyExists = false;
+                                        }
+
+                                        if (alreadyExists) {
+                                          Navigator.of(context)
+                                              .pop(); // close the product dialog first
+                                          if (screenContext.mounted) {
+                                            ScaffoldMessenger.of(
+                                                    screenContext)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                    'This product is already in the cart. Please edit it from the cart.'),
+                                                backgroundColor:
+                                                    Colors.orange,
+                                              ),
+                                            );
+                                          }
+                                          return;
+                                        }
+                                        // ---- end duplicate check ----
+
+                                      final newProduct = {
+  'id': product.id,
+  'serial_number': DateTime.now()
+      .millisecondsSinceEpoch
+      .toString(),
+  'code': product.code,
+  'name': product.name,
+  'unit_id': selectedUnitId,
+  'unit_name': selectedUnit?['name'],
+  'type_id': selectedProductTypeId,
+  'type_name': productTypes.firstWhere(
+    (type) =>
+        type['id'].toString() ==
+        selectedProductTypeId,
+  )['name'],
+  'quantity': quantity,
+  'amount': amountController.text,
+  'description':
+      descriptionController.text,
+  'tax_percentage': product.taxPercentage,
+};
 
                                         final prefs = await SharedPreferences
                                             .getInstance();
@@ -1110,9 +1205,13 @@ class _SalesSelectProductsorderScreenState
                                         );
 
 // Directly go to Order page
-                                        Navigator.pushReplacementNamed(
+                                     Navigator.pushReplacementNamed(
                                           context,
                                           Customerorderdetail.routeName,
+                                          arguments: {
+                                            'customerId': id,
+                                            'name': name,
+                                          },
                                         );
                                       }
                                     : null,

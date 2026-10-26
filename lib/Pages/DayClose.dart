@@ -558,11 +558,11 @@ class _DaycloseState extends State<Dayclose> {
                 }
               }
 
-              print("isdayclose: $isdayclose");
+                           print("isdayclose: $isdayclose");
               print("Dayclosedata: ${Dayclosedata?['balance_cash_in_hand']}");
               print("balcash: $balcash");
-              return Scaffold(
-                body: SingleChildScrollView(
+              return SafeArea(
+                child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1187,7 +1187,7 @@ child: FittedBox(
                                       setState(() => _isPosting = false);
                                     }
                                   },
-                            child: _isPosting
+                                                       child: _isPosting
                                 ? SizedBox(
                                     height: 16,
                                     width: 16,
@@ -1200,6 +1200,9 @@ child: FittedBox(
                                   ),
                           ),
                         ],
+                      ),
+                      const SizedBox(
+                        height: 30,
                       ),
                     ],
                   ),

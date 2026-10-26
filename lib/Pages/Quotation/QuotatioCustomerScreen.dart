@@ -9,7 +9,7 @@ import 'package:mobizapp/Pages/salesselectproductorder.dart';
 import 'package:mobizapp/vanstockselactpro_tst.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
-
+import '../../confg/apptextsizes.dart';
 import '../../Components/commonwidgets.dart';
 import '../../Models/sales_model.dart';
 import '../../Utilities/rest_ds.dart';
@@ -52,11 +52,13 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
   int? quotationId;
   String roundoffValueStr = '';
   bool _initDone = true;
-  @override
-  void initState() {
-    super.initState();
-    _selectedDate = DateTime.now();
-    _loadSavedProducts();
+ @override
+void initState() {
+  super.initState();
+  AppState().loadTaxName().then((_) {
+    if (mounted) setState(() {});
+  });
+  _loadSavedProducts();
     Future.delayed(Duration.zero, () {
       final Map<String, dynamic>? params =
       ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
@@ -104,6 +106,7 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
             'quantity': item['quantity'].toString(),
             'amount': item['mrp'].toString(),
             'description': item['product_description'] ?? '',
+            'tax_percentage': item['tax_percentage'] ?? item['tax_percent'] ?? 0,
             'proImage': 'defalut.jpg',
           });
         }
@@ -220,47 +223,63 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
   //   await prefs.setStringList('selected_products', savedProductsStringList);
   // }
 
+  double _vatRound(double v) {
+    final double sign = v < 0 ? -1 : 1;
+    return sign * ((v.abs() * 100) + 1e-9).roundToDouble() / 100;
+  }
+
+  double _r(double v) {
+    final int dec = AppState().noOfDecimals ?? 2;
+    double f = 1;
+    for (int i = 0; i < dec; i++) f *= 10;
+    final double sign = v < 0 ? -1 : 1;
+    return sign * ((v.abs() * f) + 1e-9).roundToDouble() / f;
+  }
+
   double calculateTax() {
     double tax = 0;
-    for (int index = 0; index < savedProducts.length; index++) {
-      String discountValue = _discountData.text.trim();
-      double discountAmount = double.tryParse(discountValue) ?? 0;
-      double amt = totalAmount - discountAmount;
-      double discountfrtax = (totalAmount * discountAmount) / 100;
-      double netTotal = totalAmount - discountfrtax;
-      num taxPercentage = 5;
-      double Tax = _isPercentage
-          ? ((netTotal * taxPercentage) / 100)
-          : (amt * taxPercentage) / 100;
-      tax = Tax;
+    final double discountAmount =
+        double.tryParse(_discountData.text.trim()) ?? 0;
+
+    for (final product in savedProducts) {
+      final double quantity =
+          double.tryParse(product['quantity']?.toString() ?? '0') ?? 0;
+      final double rate =
+          double.tryParse(product['amount']?.toString() ?? '0') ?? 0;
+      final double lineTotal = quantity * rate;
+      final num taxPercentage =
+          num.tryParse(product['tax_percentage']?.toString() ?? '0') ?? 0;
+
+      final double lineDiscountAmount = _isPercentage
+          ? (lineTotal * discountAmount) / 100
+          : (totalAmount == 0 ? 0 : (lineTotal / totalAmount) * discountAmount);
+
+      final double taxableAmount = lineTotal - lineDiscountAmount;
+      tax += (taxableAmount * taxPercentage) / 100;
     }
-    return double.parse(tax.toStringAsFixed(AppState().noOfDecimals ?? 2));
+    return _vatRound(tax);
   }
 
 
 
   Map<String, dynamic> CalculatedValue() {
-    double taxamt = calculateTax();
-    roundoff = _roundoff.text;
-    double rundff = double.tryParse(roundoff) ?? 0;
-    String discountValue = _discountData.text.trim();
-    double discountAmount = double.tryParse(discountValue) ?? 0;
-    double totalTax = 5;
-    double discountinpercent = (totalAmount * discountAmount) / 100;
-    double nettotal = totalAmount - discountinpercent;
-    double taxamtperc = (nettotal * totalTax) / 100;
-    double grandTotal = _ifVat == 1
-        ? _isPercentage
-        ? totalAmount - ((totalAmount * discountAmount) / 100) + taxamtperc
-        : (totalAmount - discountAmount) + taxamt
-        : _isPercentage
-        ? totalAmount - (totalAmount * discountAmount) / 100
+    final double taxamt = _ifVat == 1 ? calculateTax() : 0;
+    roundoff = _roundoff.text.trim();
+    final double rundff = double.tryParse(roundoff) ?? 0;
+    final double discountAmount =
+        double.tryParse(_discountData.text.trim()) ?? 0;
+
+    final double netAmount = _isPercentage
+        ? totalAmount - (totalAmount * discountAmount / 100)
         : totalAmount - discountAmount;
-    num roundedGrandTotal1 =
-    roundoff == '' ? customRound(grandTotal) : grandTotal + rundff;
-    double roundOffValue = roundedGrandTotal1 - grandTotal;
+
+    final double grandTotal = _r(netAmount + taxamt);
+
+    final double roundOffValue = roundoff.isEmpty ? 0.0 : _r(rundff);
+    final double roundedGrandTotal = _r(grandTotal + roundOffValue);
+
     return {
-      'rounded': roundedGrandTotal1,
+      'rounded': roundedGrandTotal,
       'roundOffValue': roundOffValue,
     };
   }
@@ -390,6 +409,10 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
     String taxpost = tax.toStringAsFixed(AppState().noOfDecimals ?? 2);
     double roundedGrandTotal = double.parse(double.parse(grandTotalMap['rounded'].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2));
     double roundOffValue = double.parse(double.parse(grandTotalMap['roundOffValue'].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2));
+        final int dec = AppState().noOfDecimals ?? 2;
+    final double _d = double.tryParse(_discountData.text.trim()) ?? 0;
+    final double _discAmt = _isPercentage ? totalAmount * _d / 100 : _d;
+    final double subTotal = totalAmount - _discAmt;
     double total;
     if (ModalRoute.of(context)!.settings.arguments != null) {
       final Map<String, dynamic>? params =
@@ -545,646 +568,797 @@ class _QuotatioCustomerScreenState extends State<QuotatioCustomerScreen> {
             style: AppConfig.pageTitleStyle,
           ),
           backgroundColor: AppConfig.colorPrimary,
-          actions: [
-            (_search)
-                ? Container(
-              height: SizeConfig.blockSizeVertical * 5,
-              width: SizeConfig.blockSizeHorizontal * 76,
-              decoration: BoxDecoration(
-                color: AppConfig.colorPrimary,
-                borderRadius: const BorderRadius.all(
-                  Radius.circular(10),
-                ),
-                border: Border.all(color: AppConfig.colorPrimary),
-              ),
-              child: TextField(
-                controller: _searchData,
-                decoration: const InputDecoration(
-                  contentPadding: EdgeInsets.all(5),
-                  hintText: "Search...",
-                  hintStyle: TextStyle(color: AppConfig.backgroundColor),
-                  border: InputBorder.none,
-                ),
-              ),
-            )
-                : Container(),
-            CommonWidgets.horizontalSpace(1),
-            // AppState().rolId == 5
-            //     ? GestureDetector(
-            //         onTap: () {
-            //           Navigator.pushReplacementNamed(
-            //                   context, SalesSelectProductsorderScreen.routeName,
-            //                   arguments: {'customerId': id, 'name': name})
-            //               .then((value) {
-            //             // _initDone = false;
-            //             // _getTypes();
-            //           });
-            //         },
-            //         child: Icon(
-            //           _search ? Icons.close : Icons.search,
-            //           size: 30,
-            //           color: AppConfig.backgroundColor,
-            //         ),
-            //       )
-            //     :
-            AppState().attendanceState == 'Required'
-                ? Status &&
-                attendanceData != null &&
-                attendanceData['data']['check_out'] == 0
-                ? GestureDetector(
-              onTap: () {
-                Navigator.pushReplacementNamed(context,
-                    QuotationProduct.routeName,
-                    arguments: {
-                      'customerId': id,
-                      'name': name,
-                      'quotationId': quotationId
-                    }).then((value) {
-                  // _initDone = false;
-                  // _getTypes();
-                });
-              },
-              child: Icon(
-                _search ? Icons.close : Icons.search,
-                size: 30,
-                color: AppConfig.backgroundColor,
-              ),
-            )
-                : GestureDetector(
-              onTap: () {
-                _showWelcomeDialog();
-              },
-              child: Text(
-                'Attendance Req...',
-                style: TextStyle(color: Colors.white),
-              ),
-            )
-                : GestureDetector(
-              onTap: () {
-                Navigator.pushReplacementNamed(
-                    context, QuotationProduct.routeName,
-                    arguments: {
-                      'customerId': id,
-                      'name': name,
-                      'quotationId': quotationId
-                    }).then((value) {
-                  // _initDone = false;
-                  // _getTypes();
-                });
-              },
-              child: Icon(
-                _search ? Icons.close : Icons.search,
-                size: 30,
-                color: AppConfig.backgroundColor,
-              ),
-            ),
-            CommonWidgets.horizontalSpace(3),
-          ],
+        
         ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-        floatingActionButton: SizedBox(
-          width: 100.w,
-          height: 30.h,
-          child: ElevatedButton(
-            style: ButtonStyle(
-              shape: WidgetStateProperty.all<RoundedRectangleBorder>(
-                RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(7.0),
-                ),
-              ),
-              backgroundColor: WidgetStateProperty.all(
-                savedProducts.isNotEmpty && !_isButtonDisabled
-                    ? AppConfig.colorPrimary
-                    : AppConfig.buttonDeactiveColor,
-              ),
-            ),
-            onPressed: _isButtonDisabled || savedProducts.isEmpty
-                ? null
-                : () async {
-              postDataToApi();
-            },
-            child: Text(
-              quotationId == null ?
-              'SAVE' : 'UPDATE',
-              style: TextStyle(
-                  fontSize: AppConfig.textCaption3Size,
-                  color: AppConfig.backgroundColor,
-                  fontWeight: AppConfig.headLineWeight),
-            ),
-          ),
-        ),
-        body: savedProducts.isEmpty
-            ? Center(child: Text('No saved products'))
-            : Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                children: [
-                  Text(
-                    (name ?? '').toUpperCase(),
-                    style: TextStyle(
-                      fontSize: AppConfig.textCaption3Size,
-                      color: AppConfig.buttonDeactiveColor,
-                    ),
-                  ),
-                  const Spacer(),
-                  AppState().vatState != 'Disable'
-                      ? Row(
-                    children: [
-                      InkWell(
-                        onTap: () {
-                          setState(() {
-                            _ifVat = 1;
-                          });
-                          total = 0;
-                          tax = 0;
-                          // _calculateTotal();
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                              border:
-                              Border.all(color: Colors.black),
-                              color: (_ifVat == 1)
-                                  ? AppConfig.colorPrimary
-                                  : AppConfig.backButtonColor,
-                              borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(3),
-                                  bottomLeft: Radius.circular(3))),
-                          width:
-                          SizeConfig.blockSizeHorizontal * 13,
-                          height: SizeConfig.blockSizeVertical * 3,
-                          child: Center(
-                            child: Text(
-                              'VAT',
+              body: SafeArea(
+          top: false,
+          child: savedProducts.isEmpty
+              ? Center(
+                  child: InkWell(
+                    onTap: _openProductSearch,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_shopping_cart,
+                              size: 34, color: AppConfig.colorPrimary),
+                          const SizedBox(height: 8),
+                          const Text('No saved products',
+                              style: TextStyle(color: Colors.black54)),
+                          const SizedBox(height: 4),
+                          Text('Tap to Add Item',
                               style: TextStyle(
-                                fontSize:
-                                AppConfig.textCaption3Size,
-                                color: (_ifVat == 1)
-                                    ? AppConfig.backButtonColor
-                                    : AppConfig.textBlack,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () {
-                          setState(() {
-                            _ifVat = 0;
-                          });
-                          total = 0;
-                          tax = 0;
-                          // _calculateTotal();
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                              border:
-                              Border.all(color: Colors.black),
-                              color: (_ifVat == 0)
-                                  ? AppConfig.colorPrimary
-                                  : AppConfig.backButtonColor,
-                              borderRadius: const BorderRadius.only(
-                                  topRight: Radius.circular(3),
-                                  bottomRight: Radius.circular(3))),
-                          width:
-                          SizeConfig.blockSizeHorizontal * 13,
-                          height: SizeConfig.blockSizeVertical * 3,
-                          child: Center(
-                            child: Text(
-                              'NO VAT',
-                              style: TextStyle(
-                                fontSize:
-                                AppConfig.textCaption3Size,
-                                color: (_ifVat == 0)
-                                    ? AppConfig.backButtonColor
-                                    : AppConfig.textBlack,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                      : SizedBox.shrink()
-                ],
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.only(left: 8.0.w),
-              child: Row(
-                children: [
-                  Text('Schedule Date'),
-                  SizedBox(
-                    width: 10,
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
-                    ),
-                    child: Center(
-                      child: Padding(
-                        padding:
-                        const EdgeInsets.symmetric(horizontal: 2.0),
-                      child: Text(
-                          _selectedDate == null
-                              ? 'Select Date'
-                              : DateHelper.displayFromDateTime(_selectedDate!),
-                        ),
+                                  color: AppConfig.colorPrimary,
+                                  fontWeight: FontWeight.w600)),
+                        ],
                       ),
                     ),
                   ),
-                  IconButton(
-                      onPressed: () {
-                        _selectDate(context);
-                      },
-                      icon: Icon(CupertinoIcons.calendar_today))
-                ],
-              ),
-            ),
-            SizedBox(
-              height: MediaQuery.of(context).size.height * .550,
-              child: ListView.builder(
-                physics: BouncingScrollPhysics(),
-                scrollDirection: Axis.vertical,
-                shrinkWrap: true,
-                itemCount: savedProducts.length,
-                itemBuilder: (context, index) {
-                  final product = savedProducts[index];
-                  final quantity = double.tryParse(
-                      product['quantity']?.toString() ?? '0') ??
-                      0.0;
-                  final amount = double.tryParse(
-                      product['amount']?.toString() ?? '0') ??
-                      0.0;
-
-                  final total = quantity * amount;
-                  return InkWell(
-                    onTap: _isDialogOpen
-                        ? null
-                        : () {
-                      setState(() {
-                        _isDialogOpen = true;
-                      });
-                      showProductDetailsDialog(context, product);
-                    },
-                    child: Card(
-                      elevation: 1,
+                )
+              : Column(
+                  children: [
+                    // ===== customer + VAT + date =====
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(7, 5, 7, 6),
                       child: Container(
-                        padding: const EdgeInsets.all(5),
-                        width: SizeConfig.blockSizeHorizontal * 90,
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: AppConfig.backgroundColor,
-                          border: Border.all(
-                            color: AppConfig.buttonDeactiveColor
-                                .withOpacity(0.5),
-                          ),
-                          borderRadius:
-                          const BorderRadius.all(Radius.circular(10)),
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFE0E0E0), width: 0.7),
+                        ),
+                       child: Row(
+  children: [
+    Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F4FC),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Icon(
+        Icons.storefront_outlined,
+        size: 22,
+        color: AppConfig.colorPrimary,
+      ),
+    ),
+    const SizedBox(width: 10),
+    Expanded(
+      child: Text(
+        (name ?? '').toUpperCase(),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ),
+  if (AppState().vatState != 'Disable') ...[
+  _vatBtn(AppState().taxLabel, 1),
+  _vatBtn('NO ${AppState().taxLabel}', 0),
+],
+  ],
+),
+                      ),
+                    ),
+
+                    // ===== items table =====
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border.all(color: const Color(0xFFDCDCDC), width: 0.8),
+                          borderRadius: BorderRadius.circular(5),
                         ),
                         child: Column(
                           children: [
-                            Row(
-                              crossAxisAlignment:
-                              CrossAxisAlignment.start,
-                              children: [
-                                // SizedBox(
-                                //   width: 50,
-                                //   height: 60,
-                                //   child: ClipRRect(
-                                //     borderRadius: BorderRadius.circular(10),
-                                //     child: FadeInImage(
-                                //       image: NetworkImage(
-                                //         '${RestDatasource().Product_URL}/uploads/product/${product['proImage']}',
-                                //       ),
-                                //       placeholder: const AssetImage(
-                                //           'Assets/Images/no_image.jpg'),
-                                //       imageErrorBuilder:
-                                //           (context, error, stackTrace) {
-                                //         return Image.asset(
-                                //           'Assets/Images/no_image.jpg',
-                                //           fit: BoxFit.fitWidth,
-                                //         );
-                                //       },
-                                //       fit: BoxFit.fitWidth,
-                                //     ),
-                                //   ),
-                                // ),
-                                // CommonWidgets.horizontalSpace(1),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${product['code']} | ${product['name'].toString().toUpperCase()}',
-                                        style: TextStyle(
-                                            fontSize: AppConfig
-                                                .textCaption3Size,
-                                            fontWeight: FontWeight.bold),
+                            Container(
+                              height: 34,
+                              color: const Color(0xFFFAFAFC),
+                              child: Row(
+                                children: [
+                                  SizedBox(width: 32, child: Center(child: _hd('#'))),
+                                  Expanded(child: _hd('Item Details')),
+                                  SizedBox(width: 34, child: Center(child: _hd('Qty'))),
+                                  SizedBox(width: 52, child: Center(child: _hd('Rate'))),
+                                  SizedBox(width: 52, child: Center(child: _hd('Amt'))),
+                                  const SizedBox(
+                                      width: 32,
+                                      child: Icon(Icons.delete_outline,
+                                          size: 16, color: Colors.red)),
+                                ],
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            Expanded(
+                             child: ListView.builder(
+  physics: const BouncingScrollPhysics(),
+  padding: EdgeInsets.zero,
+  itemCount: savedProducts.length,
+  itemBuilder: (context, index) {
+                                  final p = savedProducts[index];
+                                  final qty = double.tryParse(p['quantity']?.toString() ?? '0') ?? 0.0;
+                                  final rate = double.tryParse(p['amount']?.toString() ?? '0') ?? 0.0;
+                                  final dec = AppState().noOfDecimals ?? 2;
+                                  return InkWell(
+                                    onTap: _isDialogOpen
+                                        ? null
+                                        : () {
+                                            setState(() => _isDialogOpen = true);
+                                            showProductDetailsDialog(context, p);
+                                          },
+                               child: Container(
+  constraints: const BoxConstraints(minHeight: 76),
+  decoration: const BoxDecoration(
+    color: Colors.white,
+    border: Border(
+      bottom: BorderSide(color: Color(0xFFE8E8E8), width: 0.7),
+    ),
+  ),
+  child: Row(
+                                        children: [
+                                         SizedBox(
+  width: 32,
+  child: Center(
+    child: Container(
+      width: 21,
+      height: 21,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F3FF),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: const Color(0xFFDDE0F5), width: 0.6),
+      ),
+      child: Text('${index + 1}',
+          style: const TextStyle(
+            fontSize: AppFontSizes.body,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF555EA0),
+          )),
+    ),
+  ),
+),
+                                          Expanded(
+                                            child: Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 5),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                            Text(
+  '${p['code']} | ${p['name'].toString().toUpperCase()}',
+  maxLines: 2,
+  softWrap: true,
+  overflow: TextOverflow.visible,
+  style: const TextStyle(
+    fontSize: AppFontSizes.label,
+    height: 1.15,
+    fontWeight: FontWeight.w600,
+    color: Color(0xFF222222),
+  ),
+),
+const SizedBox(height: 4),
+Row(
+  children: [
+    Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 6,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0EFFA),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        '${p['type_name']}',
+        style: const TextStyle(
+          fontSize: 10,
+          color: Color(0xFF5558B5),
+        ),
+      ),
+    ),
+    const SizedBox(width: 5),
+    Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 6,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F2F2),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        '${p['unit_name']}',
+        style: const TextStyle(
+          fontSize: 10,
+          color: Color(0xFF555555),
+        ),
+      ),
+    ),
+  ],
+),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          SizedBox(
+                                              width: 34,
+                                              child: Center(
+                                                  child: Text(
+                                                      qty % 1 == 0 ? qty.toInt().toString() : qty.toString(),
+                                                      style: const TextStyle(fontSize: 10)))),
+                                          SizedBox(
+                                              width: 52,
+                                              child: Center(
+                                                  child: Text(rate.toStringAsFixed(dec),
+                                                      style: const TextStyle(fontSize: 10)))),
+                                          SizedBox(
+                                              width: 52,
+                                              child: Center(
+                                                  child: Text((qty * rate).toStringAsFixed(dec),
+                                                      style: const TextStyle(
+                                                          fontSize: 10, fontWeight: FontWeight.w600)))),
+                                          SizedBox(
+                                            width: 32,
+                                            child: GestureDetector(
+                                              onTap: () => _removeProduct(index),
+                                              child: const Icon(Icons.delete_outline,
+                                                  size: 16, color: Colors.red),
+                                            ),
+                                          ),
+                                        ],
                                       ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            InkWell(
+                              onTap: _openProductSearch,
+                           child: Container(
+  constraints: const BoxConstraints(minHeight: 64),
+  decoration: const BoxDecoration(
+    color: Colors.white,
+    border: Border(
+      bottom: BorderSide(color: Color(0xFFE8E8E8), width: 0.7),
+    ),
+  ),
+  child: IntrinsicHeight(
+    child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.add_circle_outline,
+                                        size: 13, color: AppConfig.colorPrimary),
+                                    const SizedBox(width: 4),
+                                    Text('Add Item',
+                                        style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppConfig.colorPrimary)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        )  ],                        ),
+                      ),
+                    ),
+
+                    // ===== summary + buttons =====
+                   Padding(
+  padding: const EdgeInsets.fromLTRB(7, 6, 7, 10),
+  child: LayoutBuilder(
+    builder: (context, constraints) {
+      final bool isVerySmall = constraints.maxWidth < 340;
+      final double discountLabelWidth = isVerySmall ? 52 : 60;
+      final double sectionPadding = isVerySmall ? 8 : 14;
+
+      Widget label(String t) => Text(t,
+          style: const TextStyle(
+              fontSize: AppFontSizes.label,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF222222)));
+
+      Widget discBtn(String t, bool pct, double w) => InkWell(
+            onTap: () => setState(() => _isPercentage = pct),
+            child: Container(
+              width: w,
+              height: 30,
+              alignment: Alignment.center,
+              color: _isPercentage == pct
+                  ? AppConfig.colorPrimary
+                  : Colors.white,
+              child: Text(t,
+                  style: TextStyle(
+                      fontSize: AppFontSizes.label,
+                      fontWeight: FontWeight.w600,
+                      color: _isPercentage == pct
+                          ? Colors.white
+                          : const Color(0xFF222222))),
+            ),
+          );
+
+      Widget sumRow(String t, double v) => Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Text(t,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: AppFontSizes.label,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF222222))),
+              ),
+              Flexible(
+                child: Text(v.toStringAsFixed(dec),
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                        fontSize: AppFontSizes.value,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF222222))),
+              ),
+            ],
+          );
+
+      return Container(
+        padding: EdgeInsets.fromLTRB(
+            isVerySmall ? 9 : 13, 10, isVerySmall ? 9 : 13, 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE1E1E1), width: 0.7),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ================= LEFT =================
+                  Expanded(
+                    flex: 6,
+                    child: Padding(
+                      padding: EdgeInsets.only(right: sectionPadding),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          label('Delivery Location'),
+                          const SizedBox(height: 4),
+                          InkWell(
+                            onTap: _editDeliveryLocation,
+                            child: Container(
+                              width: double.infinity,
+                              height: 30,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 9),
+                              alignment: Alignment.centerLeft,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                    color: const Color(0xFFD2D2D2),
+                                    width: 0.7),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                _remarksText.isEmpty
+                                    ? 'Enter delivery location'
+                                    : _remarksText,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: AppFontSizes.label,
+                                  color: _remarksText.isEmpty
+                                      ? const Color(0xFF9A9A9A)
+                                      : const Color(0xFF222222),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 9),
+                          label('Schedule Date'),
+                          const SizedBox(height: 4),
+                          InkWell(
+                            onTap: () => _selectDate(context),
+                            child: Container(
+                              width: double.infinity,
+                              height: 30,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 9),
+                              alignment: Alignment.centerLeft,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                    color: const Color(0xFFD2D2D2),
+                                    width: 0.7),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.calendar_today_outlined,
+                                      size: 12,
+                                      color: AppConfig.colorPrimary),
+                                  const SizedBox(width: 5),
+                                  Expanded(
+                                    child: Text(
+                                      _selectedDate == null
+                                          ? 'Select Date'
+                                          : DateHelper.displayFromDateTime(
+                                              _selectedDate!),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: AppFontSizes.label,
+                                        color: Color(0xFF222222),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (AppState().discountState != 'Disable') ...[
+                            const SizedBox(height: 9),
+                            Row(
+                              children: [
+                                SizedBox(
+                                    width: discountLabelWidth,
+                                    child: label('Discount')),
+                                Container(
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                        color: const Color(0xFFD2D2D2),
+                                        width: 0.7),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      discBtn('AMT', false, 42),
+                                      discBtn('%', true, 34),
                                     ],
                                   ),
                                 ),
-                                CircleAvatar(
-                                  backgroundColor:
-                                  Colors.grey.withOpacity(0.2),
-                                  radius: 10,
-                                  child: GestureDetector(
-                                    onTap: () => _removeProduct(index),
-                                    child: const Icon(
-                                      Icons.close,
-                                      size: 15,
-                                      color: Colors.red,
+                                SizedBox(width: isVerySmall ? 5 : 7),
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 30,
+                                    child: TextField(
+                                      controller: _discountData,
+                                      keyboardType: TextInputType.number,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: AppFontSizes.value,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF222222),
+                                      ),
+                                      decoration: InputDecoration(
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 2, vertical: 6),
+                                        border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                          borderSide: const BorderSide(
+                                              color: Color(0xFFD2D2D2),
+                                              width: 0.7),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                          borderSide: const BorderSide(
+                                              color: Color(0xFFD2D2D2),
+                                              width: 0.7),
+                                        ),
+                                      ),
+                                      onChanged: (_) => setState(() {}),
                                     ),
                                   ),
                                 ),
                               ],
                             ),
-                            SizedBox(height: 5.h),
-                            Row(
-                              children: [
-                                Text(product['type_name']),
-                                Text(' | '),
-                                Text(product['unit_name']),
-                                Text(' | '),
-                                Text('Qty: ${product['quantity']}'),
-                                Text(' | '),
-                                Text('Rate: ${product['amount']}'),
-                                Text(' | '),
-                                Text('Amt: ${total.toStringAsFixed(AppState().noOfDecimals ?? 2)}')
-                              ],
-                            )
                           ],
-                        ),
+                        ],
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(
-                right: 18.0,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Text(
-                        "Delivery Location",
-                        style: TextStyle(
-                          fontSize: AppConfig.textCaption3Size,
-                        ),
-                      ),
-                      SizedBox(
-                        width: 2,
-                      ),
-                      InkWell(
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) {
-                              return AlertDialog(
-                                title: const Text('Delivery Location'),
-                                content: TextField(
-                                  controller: _remarksController,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _remarksText = value;
-                                    });
-                                  },
-                                  keyboardType: TextInputType.text,
-                                  decoration: const InputDecoration(
-                                    hintText: "Enter your location",
+                  ),
+
+                  Container(width: 0.8, color: const Color(0xFFE3E3E3)),
+
+                  // ================= RIGHT =================
+                  Expanded(
+                    flex: 4,
+                    child: Padding(
+                      padding: EdgeInsets.only(left: sectionPadding),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          sumRow('Total', subTotal),
+                          const SizedBox(height: 9),
+                          sumRow(AppState().taxLabel, tax),
+                          const SizedBox(height: 9),
+                          sumRow('Sub Total', totalAmount),
+                          const SizedBox(height: 9),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Flexible(
+                                child: Text('Round Off',
+                                    style: TextStyle(
+                                        fontSize: AppFontSizes.label,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF222222))),
+                              ),
+                              InkWell(
+                                onTap: _editRoundOff,
+                                child: Container(
+                                  width: isVerySmall ? 55 : 65,
+                                  height: 30,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                        color: const Color(0xFFD2D2D2),
+                                        width: 0.7),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      roundOffValue.toStringAsFixed(dec),
+                                      style: const TextStyle(
+                                        fontSize: AppFontSizes.value,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF222222),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                actions: <Widget>[
-                                  MaterialButton(
-                                    color: AppConfig.colorPrimary,
-                                    textColor: Colors.white,
-                                    child: const Text('OK'),
-                                    onPressed: () {
-                                      setState(() {
-                                        _remarksText =
-                                            _remarksController.text;
-                                      });
-                                      Navigator.pop(context);
-                                    },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                              height: 1,
+                              width: double.infinity,
+                              color: const Color(0xFFE0E0E0)),
+                          const SizedBox(height: 7),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const Text('Grand Total',
+                                  style: TextStyle(
+                                      fontSize: AppFontSizes.label,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF222222))),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    roundedGrandTotal.toStringAsFixed(dec),
+                                    style: TextStyle(
+                                      fontSize: AppFontSizes.grandTotal,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppConfig.colorPrimary,
+                                    ),
                                   ),
-                                ],
-                              );
-                            },
-                          );
-                        },
-                        child: Container(
-                          width: MediaQuery.of(context).size.width * 0.67,
-                          // padding: EdgeInsets.symmetric(
-                          //     horizontal: 10, vertical: 3),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                                color: AppConfig.buttonDeactiveColor),
-                            borderRadius: const BorderRadius.all(
-                                Radius.circular(5)),
-                          ),
-                          child: Center(
-                            child: Text(
-                              _remarksText,
-                              style: TextStyle(
-                                color: Colors.black,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(
-                    height: 10,
-                  ),
-                  AppState().discountState != 'Disable'
-                      ? Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Text(
-                        'Discount ',
-                        style: TextStyle(
-                          fontSize: AppConfig.textCaption3Size,
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () => setState(() {
-                          _isPercentage = !_isPercentage;
-                        }),
-                        child: Container(
-                          decoration: BoxDecoration(
-                              border:
-                              Border.all(color: Colors.black),
-                              color: (!_isPercentage)
-                                  ? AppConfig.colorPrimary
-                                  : AppConfig.backButtonColor,
-                              borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(3),
-                                  bottomLeft: Radius.circular(3))),
-                          width:
-                          SizeConfig.blockSizeHorizontal * 24,
-                          height: SizeConfig.blockSizeVertical * 3,
-                          child: Center(
-                            child: Text(
-                              'AMOUNT',
-                              style: TextStyle(
-                                fontSize:
-                                AppConfig.textCaption3Size,
-                                color: (!_isPercentage)
-                                    ? AppConfig.backButtonColor
-                                    : AppConfig.textBlack,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () => setState(() {
-                          _isPercentage = !_isPercentage;
-                        }),
-                        child: Container(
-                          decoration: BoxDecoration(
-                              border:
-                              Border.all(color: Colors.black),
-                              color: (_isPercentage)
-                                  ? AppConfig.colorPrimary
-                                  : AppConfig.backButtonColor,
-                              borderRadius: const BorderRadius.only(
-                                  topRight: Radius.circular(3),
-                                  bottomRight: Radius.circular(3))),
-                          width:
-                          SizeConfig.blockSizeHorizontal * 24,
-                          height: SizeConfig.blockSizeVertical * 3,
-                          child: Center(
-                              child: Text(
-                                'PERCENTAGE',
-                                style: TextStyle(
-                                  fontSize: AppConfig.textCaption3Size,
-                                  color: (_isPercentage)
-                                      ? AppConfig.backButtonColor
-                                      : AppConfig.textBlack,
                                 ),
-                              )),
-                        ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      CommonWidgets.horizontalSpace(2),
-                      InkWell(
-                        onTap: () {
-                          showDialog(
-                              context: context,
-                              builder: (context) {
-                                return AlertDialog(
-                                  title: const Text('Discount'),
-                                  content: TextField(
-                                    keyboardType:
-                                    TextInputType.number,
-                                    controller: _discountData,
-                                    decoration:
-                                    const InputDecoration(
-                                        hintText: "Discount"),
-                                  ),
-                                  actions: <Widget>[
-                                    MaterialButton(
-                                      color: AppConfig.colorPrimary,
-                                      textColor: Colors.white,
-                                      child: const Text('OK'),
-                                      onPressed: () {
-                                        Navigator.pop(context);
-                                      },
-                                    ),
-                                  ],
-                                );
-                              });
-                        },
-                        child: Container(
-                            width:
-                            SizeConfig.blockSizeHorizontal * 17,
-                            height:
-                            SizeConfig.blockSizeVertical * 3,
-                            decoration: BoxDecoration(
-                                border: Border.all(
-                                    color: AppConfig
-                                        .buttonDeactiveColor),
-                                borderRadius:
-                                const BorderRadius.all(
-                                    Radius.circular(5))),
-                            child: Center(
-                              child: Text(_discountData.text.isEmpty
-                                  ? ''
-                                  : _discountData.text),
-                            )),
-                      ),
-                    ],
-                  )
-                      : SizedBox.shrink(),
-                  Text('Total: ${totalAmount.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
-                  Text('Tax: ${tax.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Text('Round off:'),
-                      InkWell(
-                        onTap: () {
-                          showDialog(
-                              context: context,
-                              builder: (context) {
-                                return AlertDialog(
-                                  title: const Text('Round off'),
-                                  content: TextField(
-                                    keyboardType: TextInputType.number,
-                                    controller: _roundoff,
-                                    decoration: const InputDecoration(
-                                        hintText: "Round off"),
-                                  ),
-                                  actions: <Widget>[
-                                    MaterialButton(
-                                      color: AppConfig.colorPrimary,
-                                      textColor: Colors.white,
-                                      child: const Text('OK'),
-                                      onPressed: () {
-                                        Navigator.pop(context);
-                                      },
-                                    ),
-                                  ],
-                                );
-                              });
-                        },
-                        child: Container(
-                            width: SizeConfig.blockSizeHorizontal * 17,
-                            height: SizeConfig.blockSizeVertical * 3,
-                            decoration: BoxDecoration(
-                                border: Border.all(
-                                    color: AppConfig.buttonDeactiveColor),
-                                borderRadius: const BorderRadius.all(
-                                    Radius.circular(5))),
-                            child: Center(
-                              child: Text(''
-                                  '${roundoff == '' ? roundOffValue.toStringAsFixed(AppState().noOfDecimals ?? 2) : roundoff}'),
-                            )),
-                      ),
-                    ],
+                    ),
                   ),
-                  Text('Grand Total: '
-                      '${roundedGrandTotal.toStringAsFixed(AppState().noOfDecimals ?? 2)}'
-                      ''),
                 ],
               ),
             ),
+            const SizedBox(height: 11),
+
+            // ================= BUTTONS =================
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.red, width: 1.2),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6)),
+                      padding:
+                          EdgeInsets.symmetric(vertical: isVerySmall ? 10 : 11),
+                    ),
+                    onPressed: clearCart,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.delete_outline,
+                              size: 15, color: Colors.red),
+                          SizedBox(width: 4),
+                          Text('CLEAR ALL',
+                              style: TextStyle(
+                                  fontSize: AppFontSizes.label,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: !_isButtonDisabled
+                          ? AppConfig.colorPrimary
+                          : AppConfig.buttonDeactiveColor,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6)),
+                      padding:
+                          EdgeInsets.symmetric(vertical: isVerySmall ? 10 : 11),
+                      elevation: 0,
+                    ),
+                    onPressed: _isButtonDisabled ? null : postDataToApi,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.save_outlined,
+                              size: 15, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text(
+                            _isButtonDisabled
+                                ? 'SAVING...'
+                                : (quotationId == null ? 'SAVE' : 'UPDATE'),
+                            style: const TextStyle(
+                                fontSize: AppFontSizes.label,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
+        ),
+      );
+    },
+  ),
+),
+                  ],
+                ),
         ),
       ),
     );
   }
 
+  // ---------- small UI helpers ----------
+  Widget _hd(String t) => Text(t,
+      style: TextStyle(
+          fontSize: 11, fontWeight: FontWeight.w700, color: AppConfig.colorPrimary));
+
+ Widget _vatBtn(String label, int value) => InkWell(
+      onTap: () => setState(() => _ifVat = value),
+      child: Container(
+        constraints: BoxConstraints(minWidth: value == 1 ? 45 : 52),
+        height: 22,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          color: _ifVat == value ? AppConfig.colorPrimary : const Color(0xFFF7F7F7),
+          border: Border.all(color: const Color(0xFFD5D5D5), width: 0.7),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label,
+              maxLines: 1,
+              style: TextStyle(
+                  fontSize: AppFontSizes.body,
+                  fontWeight: FontWeight.w600,
+                  color: _ifVat == value ? Colors.white : const Color(0xFF333333))),
+        ),
+      ),
+    );
+
+  Widget _discBtn(String label, bool pct, double w) => InkWell(
+        onTap: () => setState(() => _isPercentage = pct),
+        child: Container(
+          width: w,
+          height: 30,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _isPercentage == pct ? AppConfig.colorPrimary : Colors.white,
+            border: Border.all(color: const Color(0xFFD2D2D2), width: 0.7),
+          ),
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  color: _isPercentage == pct ? Colors.white : const Color(0xFF222222))),
+        ),
+      );
+
+  Widget _sumRow(String label, double v) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+          Text(v.toStringAsFixed(AppState().noOfDecimals ?? 2),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        ],
+      );
+
+  void _editDeliveryLocation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delivery Location'),
+        content: TextField(
+          controller: _remarksController,
+          decoration: const InputDecoration(hintText: 'Enter your location'),
+        ),
+        actions: [
+          MaterialButton(
+            color: AppConfig.colorPrimary,
+            textColor: Colors.white,
+            child: const Text('OK'),
+            onPressed: () {
+              setState(() => _remarksText = _remarksController.text);
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editRoundOff() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Round off'),
+        content: TextField(
+          keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: true),
+          controller: _roundoff,
+          decoration: const InputDecoration(hintText: 'Round off'),
+        ),
+        actions: [
+          MaterialButton(
+            color: AppConfig.colorPrimary,
+            textColor: Colors.white,
+            child: const Text('OK'),
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() {});
+            },
+          ),
+        ],
+      ),
+    );
+  }
+  void _openProductSearch() {
+    Navigator.pushReplacementNamed(context, QuotationProduct.routeName,
+        arguments: {
+          'customerId': customerId ?? id,
+          'name': name,
+          'quotationId': quotationId,
+        });
+  }
   void showProductDetailsDialog(
       BuildContext context, Map<String, dynamic> product) async {
     final response = await http.get(Uri.parse(

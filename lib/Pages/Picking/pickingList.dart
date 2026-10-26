@@ -1,9 +1,34 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobizapp/Models/appstate.dart';
 import '../../confg/appconfig.dart';
 import 'AddPicking.dart';
+
+int _toInt(dynamic v) {
+  if (v == null) return 0;
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  return double.tryParse(v.toString())?.toInt() ?? 0;
+}
+
+String _toStr(dynamic v) => v?.toString() ?? '';
+
+List<PickList> _parsePickLists(String body) {
+  final data = json.decode(body);
+  final out = <PickList>[];
+  if (data['status'] == true && data['data'] != null) {
+    for (final e in data['data'] as List) {
+      try {
+        out.add(PickList.fromJson(e));
+      } catch (err) {
+        debugPrint('PARSE ERROR id=${e['id']}: $err');
+      }
+    }
+  }
+  return out;
+}
 
 class PickingListPage extends StatefulWidget {
   static const routeName = "/PickingListPage";
@@ -17,7 +42,30 @@ class _PickingListPageState extends State<PickingListPage> {
   bool isLoading = false;
   List<PickList> pickLists = [];
   int? expandedId;
+  String? loadError;
   Map<int, List<PickingDetail>> pickingDetails = {};
+  final Set<int> completingIds = {};
+  final Set<int> deletingIds = {};
+
+   // SEARCH
+  final TextEditingController searchController = TextEditingController();
+  String searchQuery = '';
+  bool isSearching = false;
+
+  List<PickList> get _filteredPickLists {
+    final q = searchQuery.trim().toLowerCase();
+    if (q.isEmpty) return pickLists;
+    return pickLists.where((p) {
+      final userName = p.user.isNotEmpty ? p.user.first.name : '';
+
+      return p.invoiceNo.toLowerCase().contains(q) ||
+      p.picklistDetail
+    .fold<int>(0, (s, i) => s + i.quantity)
+   .toString().contains(q) ||
+          p.customer_name.toLowerCase().contains(q) ||
+          userName.toLowerCase().contains(q);
+    }).toList();
+  }
 
   @override
   void initState() {
@@ -25,92 +73,291 @@ class _PickingListPageState extends State<PickingListPage> {
     fetchPickLists();
   }
 
-  Future<void> fetchPickLists() async {
-    setState(() => isLoading = true);
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
 
-    final url = Uri.parse('http://68.183.92.8:3699/api/picklists-pending?store_id=${AppState().storeId}');
+   Future<void> fetchPickLists({bool silent = false}) async {
+    if (!mounted) return;
+    setState(() {
+      if (!silent) isLoading = true;
+      loadError = null;
+    });
+
+    final storeId = AppState().storeId;
+    final url = Uri.parse(
+        'http://68.183.92.8:3699/api/picklists-pending?store_id=$storeId');
+    debugPrint('REQUEST URL: $url');
+
     try {
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(const Duration(seconds: 90));
+      debugPrint('STATUS: ${response.statusCode}, '
+      
+          'SIZE: ${(response.bodyBytes.lengthInBytes / (1024 * 1024)).toStringAsFixed(2)} MB');
 
       if (response.statusCode == 200) {
-        print(response.request);
-        final data = json.decode(response.body);
-        if (data['status'] == true && data['data'] != null) {
-          setState(() {
-            pickLists = (data['data'] as List)
-                .map((e) => PickList.fromJson(e))
-                .toList();
-          });
-        }
+        final list = await compute(_parsePickLists, response.body);
+        debugPrint('PARSED COUNT: ${list.length}');
+        if (mounted) setState(() => pickLists = list);
       } else {
         debugPrint('Failed: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('Error fetching data: $e');
-    }
-
-    setState(() => isLoading = false);
-  }
-
-  Future<void> fetchPickingDetail(int picklistId) async {
-    final url = Uri.parse(
-        'http://68.183.92.8:3699/api/get-picklist-picking-detail?store_id=${AppState().storeId}&picklist_id=$picklistId');
-
-    try {
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-
-        if (data['status'] == true && data['data'] != null) {
-          setState(() {
-            pickingDetails[picklistId] = (data['data'] as List)
-                .map((e) => PickingDetail.fromJson(e))
-                .toList();
-          });
+        if (mounted) {
+          setState(() => loadError = 'Server error (${response.statusCode})');
         }
-      } else {
-        debugPrint('Failed to fetch picking details');
       }
-    } catch (e) {
-      debugPrint('Error fetching picking details: $e');
+    } catch (e, st) {
+      debugPrint('Error fetching data: $e\n$st');
+      if (mounted) {
+        setState(() => loadError = 'Network error. Please check connection.');
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
+ Future<void> fetchPickingDetail(int picklistId) async {
+  final url = Uri.parse(
+      'http://68.183.92.8:3699/api/get-picklist-picking-detail?store_id=${AppState().storeId}&picklist_id=$picklistId');
+  debugPrint('>>> DETAIL REQUEST: $url');
 
-  List<int> getPicklistDetailIds(int picklistId) {
-    if (pickingDetails.containsKey(picklistId)) {
-      return pickingDetails[picklistId]!
-          .map((detail) => detail.picklistId)
-          .toList();
+  try {
+    final response = await http.get(url).timeout(const Duration(seconds: 30));
+    debugPrint('>>> DETAIL STATUS: ${response.statusCode} id=$picklistId');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+
+      if (data['status'] == true && data['data'] != null) {
+        if (!mounted) return;
+        setState(() {
+          pickingDetails[picklistId] = (data['data'] as List)
+              .map((e) => PickingDetail.fromJson(e))
+              .toList();
+        });
+      } else {
+        debugPrint('>>> DETAIL status false: ${response.body}');
+        if (mounted) setState(() => pickingDetails[picklistId] = []);
+      }
+    } else {
+      debugPrint('>>> DETAIL FAILED ${response.statusCode}');
+      if (mounted) setState(() => pickingDetails[picklistId] = []);
     }
-    return [];
+  } catch (e) {
+    debugPrint('>>> DETAIL ERROR: $e');
+    if (mounted) setState(() => pickingDetails[picklistId] = []);
   }
+}
+  // Change this only when the backend confirms the correct endpoint
+static const String _completePicklistPath = '/api/complete-picklist';
+
+Future<String?> completePicklist(int picklistId) async {
+  // null = success, else error message
+  final url = Uri.parse('http://68.183.92.8:3699$_completePicklistPath');
+  try {
+    final response = await http
+        .post(
+          url,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({
+            'store_id': AppState().storeId,
+            'picklist_id': picklistId,
+          }),
+        )
+        .timeout(const Duration(seconds: 30));
+
+    debugPrint('>>> COMPLETE ${response.statusCode}: ${response.body}');
+
+    // Endpoint missing on the server
+    if (response.statusCode == 404) {
+      return 'Complete service is not available on the server yet. '
+          'Please contact support.';
+    }
+
+    dynamic data;
+    try {
+      data = json.decode(response.body);
+    } catch (_) {}
+
+    if ((response.statusCode == 200 || response.statusCode == 201) &&
+        data is Map &&
+        data['status'] == true) {
+      return null;
+    }
+    if (data is Map && data['message'] != null) {
+      return '(${response.statusCode}) ${data['message']}';
+    }
+     return 'HTTP ${response.statusCode}: ${response.body}';
+  } catch (e) {
+    return 'Error: $e';
+  }
+}
+
+// ---------- DELETE PICKED ITEM ----------
+static const String _deletePickingPath = '/api/picklist-picking-detail/delete';
+
+Future<String?> deletePickingDetail(int pickingDetailId, int picklistId) async {
+  // null = success, else error message
+  final url = Uri.parse('http://68.183.92.8:3699$_deletePickingPath');
+  try {
+    final response = await http
+        .post(
+          url,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({
+            'id': pickingDetailId,
+            'picklist_id': picklistId,
+            'store_id': AppState().storeId,
+          }),
+        )
+        .timeout(const Duration(seconds: 30));
+
+    debugPrint('>>> DELETE ${response.statusCode}: ${response.body}');
+
+    dynamic data;
+    try {
+      data = json.decode(response.body);
+    } catch (_) {}
+
+    if ((response.statusCode == 200 || response.statusCode == 201) &&
+        data is Map &&
+        data['status'] == true) {
+      return null;
+    }
+    if (data is Map && data['message'] != null) {
+      return '(${response.statusCode}) ${data['message']}';
+    }
+    return 'HTTP ${response.statusCode}: ${response.body}';
+  } catch (e) {
+    return 'Error: $e';
+  }
+}
+
+Future<void> _confirmAndDelete(PickingDetail item, int picklistId) async {
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Delete item?'),
+      content: Text(
+          'Do you want to delete ${item.product?.name ?? 'this item'} (${item.qty})?'),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel')),
+        TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red))),
+      ],
+    ),
+  );
+  if (confirm != true) return;
+
+  setState(() => deletingIds.add(item.id));
+  final err = await deletePickingDetail(item.id, picklistId);
+  if (!mounted) return;
+  setState(() => deletingIds.remove(item.id));
+
+  final ok = err == null;
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    content: Text(ok ? 'Item deleted' : 'Failed: $err'),
+    backgroundColor: ok ? Colors.green : Colors.redAccent,
+    duration: Duration(seconds: ok ? 2 : 6),
+  ));
+
+  if (ok) await fetchPickingDetail(picklistId); // refresh -> Picked Qty update aakum
+}
+  // List<int> getPicklistDetailIds(int picklistId) {
+  //   if (pickingDetails.containsKey(picklistId)) {
+  //     return pickingDetails[picklistId]!
+  //         .map((detail) => detail.picklistId)
+  //         .toList();
+  //   }
+  //   return [];
+  // }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
+    appBar: AppBar(
+  title: isSearching
+      ? TextField(
+          controller: searchController,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+          cursorColor: Colors.white,
+          decoration: const InputDecoration(
+            hintText: 'Search...',
+            hintStyle: TextStyle(color: Colors.white70),
+            border: InputBorder.none,
+          ),
+          onChanged: (v) => setState(() => searchQuery = v),
+        )
+      : const Text(
           'Picking',
-           style: AppConfig.pageTitleStyle,
+          style: AppConfig.pageTitleStyle,
         ),
-        backgroundColor: AppConfig.colorPrimary,
+  backgroundColor: AppConfig.colorPrimary,
+  iconTheme: const IconThemeData(color: Colors.white),
+  actions: [
+    IconButton(
+      icon: Icon(
+        isSearching ? Icons.close : Icons.search,
+        color: Colors.white,
       ),
+      onPressed: () {
+        setState(() {
+          if (isSearching) {
+            searchController.clear();
+            searchQuery = '';
+          }
+          isSearching = !isSearching;
+        });
+      },
+    ),
+  ],
+),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : pickLists.isEmpty
-          ? const Center(child: Text('No pending picklists found.'))
-          : Padding(
+               : pickLists.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(loadError ?? 'No pending picklists found.'),
+                  if (loadError != null)
+                    TextButton(
+                      onPressed: fetchPickLists,
+                      child: const Text('Retry'),
+                    ),
+                ],
+              ),
+            )
+                  : Padding(
         padding: const EdgeInsets.all(10.0),
-        child: ListView.builder(
-          itemCount: pickLists.length,
+           child: Column(
+          children: [
+            Expanded(
+              child: _filteredPickLists.isEmpty
+                  ? const Center(child: Text('No matching picklists found.'))
+                  : ListView.builder(
+          itemCount: _filteredPickLists.length,
           itemBuilder: (context, index) {
-            final pick = pickLists[index];
+            final pick = _filteredPickLists[index];
             final totalQty = pick.picklistDetail.fold<int>(
                 0, (sum, item) => sum + item.quantity);
 
             final isExpanded = expandedId == pick.id;
-
+            final pickedQty = (pickingDetails[pick.id] ?? []).fold<double>(
+                0, (sum, d) => sum + (double.tryParse(d.qty) ?? 0));
+            final pickedText = pickedQty == pickedQty.roundToDouble()
+                ? pickedQty.toInt().toString()
+                : pickedQty.toString();
             return GestureDetector(
               onTap: () async {
                 setState(() {
@@ -134,7 +381,7 @@ class _PickingListPageState extends State<PickingListPage> {
                     children: [
                       Text('${pick.invoiceNo} | ${pick.customer_name} | ${pick.user.isNotEmpty ? pick.user.first.name : 'N/A'}'),
                       const SizedBox(height: 5),
-                      Text('Qty : $totalQty | Picked Qty : 0'),
+            Text('Qty : $totalQty | Picked Qty : $pickedText'),
                       if (isExpanded)
                         Column(
                           children: [
@@ -156,62 +403,83 @@ class _PickingListPageState extends State<PickingListPage> {
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
                                   itemCount: pickingDetails[pick.id]!.length,
-                                  itemBuilder: (context, i) {
-                                    final item = pickingDetails[pick.id]![i];
-                                    return Padding(
-                                      padding: const EdgeInsets.all(6.0),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text("${item.product!.name}",style: const TextStyle(
-                                              fontWeight: FontWeight.bold)),
-                                          Text(
-                                            '${item.unit!.name} | ${item.qty} | ${item.batch} | ${item.expiry} ',
-                                            style: const TextStyle(fontSize: 14),
-                                          ),
-                                          Divider(),
-                                        ],
-                                      ),
-                                    );
-                                  },
+                               itemBuilder: (context, i) {
+  final item = pickingDetails[pick.id]![i];
+  return Padding(
+    padding: const EdgeInsets.all(6.0),
+    child: Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.product?.name ?? 'Unknown product',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    '${item.unit.name} | ${item.qty} | ${item.batch} | ${item.expiry}',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+            deletingIds.contains(item.id)
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    tooltip: 'Delete',
+                    onPressed: () => _confirmAndDelete(item, pick.id),
+                  ),
+          ],
+        ),
+        const Divider(),
+      ],
+    ),
+  );
+},
                                 ),
                               ),
                             ),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
-                                ElevatedButton(
+                                                           ElevatedButton(
                                   onPressed: () async {
-                                    final detailIds = getPicklistDetailIds(pick.id);
+                                    final detailIds = pick.picklistDetail
+                                        .map((d) => d.id)
+                                        .toList();
+
                                     if (detailIds.isEmpty) {
-                                      fetchPickingDetail(pick.id).then((_) {
-                                        final updatedDetailIds = getPicklistDetailIds(pick.id);
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => PickingAddPage(
-                                              picklistId: pick.id,
-                                              picklistDetailIds: updatedDetailIds,
-                                            ),
-                                          ),
-                                        );
-                                      });
-                                    } else {
-                                      final result = await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => PickingAddPage(
-                                            picklistId: pick.id,
-                                            picklistDetailIds: detailIds,
-                                          ),
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              "No picklist detail found for this pick"),
+                                          backgroundColor: Colors.redAccent,
                                         ),
                                       );
+                                      return;
+                                    }
 
-// ✅ If PickingAddPage returns true (successful post)
-                                      if (result == true) {
-                                        await fetchPickingDetail(pick.id); // refresh only that picklist’s data
-                                        setState(() {}); // redraw UI but keep expandedId, scroll, etc.
-                                      }
+                                    final result = await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                    builder: (_) => PickingAddPage(
+  picklistId: pick.id,
+  picklistDetailIds: detailIds,
+  picklistDetails: pick.picklistDetail.map((d) => d.raw).toList(),
+),
+                                      ),
+                                    );
+
+                                    // ✅ If PickingAddPage returns true (successful post)
+                                    if (result == true) {
+                                      await fetchPickingDetail(pick.id); // refresh only that picklist's data
+                                      setState(() {}); // redraw UI but keep expandedId, scroll, etc.
                                     }
                                   },
                                   style: ElevatedButton.styleFrom(
@@ -222,15 +490,68 @@ class _PickingListPageState extends State<PickingListPage> {
                                       style: TextStyle(color: Colors.white)),
                                 ),
                                 const SizedBox(width: 10),
-                                ElevatedButton(
-                                  onPressed: () {},
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppConfig.colorPrimary,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                                  ),
-                                  child: const Text('Complete',
-                                      style: TextStyle(color: Colors.white)),
-                                ),
+                           ElevatedButton(
+  onPressed: completingIds.contains(pick.id)
+      ? null
+      : () async {
+          debugPrint('>>> COMPLETE TAPPED: picklistId=${pick.id}, invoice=${pick.invoiceNo}');
+
+          final details = pickingDetails[pick.id];
+          if (details == null || details.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No picked items. Add items before completing.'),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+            return;
+          }
+
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Complete picking?'),
+           content: Text('Do you want to complete picklist ${pick.invoiceNo}?'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel')),
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Yes')),
+              ],
+            ),
+          );
+          if (confirm != true) return;
+
+          setState(() => completingIds.add(pick.id));
+       final err = await completePicklist(pick.id);
+final ok = err == null;
+if (!mounted) return;
+setState(() => completingIds.remove(pick.id));
+
+ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+  content: Text(ok ? 'Picklist completed' : 'Failed: $err'),
+  backgroundColor: ok ? Colors.green : Colors.redAccent,
+  duration: Duration(seconds: ok ? 2 : 6),
+));
+
+if (ok) {
+            setState(() => expandedId = null);
+            await fetchPickLists();
+          }
+        },
+  style: ElevatedButton.styleFrom(
+    backgroundColor: AppConfig.colorPrimary,
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+  ),
+  child: completingIds.contains(pick.id)
+      ? const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+      : const Text('Complete', style: TextStyle(color: Colors.white)),
+),
                               ],
                             ),
                           ],
@@ -239,8 +560,11 @@ class _PickingListPageState extends State<PickingListPage> {
                   ),
                 ),
               ),
-            );
+                  );
           },
+        ),
+            ),
+          ],
         ),
       ),
     );
@@ -268,15 +592,21 @@ class PickList {
 
   factory PickList.fromJson(Map<String, dynamic> json) {
     return PickList(
-      id: json['id'] ?? 0,
-      invoiceNo: json['invoice_no'] ?? '',
-      saReference: json['sa_reference'] ?? '',
-      customer_name: json['customer_name'] ?? '',
-      van: (json['van'] as List?)?.map((e) => Van.fromJson(e)).toList() ?? [],
-      user: (json['user'] as List?)?.map((e) => User.fromJson(e)).toList() ?? [],
+      id: _toInt(json['id']),
+      invoiceNo: _toStr(json['invoice_no']),
+      saReference: _toStr(json['sa_reference']),
+      customer_name: _toStr(json['customer_name']),
+      van: (json['van'] as List?)
+              ?.map((e) => Van.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      user: (json['user'] as List?)
+              ?.map((e) => User.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
       picklistDetail: (json['picklistdetail'] as List?)
-          ?.map((e) => PickListDetail.fromJson(e))
-          .toList() ??
+              ?.map((e) => PickListDetail.fromJson(e as Map<String, dynamic>))
+              .toList() ??
           [],
     );
   }
@@ -290,8 +620,8 @@ class Van {
 
   factory Van.fromJson(Map<String, dynamic> json) {
     return Van(
-      id: json['id'] ?? 0,
-      name: json['name'] ?? '',
+      id: _toInt(json['id']),
+      name: _toStr(json['name']),
     );
   }
 }
@@ -304,8 +634,8 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'] ?? 0,
-      name: json['name'] ?? '',
+      id: _toInt(json['id']),
+      name: _toStr(json['name']),
     );
   }
 }
@@ -313,16 +643,14 @@ class User {
 class PickListDetail {
   final int id;
   final int quantity;
+  final Map<String, dynamic> raw;
+  PickListDetail({required this.id, required this.quantity, required this.raw});
 
-  PickListDetail({
-    required this.id,
-    required this.quantity,
-  });
-
-  factory PickListDetail.fromJson(Map<String, dynamic> json) {
+    factory PickListDetail.fromJson(Map<String, dynamic> json) {
     return PickListDetail(
-      id: json['id'] ?? 0,
-      quantity: json['quantity'] ?? 0,
+      id: _toInt(json['id']),
+      quantity: _toInt(json['quantity']),
+      raw: json,
     );
   }
 }
@@ -351,7 +679,7 @@ class PickingDetail {
   final int productId;
   final int unitId;
   final String qty;
-  final Unit unit; // Changed from String to Unit
+  final Unit unit;
   final String expiry;
   final String batch;
   final int userId;
@@ -364,7 +692,7 @@ class PickingDetail {
     required this.picklistDetailId,
     required this.productId,
     required this.unitId,
-    required this.unit, // Changed from String to Unit
+    required this.unit,
     required this.qty,
     required this.expiry,
     required this.batch,
@@ -375,20 +703,19 @@ class PickingDetail {
 
   factory PickingDetail.fromJson(Map<String, dynamic> json) {
     return PickingDetail(
-      id: json['id'] ?? 0,
-      picklistId: json['picklist_id'] ?? 0,
-      picklistDetailId: json['picklist_detail_id'] ?? 0,
-      productId: json['product_id'] ?? 0,
-      unitId: json['unit_id'] ?? 0,
+      id: _toInt(json['id']),
+      picklistId: _toInt(json['picklist_id']),
+      picklistDetailId: _toInt(json['picklist_detail_id']),
+      productId: _toInt(json['product_id']),
+      unitId: _toInt(json['unit_id']),
       qty: json['qty']?.toString() ?? '0',
-      unit: Unit.fromJson(json['unit'] ?? {}), // Parse unit object
-      expiry: json['expiry'] ?? '',
-      batch: json['batch'] ?? '',
-      userId: json['user_id'] ?? 0,
-      storeId: json['store_id'] ?? 0,
-      product: json['product'] != null
-          ? Product.fromJson(json['product'])
-          : null,
+      unit: Unit.fromJson(json['unit'] ?? {}),
+      expiry: _toStr(json['expiry']),
+      batch: _toStr(json['batch']),
+      userId: _toInt(json['user_id']),
+      storeId: _toInt(json['store_id']),
+      product:
+          json['product'] != null ? Product.fromJson(json['product']) : null,
     );
   }
 }

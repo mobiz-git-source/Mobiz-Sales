@@ -46,11 +46,27 @@ class _SalesScreenState extends State<SalesScreen> {
   bool Status = false;
   var attendanceData;
 
-  String roundoff = '';
+   String roundoff = '';
 
-  @override
+  double _r(double v) {
+    final int dec = AppState().noOfDecimals ?? 2;
+    double f = 1;
+    for (int i = 0; i < dec; i++) f *= 10;
+    final double sign = v < 0 ? -1 : 1;
+    return sign * ((v.abs() * f) + 1e-9).roundToDouble() / f;
+  }
+
+  double _vatRound(double v) {
+    final double sign = v < 0 ? -1 : 1;
+    return sign * ((v.abs() * 100) + 1e-9).roundToDouble() / 100;
+  }
+
+   @override
   void initState() {
     super.initState();
+    AppState().loadTaxName().then((_) {
+      if (mounted) setState(() {});
+    });
     _loadSavedProducts();
     fetchProductTypes();
     fetchCheckInDetail();
@@ -135,36 +151,35 @@ class _SalesScreenState extends State<SalesScreen> {
 
       if (taxableAmount < 0) taxableAmount = 0;
 
-      tax += (taxableAmount * taxPercentage) / 100;
+       tax += (taxableAmount * taxPercentage) / 100;
     }
 
-    return tax;
+    return _vatRound(tax);
   }
+ Map<String, dynamic> CalculatedValue() {
+  final double taxamt = _ifVat == 1 ? calculateTax() : 0;
 
-  Map<String, dynamic> CalculatedValue() {
-    double taxamt = calculateTax();
+  roundoff = _roundoff.text.trim();
+  final double rundff = double.tryParse(roundoff) ?? 0;
 
-    roundoff = _roundoff.text;
-    double rundff = double.tryParse(roundoff) ?? 0;
+  final double discountAmount =
+      double.tryParse(_discountData.text.trim()) ?? 0;
 
-    String discountValue = _discountData.text.trim();
-    double discountAmount = double.tryParse(discountValue) ?? 0;
+  final double netAmount = _isPercentage
+      ? totalAmount - (totalAmount * discountAmount / 100)
+      : totalAmount - discountAmount;
 
-    double grandTotal = _ifVat == 1
-        ? _isPercentage
-            ? totalAmount - ((totalAmount * discountAmount) / 100) + taxamt
-            : (totalAmount - discountAmount) + taxamt
-        : _isPercentage
-            ? totalAmount - ((totalAmount * discountAmount) / 100)
-            : totalAmount - discountAmount;
-    num roundedGrandTotal1 =
-        roundoff == '' ? customRound(grandTotal) : grandTotal + rundff;
-    double roundOffValue = roundedGrandTotal1 - grandTotal;
-    return {
-      'rounded': roundedGrandTotal1,
-      'roundOffValue': roundOffValue,
-    };
-  }
+  final double grandTotal = _r(netAmount + taxamt);
+
+  // Default round off = 0. Applied only when entered manually.
+  final double roundOffValue = roundoff.isEmpty ? 0.0 : _r(rundff);
+  final double roundedGrandTotal = _r(grandTotal + roundOffValue);
+
+  return {
+    'rounded': roundedGrandTotal,
+    'roundOffValue': roundOffValue,
+  };
+}
 
   Future<void> _loadSavedProducts() async {
     final prefs = await SharedPreferences.getInstance();
@@ -406,7 +421,7 @@ class _SalesScreenState extends State<SalesScreen> {
           'product_type': productTypes,
           'total_tax': tax,
           "discount": _discountData.text.isEmpty ? '0' : _discountData.text,
-          "total": totalAmount,
+               "total": _r(totalAmount),
           "round_off": roundOffValue,
           "grand_total":
               roundedGrandTotal.toStringAsFixed(AppState().noOfDecimals ?? 2),
@@ -624,16 +639,19 @@ class _SalesScreenState extends State<SalesScreen> {
                                           SizeConfig.blockSizeHorizontal * 13,
                                       height: SizeConfig.blockSizeVertical * 3,
                                       child: Center(
-                                        child: Text(
-                                          'VAT',
-                                          style: TextStyle(
-                                            fontSize:
-                                                AppConfig.textCaption3Size,
-                                            color: (_ifVat == 1)
-                                                ? AppConfig.backButtonColor
-                                                : AppConfig.textBlack,
-                                          ),
-                                        ),
+                                       child: FittedBox(
+  fit: BoxFit.scaleDown,
+  child: Text(
+    AppState().taxLabel,
+    style: TextStyle(
+      fontSize:
+          AppConfig.textCaption3Size,
+      color: (_ifVat == 1)
+          ? AppConfig.backButtonColor
+          : AppConfig.textBlack,
+    ),
+  ),
+),
                                       ),
                                     ),
                                   ),
@@ -659,16 +677,19 @@ class _SalesScreenState extends State<SalesScreen> {
                                           SizeConfig.blockSizeHorizontal * 13,
                                       height: SizeConfig.blockSizeVertical * 3,
                                       child: Center(
-                                        child: Text(
-                                          'NO VAT',
-                                          style: TextStyle(
-                                            fontSize:
-                                                AppConfig.textCaption3Size,
-                                            color: (_ifVat == 0)
-                                                ? AppConfig.backButtonColor
-                                                : AppConfig.textBlack,
-                                          ),
-                                        ),
+                                     child: FittedBox(
+  fit: BoxFit.scaleDown,
+  child: Text(
+    'NO ${AppState().taxLabel}',
+    style: TextStyle(
+      fontSize:
+          AppConfig.textCaption3Size,
+      color: (_ifVat == 0)
+          ? AppConfig.backButtonColor
+          : AppConfig.textBlack,
+    ),
+  ),
+),
                                       ),
                                     ),
                                   ),
@@ -978,8 +999,8 @@ class _SalesScreenState extends State<SalesScreen> {
                             : const SizedBox.shrink(),
                         Text(
                             'Total: ${totalAmount.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
-                        Text(
-                            'Tax: ${tax.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
+                       Text(
+    '${AppState().taxLabel}: ${tax.toStringAsFixed(AppState().noOfDecimals ?? 2)}'),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
@@ -1068,8 +1089,8 @@ class _SalesScreenState extends State<SalesScreen> {
                                       borderRadius: const BorderRadius.all(
                                           Radius.circular(5))),
                                   child: Center(
-                                    child: Text(
-                                        '${roundoff == '' ? roundOffValue.toStringAsFixed(AppState().noOfDecimals ?? 2) : roundoff}'),
+                                                                        child: Text(roundOffValue.toStringAsFixed(
+                                        AppState().noOfDecimals ?? 2)),
                                   )),
                             ),
                           ],

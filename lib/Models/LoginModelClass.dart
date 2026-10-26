@@ -5,31 +5,47 @@ class LoginModel {
   Authorisation? authorisation;
   Currency? currency;
   Store? store;
+  Tax? tax;
 
-  LoginModel(
-      {this.status,
-      this.user,
-      this.authorisation,
-      this.settings,
-      this.currency,
-      this.store});
+  LoginModel({
+    this.status,
+    this.user,
+    this.authorisation,
+    this.settings,
+    this.currency,
+    this.store,
+    this.tax,
+  });
 
-  LoginModel.fromJson(Map<String, dynamic> json) {
+   LoginModel.fromJson(Map<String, dynamic> json) {
     status = json['status'];
-    user = json['user'] != null ? new User.fromJson(json['user']) : null;
+
+    user = json['user'] != null
+        ? User.fromJson(json['user'])
+        : null;
+
     settings = json['settings'] != null
-        ? new Settings.fromJson(json['settings'])
+        ? Settings.fromJson(json['settings'])
         : null;
+
     authorisation = json['authorisation'] != null
-        ? new Authorisation.fromJson(json['authorisation'])
+        ? Authorisation.fromJson(json['authorisation'])
         : null;
+
     currency = json['currency'] != null
-        ? new Currency.fromJson(json['currency'])
+        ? Currency.fromJson(json['currency'])
         : null;
-    store = json['store'] != null ? new Store.fromJson(json['store']) : null;
+
+    store = json['store'] != null
+        ? Store.fromJson(json['store'])
+        : null;
+
+    tax = json['tax'] != null
+        ? Tax.fromJson(Map<String, dynamic>.from(json['tax']))
+        : null;
   }
 
-  Map<String, dynamic> toJson() {
+   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = new Map<String, dynamic>();
     data['status'] = this.status;
     if (this.user != null) {
@@ -38,12 +54,49 @@ class LoginModel {
     if (this.authorisation != null) {
       data['authorisation'] = this.authorisation!.toJson();
     }
-    if (this.currency != null) {
-      data['currency'] = this.currency!.toJson();
-    }
-    return data;
+ if (currency != null) {
+  data['currency'] = currency!.toJson();
+}
+
+if (tax != null) {
+  data['tax'] = tax!.toJson();
+}
+
+return data;
   }
 }
+
+class Tax {
+  int? id;
+  String? name;
+  num? percentage;
+  String? description;
+
+  Tax({
+    this.id,
+    this.name,
+    this.percentage,
+    this.description,
+  });
+
+  Tax.fromJson(Map<String, dynamic> json) {
+    id = json['id'];
+    name = json['name']?.toString();
+    percentage = json['percentage'];
+    description = json['description']?.toString();
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'percentage': percentage,
+      'description': description,
+    };
+  }
+}
+
+// ✅ purathulla toJson() delete cheythu
 
 class User {
   int? id;

@@ -30,9 +30,9 @@ class QuotationHome extends StatefulWidget {
   @override
   State<QuotationHome> createState() => _QuotationHomeState();
 }
-
 class _QuotationHomeState extends State<QuotationHome> {
   final TextEditingController _searchController = TextEditingController();
+  final Map<int, Future<String?>> _statusFutures = {};
   VanSaleProducts products = VanSaleProducts();
   List<Data> filteredProducts = [];
   bool _initDone = false;
@@ -49,11 +49,27 @@ class _QuotationHomeState extends State<QuotationHome> {
   List<Qty.ProductQuantityDetails> quantity = [];
 
   @override
-  void initState() {
+   void initState() {
     super.initState();
+    AppState().loadTaxName().then((_) {
+      if (mounted) setState(() {});
+    });
     _getProducts();
   }
+String _discountText(Data data) {
+  final dec = AppState().noOfDecimals ?? 2;
+  final t = (data.discount_type ?? '').trim().toLowerCase();
+  final isPct = t == '1' || t == 'percentage';
+  final num disc = data.discount ?? 0;
 
+  if (isPct) {
+    final num amt = data.discount_amount ?? 0;
+    final p = disc.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
+    return 'Discount ($p%): ${amt.toStringAsFixed(dec)}';
+  }
+  // type 0 -> direct amount, percentage kaanikkaruthu
+  return 'Discount: ${disc.toStringAsFixed(dec)}';
+}
   @override
   void dispose() {
     _searchController.dispose();
@@ -252,10 +268,12 @@ class _QuotationHomeState extends State<QuotationHome> {
     );
   }
 
-  Widget _productsCard(Data data, int index) {
-    return FutureBuilder<String?>(
-        future: fetchUpdatedStatus(data.id!),
-        builder: (context, snapshot) {
+ // add this field near the other state variables
+Widget _productsCard(Data data, int index) {
+  return FutureBuilder<String?>(
+      future: _statusFutures.putIfAbsent(
+          data.id!, () => fetchUpdatedStatus(data.id!)),
+      builder: (context, snapshot) {
           String status = "Loading...";
           Color statusColor = Colors.grey;
 
@@ -359,12 +377,12 @@ class _QuotationHomeState extends State<QuotationHome> {
                           fontSize: AppConfig.textCaption3Size,
                         ),
                       ),
-                      Text(
-                        'Discount(%): ${data.discount}',
-                        style: TextStyle(
-                          fontSize: AppConfig.textCaption3Size,
-                        ),
-                      ),
+                    Text(
+  _discountText(data),
+  style: TextStyle(
+    fontSize: AppConfig.textCaption3Size,
+  ),
+),
                       SizedBox(
                         width: SizeConfig.blockSizeHorizontal * 90,
                         child: Row(
@@ -416,7 +434,7 @@ class _QuotationHomeState extends State<QuotationHome> {
                         ),
                       ),
                       Text(
-                        'Total Vat: ${data.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? ''}',
+  '${AppState().taxLabel}: ${data.totalTax?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? ''}',
                         style: TextStyle(
                           fontSize: AppConfig.textCaption3Size,
                         ),
@@ -524,24 +542,46 @@ class _QuotationHomeState extends State<QuotationHome> {
     );
   }
 
-  Future<void> _getProducts() async {
+ Future<void> _getProducts() async {
+  try {
+    debugPrint('storeId=${AppState().storeId} vanId=${AppState().vanId} userId=${AppState().userId}');
+
     RestDatasource api = RestDatasource();
-    dynamic resJson = await api.getDetails(
-        '/api/sales-quotation?store_id=${AppState().storeId}&van_id=${AppState().vanId}&user_id=${AppState().userId}',
-        AppState().token); //
-    if (resJson['data'] != null) {
+    dynamic resJson = await api
+        .getDetails(
+          '/api/sales-quotation?store_id=${AppState().storeId}&van_id=${AppState().vanId}&user_id=${AppState().userId}',
+          AppState().token,
+        )
+        .timeout(const Duration(seconds: 30));
+
+    debugPrint('Quotation response: $resJson');
+
+    if (resJson != null && resJson['data'] != null) {
       products = VanSaleProducts.fromJson(resJson);
       filteredProducts = products.data ?? [];
+      _statusFutures.clear(); // refresh statuses on reload
+      if (!mounted) return;
       setState(() {
+        _noData = (products.data ?? []).isEmpty;
         _initDone = true;
       });
     } else {
+      if (!mounted) return;
       setState(() {
         _noData = true;
         _initDone = true;
       });
     }
+   } catch (e, st) {
+    // 404 "No sales quotations found" is treated as an empty list
+    debugPrint('Error loading quotations: $e');
+    if (!mounted) return;
+    setState(() {
+      _noData = true;
+      _initDone = true;
+    });
   }
+}
 
   Future<void> _createPdf(Invoice.InvoiceData invoice, bool isPrint) async {
 
@@ -622,12 +662,19 @@ class _QuotationHomeState extends State<QuotationHome> {
       Offset(pageWidth, lineYPosition),
     );
 
-    String address = '''
-  Customer: ${invoice.data!.customer![0].code} | ${invoice.data!.customer![0].name}
-  Email: ${invoice.data!.customer![0].email}
-  Contact No:  ${invoice.data!.customer![0].contactNumber}
-  TRN:  ${invoice.data!.customer![0].trn ?? ''}
-  ''';
+  final cust = invoice.data!.customer![0];
+final custCode = (cust.code ?? '').toString().trim();
+final custEmail = (cust.email ?? '').toString().trim();
+final custContact = (cust.contactNumber ?? '').toString().trim();
+final custTrn = (cust.trn ?? '').toString().trim();
+
+final addressLines = <String>[
+  'Customer: ${custCode.isNotEmpty ? '$custCode | ' : ''}${cust.name ?? ''}',
+  if (custEmail.isNotEmpty) 'Email: $custEmail',
+  if (custContact.isNotEmpty) 'Contact No: $custContact',
+  if (custTrn.isNotEmpty) 'TRN: $custTrn',
+];
+final String address = addressLines.join('\n');
 
   String invoiceDetails = '''
   Order No: ${invoice.data!.invoiceNo!}

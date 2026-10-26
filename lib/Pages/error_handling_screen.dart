@@ -26,7 +26,7 @@ class _ErrorHandlingScreenState extends State<ErrorHandlingScreen> {
   @override
   void initState() {
     super.initState();
-  // AppState().rolId = 7;
+  //  AppState().rolId = 7;
     print("Role : ${AppState().rolId}");
     print("Login : ${AppState().loginState}");
     _loadRole = _getRoleId();
