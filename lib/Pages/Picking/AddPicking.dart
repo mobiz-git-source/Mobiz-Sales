@@ -86,17 +86,29 @@ double _pendingQty(Map<String, dynamic> s) {
   }
   return sum;
   
-}bool _qtyAllowed(dynamic productId, double entering) {
+}bool _scanAllowed(Map<String, dynamic> data, double entering) {
   final s = _currentSuggestion;
-  if (s == null || s['product_id']?.toString() != productId?.toString()) {
-    return true;
+  if (s == null) {
+    _showMessage('No pending item to pick for this picklist', true);
+    return false;
   }
+
+  if (s['product_id']?.toString() != data['product_id']?.toString()) {
+    _showMessage(
+      'Wrong product scanned: ${data['product_name'] ?? ''}.\n'
+      'This line is for ${s['product_name'] ?? ''}.',
+      true,
+    );
+    return false;
+  }
+
   final total = _num(s['qty']);
   final remaining = total - _num(s['picked']) - _pendingQty(s);
   if (entering > remaining) {
     _showMessage(
-        'Only ${_fmt(remaining < 0 ? 0 : remaining)} left to pick (Qty: ${_fmt(total)})',
-        true);
+      'Only ${_fmt(remaining < 0 ? 0 : remaining)} left to pick (Qty: ${_fmt(total)})',
+      true,
+    );
     return false;
   }
   return true;
@@ -488,25 +500,25 @@ if ((s["supply_type"] ?? '').toString().isNotEmpty) ...[
     return true;
   }
 
-   // ---------- ADD ITEM ----------
-  bool _addItem(Map<String, dynamic> data, {int? qty}) {
-    final enteredQty = qty ?? int.tryParse(qtyController.text.trim()) ?? 1;
-    if (!_qtyAllowed(data["product_id"], enteredQty.toDouble())) return false;
+ bool _addItem(Map<String, dynamic> data, {int? qty}) {
+  final enteredQty = qty ?? int.tryParse(qtyController.text.trim()) ?? 1;
+  if (!_scanAllowed(data, enteredQty.toDouble())) return false;
 
-    scannedItems.add({
-      "product_id": data["product_id"] ?? "",
-      "unit_id": data["unit_id"] ?? data["unit"] ?? "",
-      "product_name": data["product_name"] ?? "Unknown Product",
-      "qty": enteredQty,
-      "unit_name": data["unit_name"] ?? "",
-      "batch": data["batch"] ?? "",
-      "expiry": data["expire"] ?? data["expiry"] ?? "",
-      "location_id": selectedLocationId,
-      "location_name": _selectedLocationName(),
-      "picklist_detail_id": data["picklist_detail_id"],
-    });
-    return true;
-  }
+  scannedItems.add({
+    "product_id": data["product_id"] ?? "",
+    "unit_id": data["unit_id"] ?? data["unit"] ?? "",
+    "product_name": data["product_name"] ?? "Unknown Product",
+    "qty": enteredQty,
+    "unit_name": data["unit_name"] ?? "",
+    "batch": data["batch"] ?? "",
+    "expiry": data["expire"] ?? data["expiry"] ?? "",
+    "location_id": selectedLocationId,
+    "location_name": _selectedLocationName(),
+    "picklist_detail_id":
+        _currentSuggestion?["picklist_detail_id"] ?? data["picklist_detail_id"],
+  });
+  return true;
+}
 
   Future<void> _onBarcodeSubmit(String value) async {
     final code = value.trim();
@@ -525,17 +537,18 @@ if ((s["supply_type"] ?? '').toString().isNotEmpty) ...[
          final result = jsonDecode(response.body);
         if (result["status"] == true) {
          
-       setState(() {
+    setState(() {
   if (_addItem(Map<String, dynamic>.from(result))) {
-    barcodeController.clear();
     qtyController.text = '1';
   }
+  barcodeController.clear();
 });
-                 FocusScope.of(context).requestFocus(barcodeFocusNode);
-          _refreshSuggestions(keepPosition: true);
-        } else {
-          _showMessage(result["message"] ?? "Invalid scan data", true);
-        }
+FocusScope.of(context).requestFocus(barcodeFocusNode);
+_refreshSuggestions(keepPosition: true);
+} else {
+  barcodeController.clear(); // server reject aayaalum clear
+  _showMessage(result["message"] ?? "Invalid scan data", true);
+}
       } else {
         _showMessage("Error: ${response.statusCode}", true);
       }
@@ -734,14 +747,17 @@ Widget _buildManualSelect() {
       for (var i = 0; i < scannedItems.length; i++) {
         final item = scannedItems[i];
 
-               final picklistDetailId =
-            int.tryParse('${item["picklist_detail_id"] ?? ""}') ??
-            _detailIdFor(item["product_id"]) ??
-            (widget.picklistDetailIds.isNotEmpty
-                ? widget.picklistDetailIds[i % widget.picklistDetailIds.length]
-                : null);
+            final picklistDetailId =
+    int.tryParse('${item["picklist_detail_id"] ?? ""}') ??
+    _detailIdFor(item["product_id"]);
 
-        final body = {
+if (picklistDetailId == null) {
+  failedItems.add(item);
+  lastErrorMessage = "No picklist line found for ${item["product_name"]}";
+  continue;
+}
+
+final body = {
           "picklist_id": widget.picklistId,
           "picklist_detail_id": picklistDetailId,
           "product_id": int.tryParse(item["product_id"].toString()) ?? 0,

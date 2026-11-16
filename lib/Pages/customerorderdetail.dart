@@ -58,10 +58,10 @@ double _r(double v) {
   return sign * ((v.abs() * f) + 1e-9).roundToDouble() / f;
 }
 
-double _vatRound(double v) {
-  final double sign = v < 0 ? -1 : 1;
-  return sign * ((v.abs() * 100) + 1e-9).roundToDouble() / 100;
-}
+// double _vatRound(double v) {
+//   final double sign = v < 0 ? -1 : 1;
+//   return sign * ((v.abs() * 100) + 1e-9).roundToDouble() / 100;
+// }
   // =====================================================================
   // NOTE: Everything in this class below `build()` (all calculations,
   // API calls, SharedPreferences logic, navigation, and the product
@@ -177,49 +177,49 @@ double _vatRound(double v) {
     await prefs.setStringList('selected_products', savedProductsStringList);
   }
 
-  double calculateTax() {
-    double tax = 0;
+ double calculateTax() {
+  double tax = 0;
 
-    String discountValue = _discountData.text.trim();
-    double discountAmount = double.tryParse(discountValue) ?? 0;
-
-    for (var product in savedProducts) {
-      print('TAX DEBUG ${product['code']} keys=${product.keys.toList()} pct=${product['tax_percentage']}');
-      double quantity =
-          double.tryParse(product['quantity']?.toString() ?? '0') ?? 0;
-
-      double rate = double.tryParse(product['amount']?.toString() ?? '0') ?? 0;
-
-      double lineTotal = quantity * rate;
-
-      double taxPercentage =
-          double.tryParse(product['tax_percentage']?.toString() ?? '0') ?? 0;
-
-      double lineDiscountShare =
-          totalAmount == 0 ? 0 : (lineTotal / totalAmount) * discountAmount;
-
-      double taxableAmount = _isPercentage
-          ? lineTotal - ((lineTotal * discountAmount) / 100)
-          : lineTotal - lineDiscountShare;
-
-      if (taxableAmount < 0) taxableAmount = 0;
-
-      tax += (taxableAmount * taxPercentage) / 100;
-    }
-
- return _vatRound(tax);
-  }
-
-Map<String, dynamic> CalculatedValue() {
-  final double taxamt = _ifVat == 1 ? calculateTax() : 0;
-  final double discountAmount =
+  final double discountInput =
       double.tryParse(_discountData.text.trim()) ?? 0;
 
-  final double netAmount = _isPercentage
-      ? totalAmount - (totalAmount * discountAmount / 100)
-      : totalAmount - discountAmount;
+  // Same rounded total discount as CalculatedValue()
+  final double totalDiscount =
+      _r(_isPercentage ? totalAmount * discountInput / 100 : discountInput);
 
-  final double grandTotal = _r(netAmount + taxamt);
+  for (var product in savedProducts) {
+    final double quantity =
+        double.tryParse(product['quantity']?.toString() ?? '0') ?? 0;
+    final double rate =
+        double.tryParse(product['amount']?.toString() ?? '0') ?? 0;
+    final double lineTotal = quantity * rate;
+
+    final double taxPercentage =
+        double.tryParse(product['tax_percentage']?.toString() ?? '0') ?? 0;
+
+    final double lineDiscount =
+        totalAmount == 0 ? 0 : (lineTotal / totalAmount) * totalDiscount;
+
+    double taxableAmount = lineTotal - lineDiscount;
+    if (taxableAmount < 0) taxableAmount = 0;
+
+    tax += (taxableAmount * taxPercentage) / 100;
+  }
+
+  return _r(tax);
+}
+
+Map<String, dynamic> CalculatedValue() {
+ final double taxamt = _ifVat == 1 ? calculateTax() : 0;
+final double discountInput =
+    double.tryParse(_discountData.text.trim()) ?? 0;
+
+// Round the discount amount first, like the server does
+final double discountAmount =
+    _r(_isPercentage ? totalAmount * discountInput / 100 : discountInput);
+
+final double netAmount = _r(totalAmount - discountAmount);
+final double grandTotal = _r(netAmount + taxamt);
 
   roundoff = _roundoff.text.trim();
   double roundedGrandTotal;
@@ -373,8 +373,8 @@ Map<String, dynamic> CalculatedValue() {
  final double roundedGrandTotal = grandTotalMap['rounded'];
 final double roundOffValue = grandTotalMap['roundOffValue'];
 final double _d = double.tryParse(_discountData.text.trim()) ?? 0;
-final double _discAmt = _isPercentage ? totalAmount * _d / 100 : _d;
-final double subTotal = totalAmount - _discAmt;
+final double _discAmt = _r(_isPercentage ? totalAmount * _d / 100 : _d);
+final double subTotal = _r(totalAmount - _discAmt);
     double total;
   if (ModalRoute.of(context)!.settings.arguments != null) {
       final Map<String, dynamic>? params =

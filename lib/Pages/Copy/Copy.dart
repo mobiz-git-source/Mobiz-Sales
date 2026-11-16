@@ -7,6 +7,7 @@ import 'package:mobizapp/Pages/Copy/CopySelectProducts.dart';
 import 'package:mobizapp/Pages/saleinvoices.dart';
 import 'package:mobizapp/Pages/salesselectproductorder.dart';
 import 'package:mobizapp/Pages/salesselectproducts.dart';
+import 'package:mobizapp/Utilities/app_info.dart';
 import 'package:mobizapp/Utilities/date_helper.dart';
 import 'package:mobizapp/vanstockselactpro_tst.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -62,10 +63,10 @@ class _CopyScreenState extends State<CopyScreen> {
   return sign * ((v.abs() * f) + 1e-9).roundToDouble() / f;
 }
 
-double _vatRound(double v) {
-  final double sign = v < 0 ? -1 : 1;
-  return sign * ((v.abs() * 100) + 1e-9).roundToDouble() / 100;
-}
+// double _vatRound(double v) {
+//   final double sign = v < 0 ? -1 : 1;
+//   return sign * ((v.abs() * 100) + 1e-9).roundToDouble() / 100;
+// }
   String _billType = 'Cash';
   @override
   void initState() {
@@ -145,57 +146,50 @@ double _vatRound(double v) {
     await prefs.setStringList('selected_products', savedProductsStringList);
   }
 
-  double calculateTax() {
-    double tax = 0;
+ double calculateTax() {
+  double tax = 0;
 
-    String discountValue = _discountData.text.trim();
-    double discountAmount = double.tryParse(discountValue) ?? 0;
+  final double discountInput =
+      double.tryParse(_discountData.text.trim()) ?? 0;
 
-    for (int index = 0; index < savedProducts.length; index++) {
-      final product = savedProducts[index];
+  // Same rounded total discount as CalculatedValue()
+  final double totalDiscount =
+      _r(_isPercentage ? totalAmount * discountInput / 100 : discountInput);
 
-      double quantity =
-          double.tryParse(product['quantity']?.toString() ?? '0') ?? 0;
+  for (final product in savedProducts) {
+    final double quantity =
+        double.tryParse(product['quantity']?.toString() ?? '0') ?? 0;
+    final double rate =
+        double.tryParse(product['amount']?.toString() ?? '0') ?? 0;
+    final double lineTotal = quantity * rate;
 
-      double rate = double.tryParse(product['amount']?.toString() ?? '0') ?? 0;
+    final num taxPercentage =
+        num.tryParse(product['tax_percentage']?.toString() ?? '0') ?? 0;
 
-      double lineTotal = quantity * rate;
+    // Share of the rounded total discount for this line
+    final double lineDiscount =
+        totalAmount == 0 ? 0 : (lineTotal / totalAmount) * totalDiscount;
 
-      num taxPercentage =
-          num.tryParse(product['tax_percentage']?.toString() ?? '0') ?? 0;
-      print("========== VAT DEBUG ==========");
-      print("Product ID: ${product['id']}");
-      print("Product Name: ${product['name']}");
-      print("Tax Percentage: ${product['tax_percentage']}");
-      print("Quantity: ${product['quantity']}");
-      print("Rate: ${product['amount']}");
-      print("================================");
-      double lineDiscountAmount = _isPercentage
-          ? (lineTotal * discountAmount) / 100
-          : (totalAmount == 0 ? 0 : (lineTotal / totalAmount) * discountAmount);
-
-      double taxableAmount = lineTotal - lineDiscountAmount;
-
-      tax += (taxableAmount * taxPercentage) / 100;
-    }
-
-     return _vatRound(tax);
+    tax += ((lineTotal - lineDiscount) * taxPercentage) / 100;
   }
 
+  return _r(tax);
+}
    Map<String, dynamic> CalculatedValue() {
     final double taxamt = _ifVat == 1 ? calculateTax() : 0;
     roundoff = _roundoff.text.trim();
     final double rundff = AppState().roundOffAllowedInInvoice == false
         ? 0
         : (double.tryParse(roundoff) ?? 0);
-    final double discountAmount =
-        double.tryParse(_discountData.text.trim()) ?? 0;
+final double discountInput =
+    double.tryParse(_discountData.text.trim()) ?? 0;
 
-    final double netAmount = _isPercentage
-        ? totalAmount - (totalAmount * discountAmount / 100)
-        : totalAmount - discountAmount;
+// Round the discount amount first, like the server does
+final double discountAmount =
+    _r(_isPercentage ? totalAmount * discountInput / 100 : discountInput);   // 91.73
 
-    final double grandTotal = _r(netAmount + taxamt);
+final double netAmount = _r(totalAmount - discountAmount);  // 825.52
+final double grandTotal = _r(netAmount + taxamt);           // 866.80
 
     final double roundOffValue = roundoff.isEmpty ? 0.0 : _r(rundff);
     final double roundedGrandTotal = _r(grandTotal + roundOffValue);
@@ -476,8 +470,10 @@ double _vatRound(double v) {
           "round_off": roundOffValue,
           "grand_total": roundedGrandTotal,
           'remarks': _remarksText,
-          'serial_numbers': serialNumbers,
-          'cash_card': _billType
+                 'serial_numbers': serialNumbers,
+          'cash_card': _billType,
+          'app_version': AppInfo.version,
+          'build_number': AppInfo.buildNumber,
         };
         var body = json.encode(data);
 

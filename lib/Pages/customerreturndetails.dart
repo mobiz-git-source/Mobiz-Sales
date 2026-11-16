@@ -303,35 +303,34 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
     }
     return total;
   }
+double calculateTax() {
+  final double totalAmount = calculateTotalRate();
+  final double discountInput =
+      double.tryParse(_discountData.text.trim()) ?? 0;
 
-  double calculateTax() {
-    double totalAmount = calculateTotalRate();
-    String discountValue = _discountData.text.trim();
-    double discountAmount = double.tryParse(discountValue) ?? 0;
-    double tax = 0;
+  final double totalDiscount =
+      _r(_isPercentage ? totalAmount * discountInput / 100 : discountInput);
 
-    for (int index = 0; index < cartItems.length; index++) {
-      double rate = double.tryParse(
-              amounts[index] ?? cartItems[index].price.toString()) ??
-          0;
-      double quantity = double.tryParse(qtys[index] ?? '1') ?? 1.0;
-      double lineTotal = rate * quantity;
-      num taxPercentage = cartItems[index].taxPercentage;
+  double tax = 0;
+  for (int index = 0; index < cartItems.length; index++) {
+    final double rate = double.tryParse(
+            amounts[index] ?? cartItems[index].price.toString()) ??
+        0;
+    final double quantity = double.tryParse(qtys[index] ?? '1') ?? 1.0;
+    final double lineTotal = rate * quantity;
+    final num taxPercentage = cartItems[index].taxPercentage;
 
-      double lineDiscountShare =
-          totalAmount == 0 ? 0 : (lineTotal / totalAmount) * discountAmount;
+    final double lineDiscount =
+        totalAmount == 0 ? 0 : (lineTotal / totalAmount) * totalDiscount;
 
-      double taxableAmount = _isPercentage
-          ? lineTotal - ((lineTotal * discountAmount) / 100)
-          : lineTotal - lineDiscountShare;
+    double taxableAmount = lineTotal - lineDiscount;
+    if (taxableAmount < 0) taxableAmount = 0;
 
-      if (taxableAmount < 0) taxableAmount = 0;
-
-      tax += (taxableAmount * taxPercentage) / 100;
-    }
-
-    return _vatRound(tax);
+    tax += (taxableAmount * taxPercentage) / 100;
   }
+
+  return _r(tax);
+}
 // Half-up rounding (0.215 -> 0.22), matches backend
 // Half-up rounding (0.215 -> 0.22), matches backend
   double _r(double v) {
@@ -344,28 +343,28 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
     return sign * ((v.abs() * f) + 1e-9).roundToDouble() / f;
   }
 
-  // VAT backend-pole 2 decimal-il half-up round cheyyan
-  double _vatRound(double v) {
-    final double sign = v < 0 ? -1 : 1;
-    return sign * ((v.abs() * 100) + 1e-9).roundToDouble() / 100;
-  }
+  
+  // double _vatRound(double v) {
+  //   final double sign = v < 0 ? -1 : 1;
+  //   return sign * ((v.abs() * 100) + 1e-9).roundToDouble() / 100;
+  // }
 
-  Map<String, dynamic> grandTotal() {
-    double totalAmount = calculateTotalRate();
-    double taxamt = calculateTax();
-    String discountValue = _discountData.text.trim();
-    double discountAmount = double.tryParse(discountValue) ?? 0;
+Map<String, dynamic> grandTotal() {
+  double totalAmount = calculateTotalRate();
+  double taxamt = calculateTax();
 
-    // Calculate net amount after discount
-    double netAmount;
-    if (_isPercentage) {
-      netAmount = totalAmount - (totalAmount * discountAmount / 100);
-    } else {
-      netAmount = totalAmount - discountAmount;
-    }
+  final double discountInput =
+      double.tryParse(_discountData.text.trim()) ?? 0;
 
-    // Calculate grand total
-    double grandTotal = _r(_ifVat == 1 ? netAmount + taxamt : netAmount);
+  // Round the discount amount first, like the server does
+  final double discountAmount =
+      _r(_isPercentage ? totalAmount * discountInput / 100 : discountInput);
+
+  final double netAmount = _r(totalAmount - discountAmount);
+
+  // Calculate grand total
+  double grandTotal = _r(_ifVat == 1 ? netAmount + taxamt : netAmount);
+  
 
     // Handle round off
     String roundoffText = _roundoff.text.trim();
@@ -607,7 +606,7 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
           'discount': _discountData.text.isEmpty ? '0' : _discountData.text,
           'total': _r(total),
           'round_off': roundOffValue,
-          'grand_total': roundedGrandTotal,
+                    'grand_total': grandTotalMap['rounded'],
           'reason_id': _selectedReason?.id ?? 0,
           'remarks': _remarksText,
           'payment_terms': payment ?? 'N/A',
@@ -2077,12 +2076,10 @@ class _CustomerreturndetailState extends State<Customerreturndetail> {
                                                     ),
                                                     Flexible(
                                                       child: Text(
-                                                        (total + tax)
-                                                            .toStringAsFixed(
-                                                          AppState()
-                                                                  .noOfDecimals ??
-                                                              2,
-                                                        ),
+                                                       (_r(total - (_isPercentage
+        ? total * (double.tryParse(_discountData.text.trim()) ?? 0) / 100
+        : (double.tryParse(_discountData.text.trim()) ?? 0))) + tax)
+    .toStringAsFixed(AppState().noOfDecimals ?? 2),
                                                         textAlign:
                                                             TextAlign.right,
                                                         style: const TextStyle(

@@ -48,8 +48,8 @@ import '../Models/userDetails.dart';
 import '../selectproduct.dart';
 import 'Customer Dues/Customer Dues.dart';
 import 'Picking/pickingList.dart';
-import 'Picking/pickingList.dart';
 import 'Production/ProductionOrder.dart';
+import 'WarehouseStockTake/warehouse_stock_take_list.dart'; // NEW (file njan ezhuthi tharum)
 // import 'Picking/pickingList.dart';
 // import 'Picking/AddPicking.dart'; // TEMP
 // import 'Production/ProductionOrder.dart';
@@ -371,8 +371,10 @@ class _HomeScreenState extends State<HomeScreen> {
         return Icons.production_quantity_limits_outlined;
        case 'quora':
         return Icons.quora;
-      case 'request_quote':
+       case 'request_quote':
         return Icons.request_quote;
+      case 'warehouse':                    // NEW
+        return Icons.warehouse;
       default:
         return Icons.help;
     }
@@ -425,10 +427,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         print(AppState().vanId);
                       },
                     ),
-                    ListTile(
+                                      ListTile(
                       leading: Icon(Icons.call),
                       title: const Text('Contact Us'),
                       onTap: () {},
+                    ),
+                    // TEMP: test kazhinjal kalayam
+                    ListTile(
+                      leading: Icon(Icons.warehouse),
+                      title: const Text('Warehouse ST (TEST)'),
+                      onTap: () {
+                        Navigator.pushNamed(
+                            context, WarehouseStockTakeListPage.routeName);
+                      },
                     ),
                     ListTile(
                       leading: Icon(Icons.print),
@@ -532,8 +543,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
                                 final url = firstIconObject?['url'] as String?;
 
+                                                          // NEW: existing Stock Take is the Van stock take
+                                final displayName =
+                                    (name?.trim().toLowerCase() == 'stock take')
+                                        ? 'Van Stock Take'
+                                        : (name ?? 'Unknown');
                                 return _iconButtons(
-                                  title: name ?? 'Unknown',
+                                  title: displayName,
                                   routeName: url ?? '',
                                   icon: getIconData(iconName),
                                 );
@@ -1079,8 +1095,11 @@ Stack(
             case 'DUE':
               Navigator.pushNamed(context, CustomerDues.routeName);
               break;
-            case 'Productionorder':
+                   case 'Productionorder':
               Navigator.pushNamed(context, Productionorder.routeName);
+              break;
+            case 'WarehouseStockTake':       // NEW
+              Navigator.pushNamed(context, WarehouseStockTakeListPage.routeName);
               break;
             default:
               Navigator.pushNamed(context, routeName);

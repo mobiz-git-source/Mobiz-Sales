@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:lottie/lottie.dart';
 import 'package:mobizapp/Pages/Picking/pickingList.dart';
+import 'package:mobizapp/Pages/WarehouseStockTake/warehouse_stock_take_list.dart'; // NEW
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../Models/appstate.dart';
@@ -72,8 +73,9 @@ final response = await http.get(
             final iconList = iconData['icon'] as List?;
             if (iconList == null || iconList.isEmpty) return false;
             final iconName = iconList[0]['icon'];
-            return iconName == 'transfer_within_a_station' ||
-                iconName == 'call_missed_outgoing_rounded';
+                     return iconName == 'transfer_within_a_station' ||
+                iconName == 'call_missed_outgoing_rounded' ||
+                iconName == 'warehouse'; // NEW
           }).toList();
 
           isLoading = false;
@@ -197,6 +199,8 @@ final response = await http.get(
         return Icons.transfer_within_a_station;
       case 'call_missed_outgoing_rounded':
         return Icons.call_missed_outgoing_rounded;
+      case 'warehouse': // NEW
+        return Icons.warehouse;
       default:
         return Icons.help;
     }
@@ -213,8 +217,11 @@ final response = await http.get(
           case 'StockTransferPage':
             Navigator.pushNamed(context, StockTransferPage.routeName);
             break;
-          case 'PickingListPage':
+                   case 'PickingListPage':
             Navigator.pushNamed(context, PickingListPage.routeName);
+            break;
+          case 'WarehouseStockTake': // NEW
+            Navigator.pushNamed(context, WarehouseStockTakeListPage.routeName);
             break;
           default:
             CommonWidgets.showDialogueBox(

@@ -223,10 +223,10 @@ void initState() {
   //   await prefs.setStringList('selected_products', savedProductsStringList);
   // }
 
-  double _vatRound(double v) {
-    final double sign = v < 0 ? -1 : 1;
-    return sign * ((v.abs() * 100) + 1e-9).roundToDouble() / 100;
-  }
+  // double _vatRound(double v) {
+  //   final double sign = v < 0 ? -1 : 1;
+  //   return sign * ((v.abs() * 100) + 1e-9).roundToDouble() / 100;
+  // }
 
   double _r(double v) {
     final int dec = AppState().noOfDecimals ?? 2;
@@ -236,44 +236,49 @@ void initState() {
     return sign * ((v.abs() * f) + 1e-9).roundToDouble() / f;
   }
 
-  double calculateTax() {
-    double tax = 0;
-    final double discountAmount =
-        double.tryParse(_discountData.text.trim()) ?? 0;
+double calculateTax() {
+  double tax = 0;
+  final double discountInput =
+      double.tryParse(_discountData.text.trim()) ?? 0;
 
-    for (final product in savedProducts) {
-      final double quantity =
-          double.tryParse(product['quantity']?.toString() ?? '0') ?? 0;
-      final double rate =
-          double.tryParse(product['amount']?.toString() ?? '0') ?? 0;
-      final double lineTotal = quantity * rate;
-      final num taxPercentage =
-          num.tryParse(product['tax_percentage']?.toString() ?? '0') ?? 0;
+  // Same rounded total discount as CalculatedValue()
+  final double totalDiscount =
+      _r(_isPercentage ? totalAmount * discountInput / 100 : discountInput);
 
-      final double lineDiscountAmount = _isPercentage
-          ? (lineTotal * discountAmount) / 100
-          : (totalAmount == 0 ? 0 : (lineTotal / totalAmount) * discountAmount);
+  for (final product in savedProducts) {
+    final double quantity =
+        double.tryParse(product['quantity']?.toString() ?? '0') ?? 0;
+    final double rate =
+        double.tryParse(product['amount']?.toString() ?? '0') ?? 0;
+    final double lineTotal = quantity * rate;
+    final num taxPercentage =
+        num.tryParse(product['tax_percentage']?.toString() ?? '0') ?? 0;
 
-      final double taxableAmount = lineTotal - lineDiscountAmount;
-      tax += (taxableAmount * taxPercentage) / 100;
-    }
-    return _vatRound(tax);
+    final double lineDiscount =
+        totalAmount == 0 ? 0 : (lineTotal / totalAmount) * totalDiscount;
+
+    double taxableAmount = lineTotal - lineDiscount;
+    if (taxableAmount < 0) taxableAmount = 0;
+
+    tax += (taxableAmount * taxPercentage) / 100;
   }
-
+  return _r(tax);
+}
 
 
   Map<String, dynamic> CalculatedValue() {
     final double taxamt = _ifVat == 1 ? calculateTax() : 0;
     roundoff = _roundoff.text.trim();
     final double rundff = double.tryParse(roundoff) ?? 0;
-    final double discountAmount =
-        double.tryParse(_discountData.text.trim()) ?? 0;
+  final double discountInput =
+    double.tryParse(_discountData.text.trim()) ?? 0;
 
-    final double netAmount = _isPercentage
-        ? totalAmount - (totalAmount * discountAmount / 100)
-        : totalAmount - discountAmount;
+// Round the discount amount first, like the server does
+final double discountAmount =
+    _r(_isPercentage ? totalAmount * discountInput / 100 : discountInput);
 
-    final double grandTotal = _r(netAmount + taxamt);
+final double netAmount = _r(totalAmount - discountAmount);
+final double grandTotal = _r(netAmount + taxamt);
 
     final double roundOffValue = roundoff.isEmpty ? 0.0 : _r(rundff);
     final double roundedGrandTotal = _r(grandTotal + roundOffValue);
@@ -411,8 +416,8 @@ void initState() {
     double roundOffValue = double.parse(double.parse(grandTotalMap['roundOffValue'].toString()).toStringAsFixed(AppState().noOfDecimals ?? 2));
         final int dec = AppState().noOfDecimals ?? 2;
     final double _d = double.tryParse(_discountData.text.trim()) ?? 0;
-    final double _discAmt = _isPercentage ? totalAmount * _d / 100 : _d;
-    final double subTotal = totalAmount - _discAmt;
+   final double _discAmt = _r(_isPercentage ? totalAmount * _d / 100 : _d);
+final double subTotal = _r(totalAmount - _discAmt);
     double total;
     if (ModalRoute.of(context)!.settings.arguments != null) {
       final Map<String, dynamic>? params =
@@ -489,7 +494,7 @@ void initState() {
             'product_type': savedProducts.map((p) => int.parse(p['type_id'].toString())).toList(),
             'total_tax': tax.toStringAsFixed(AppState().noOfDecimals ?? 2),
             "discount": _discountData.text.isEmpty ? '0' : _discountData.text,
-            "total": totalAmount,
+          "total": _r(totalAmount),
             "round_off": roundOffValue.toStringAsFixed(AppState().noOfDecimals ?? 2),
             "grand_total": roundedGrandTotal,
             'remarks': _remarksText,

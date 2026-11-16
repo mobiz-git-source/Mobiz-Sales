@@ -526,7 +526,9 @@ final List<dynamic> productTypes = rawTypeData is List
   final double _rawStock0 =
       double.tryParse(selectedUnit?['stock']?.toString() ?? '0') ?? 0.0;
   final double _inCart0 = alreadyInCartQtyForUnit(selectedUnitId);
-  availableStock = (_rawStock0 - _inCart0) < 0 ? 0 : (_rawStock0 - _inCart0);
+ final double _rem0 =
+    double.parse((_rawStock0 - _inCart0).toStringAsFixed(3));
+availableStock = _rem0 < 0 ? 0 : _rem0;
   rateMatrix = parseRateMatrix(selectedUnit?['minimum_rate_matrix']);
 }
       bool isQuantityValid(String? value) {
@@ -1445,10 +1447,9 @@ final List<dynamic> productTypes = rawTypeData is List
                                                 final double _inCart =
                                                     alreadyInCartQtyForUnit(
                                                         selectedUnitId);
-                                                availableStock =
-                                                    (_rawStock - _inCart) < 0
-                                                        ? 0
-                                                        : (_rawStock - _inCart);
+                                               final double _rem =
+    double.parse((_rawStock - _inCart).toStringAsFixed(3));
+availableStock = _rem < 0 ? 0 : _rem;
                                                 rateMatrix = parseRateMatrix(
                                                   selectedUnit?[
                                                       'minimum_rate_matrix'],
@@ -1473,10 +1474,10 @@ final List<dynamic> productTypes = rawTypeData is List
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                       sectionLabel('Quantity *'),
-                                          _buildTextField(
-                                            initialValue: quantity,
-                                            keyboardType: TextInputType.number,
+                                     sectionLabel('Quantity *'),
+_buildTextField(
+  initialValue: quantity,
+  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                             icon: Icons.swap_vert_rounded,
                                             textAlign: TextAlign.right,
                                             autofocus: true,          // 👈 new

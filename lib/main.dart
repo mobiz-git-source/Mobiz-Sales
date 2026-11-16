@@ -28,6 +28,7 @@ import 'package:mobizapp/Pages/newvanstockrequests.dart';
 import 'package:mobizapp/Pages/vanselectproduct.dart';
 import 'package:mobizapp/Pages/vanstockdata.dart';
 import 'package:mobizapp/Pages/vanstockrequest.dart';
+import 'package:mobizapp/Utilities/app_info.dart';
 import 'package:mobizapp/Water.dart';
 import 'package:mobizapp/Pages/TestExpensePage.dart';
 import 'package:mobizapp/DashBoardScreen.dart';
@@ -57,6 +58,7 @@ import 'Pages/Notifications/notifications.dart';
 import 'Pages/Picking/AddPicking.dart';
 import 'Pages/Picking/pickingList.dart';
 import 'Pages/Production/ProductionOrder.dart';
+import 'Pages/WarehouseStockTake/warehouse_stock_take_list.dart'; // NEW
 import 'Pages/Quotation/QuotatioCustomerScreen.dart';
 import 'Pages/Quotation/QuotationHome.dart';
 import 'Pages/Quotation/QuotationProduct.dart';
@@ -180,7 +182,8 @@ void main() async {
     print("♻ Token refreshed: $newToken");
     sendTokenToBackend(newToken);
   });
-print("Code: ${AppState().minor}");
+  await AppInfo.init();   // ← puthiyathu
+  print("Code: ${AppState().minor}");
   runApp(MyApp());
 }
 
@@ -355,7 +358,9 @@ class _MyAppState extends State<MyApp> {
             NotificationPage.routeName: (context) => NotificationPage(),
             QuotatioCustomerScreen.routeName: (context) => QuotatioCustomerScreen(),
             QuotationProduct.routeName: (context) => QuotationProduct(),
-            QuotationHome.routeName: (context) => QuotationHome(),
+                QuotationHome.routeName: (context) => QuotationHome(),
+            WarehouseStockTakeListPage.routeName: (context) =>
+                const WarehouseStockTakeListPage(), // NEW
             // PickingAddPage.routeName: (context) => PickingAddPage(),
             // SaleInvoiceSearchPage.routeName: (context) => SaleInvoiceSearchPage(),
           }),

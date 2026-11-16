@@ -6,6 +6,7 @@ import 'package:mobizapp/Models/appstate.dart';
 import 'package:mobizapp/Pages/saleinvoices.dart';
 import 'package:mobizapp/Pages/salesselectproductorder.dart';
 import 'package:mobizapp/Pages/salesselectproducts.dart';
+import 'package:mobizapp/Utilities/app_info.dart';
 import 'package:mobizapp/Utilities/date_helper.dart';
 import 'package:mobizapp/vanstockselactpro_tst.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -56,10 +57,10 @@ class _SalesScreenState extends State<SalesScreen> {
     return sign * ((v.abs() * f) + 1e-9).roundToDouble() / f;
   }
 
-  double _vatRound(double v) {
-    final double sign = v < 0 ? -1 : 1;
-    return sign * ((v.abs() * 100) + 1e-9).roundToDouble() / 100;
-  }
+  // double _vatRound(double v) {
+  //   final double sign = v < 0 ? -1 : 1;
+  //   return sign * ((v.abs() * 100) + 1e-9).roundToDouble() / 100;
+  // }
 
    @override
   void initState() {
@@ -126,49 +127,51 @@ class _SalesScreenState extends State<SalesScreen> {
     await prefs.setStringList('selected_products', savedProductsStringList);
   }
 
-  double calculateTax() {
-    double tax = 0;
+double calculateTax() {
+  double tax = 0;
 
-    String discountValue = _discountData.text.trim();
-    double discountAmount = double.tryParse(discountValue) ?? 0;
+  final double discountInput =
+      double.tryParse(_discountData.text.trim()) ?? 0;
 
-    for (var product in savedProducts) {
-      double quantity = double.tryParse(product['quantity'].toString()) ?? 0;
+  // Same rounded total discount as CalculatedValue()
+  final double totalDiscount =
+      _r(_isPercentage ? totalAmount * discountInput / 100 : discountInput);
 
-      double rate = double.tryParse(product['amount'].toString()) ?? 0;
+  for (var product in savedProducts) {
+    final double quantity =
+        double.tryParse(product['quantity']?.toString() ?? '0') ?? 0;
+    final double rate =
+        double.tryParse(product['amount']?.toString() ?? '0') ?? 0;
+    final double lineTotal = quantity * rate;
 
-      double lineTotal = quantity * rate;
+    final double taxPercentage =
+        double.tryParse(product['tax_percentage']?.toString() ?? '0') ?? 0;
 
-      double taxPercentage =
-          double.tryParse(product['tax_percentage'].toString()) ?? 0;
+    final double lineDiscount =
+        totalAmount == 0 ? 0 : (lineTotal / totalAmount) * totalDiscount;
 
-      double lineDiscountShare =
-          totalAmount == 0 ? 0 : (lineTotal / totalAmount) * discountAmount;
+    double taxableAmount = lineTotal - lineDiscount;
+    if (taxableAmount < 0) taxableAmount = 0;
 
-      double taxableAmount = _isPercentage
-          ? lineTotal - ((lineTotal * discountAmount) / 100)
-          : lineTotal - lineDiscountShare;
-
-      if (taxableAmount < 0) taxableAmount = 0;
-
-       tax += (taxableAmount * taxPercentage) / 100;
-    }
-
-    return _vatRound(tax);
+    tax += (taxableAmount * taxPercentage) / 100;
   }
+
+  return _r(tax);
+}
  Map<String, dynamic> CalculatedValue() {
   final double taxamt = _ifVat == 1 ? calculateTax() : 0;
 
   roundoff = _roundoff.text.trim();
   final double rundff = double.tryParse(roundoff) ?? 0;
 
-  final double discountAmount =
+  final double discountInput =
       double.tryParse(_discountData.text.trim()) ?? 0;
 
-  final double netAmount = _isPercentage
-      ? totalAmount - (totalAmount * discountAmount / 100)
-      : totalAmount - discountAmount;
+  // Round the discount amount first, like the server does
+  final double discountAmount =
+      _r(_isPercentage ? totalAmount * discountInput / 100 : discountInput);
 
+  final double netAmount = _r(totalAmount - discountAmount);
   final double grandTotal = _r(netAmount + taxamt);
 
   // Default round off = 0. Applied only when entered manually.
@@ -397,7 +400,9 @@ class _SalesScreenState extends State<SalesScreen> {
           return int.parse(product['unit_id']);
         }).toList();
         List<double> amounts = savedProducts.map<double>((product) {
-          return double.parse(product['amount'].toString());
+    return double.parse(
+    double.parse(product['amount'].toString())
+        .toStringAsFixed(AppState().noOfDecimals ?? 2));
         }).toList();
         List<double> quantity = savedProducts.map<double>((product) {
           return double.parse(product['quantity'].toString());
@@ -425,7 +430,9 @@ class _SalesScreenState extends State<SalesScreen> {
           "round_off": roundOffValue,
           "grand_total":
               roundedGrandTotal.toStringAsFixed(AppState().noOfDecimals ?? 2),
-          'remarks': _remarksText
+                'remarks': _remarksText,
+          'app_version': AppInfo.version,
+          'build_number': AppInfo.buildNumber,
         };
         var body = json.encode(data);
 
