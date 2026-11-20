@@ -229,14 +229,34 @@ class _LoginScreenState extends State<LoginScreen> {
     final pattern = RegExp('.{1,800}');
     pattern.allMatches(text).forEach((match) => print(match.group(0)));
   }
-
+  Future<String> _getFcmTokenSafe() async {
+    try {
+      if (Platform.isIOS) {
+        String? apns = await FirebaseMessaging.instance.getAPNSToken();
+        int tries = 0;
+        while (apns == null && tries < 5) {
+          await Future.delayed(const Duration(seconds: 1));
+          apns = await FirebaseMessaging.instance.getAPNSToken();
+          tries++;
+        }
+        if (apns == null) {
+          print("APNs token not available, continuing without FCM token");
+          return "";
+        }
+      }
+      return await FirebaseMessaging.instance.getToken() ?? "";
+    } catch (e) {
+      print("FCM token error (non-blocking): $e");
+      return "";
+    }
+  }
   Future<void> _login() async {
     AppState appState = AppState();
     RestDatasource api = RestDatasource();
 
     try {
       // Get FCM token
-      final fcmToken = await FirebaseMessaging.instance.getToken();
+     final fcmToken = await FirebaseMessaging.instance.getToken();
       print("FCM TOKEN LOGIN: $fcmToken");
 
       // Get Device ID
@@ -246,7 +266,7 @@ class _LoginScreenState extends State<LoginScreen> {
       Map<String, String> bodyJson = {
         "email": _username.text,
         "password": _password.text,
-        "fcm_token": fcmToken ?? "",
+      "fcm_token": fcmToken ?? "",
         "device_id": deviceId,
       };
 
