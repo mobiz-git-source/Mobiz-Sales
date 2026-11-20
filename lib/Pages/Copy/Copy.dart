@@ -56,12 +56,12 @@ class _CopyScreenState extends State<CopyScreen> {
 
   String roundoff = '';
   double _r(double v) {
-  final int dec = AppState().noOfDecimals ?? 2;
-  double f = 1;
-  for (int i = 0; i < dec; i++) f *= 10;
-  final double sign = v < 0 ? -1 : 1;
-  return sign * ((v.abs() * f) + 1e-9).roundToDouble() / f;
-}
+    final int dec = AppState().noOfDecimals ?? 2;
+    double f = 1;
+    for (int i = 0; i < dec; i++) f *= 10;
+    final double sign = v < 0 ? -1 : 1;
+    return sign * ((v.abs() * f) + 1e-9).roundToDouble() / f;
+  }
 
 // double _vatRound(double v) {
 //   final double sign = v < 0 ? -1 : 1;
@@ -146,50 +146,52 @@ class _CopyScreenState extends State<CopyScreen> {
     await prefs.setStringList('selected_products', savedProductsStringList);
   }
 
- double calculateTax() {
-  double tax = 0;
+  double calculateTax() {
+    double tax = 0;
 
-  final double discountInput =
-      double.tryParse(_discountData.text.trim()) ?? 0;
+    final double discountInput =
+        double.tryParse(_discountData.text.trim()) ?? 0;
 
-  // Same rounded total discount as CalculatedValue()
-  final double totalDiscount =
-      _r(_isPercentage ? totalAmount * discountInput / 100 : discountInput);
+    // Same rounded total discount as CalculatedValue()
+    final double totalDiscount =
+        _r(_isPercentage ? totalAmount * discountInput / 100 : discountInput);
 
-  for (final product in savedProducts) {
-    final double quantity =
-        double.tryParse(product['quantity']?.toString() ?? '0') ?? 0;
-    final double rate =
-        double.tryParse(product['amount']?.toString() ?? '0') ?? 0;
-    final double lineTotal = quantity * rate;
+    for (final product in savedProducts) {
+      final double quantity =
+          double.tryParse(product['quantity']?.toString() ?? '0') ?? 0;
+      final double rate =
+          double.tryParse(product['amount']?.toString() ?? '0') ?? 0;
+      final double lineTotal = quantity * rate;
 
-    final num taxPercentage =
-        num.tryParse(product['tax_percentage']?.toString() ?? '0') ?? 0;
+      final num taxPercentage =
+          num.tryParse(product['tax_percentage']?.toString() ?? '0') ?? 0;
 
-    // Share of the rounded total discount for this line
-    final double lineDiscount =
-        totalAmount == 0 ? 0 : (lineTotal / totalAmount) * totalDiscount;
+      // Share of the rounded total discount for this line
+      final double lineDiscount =
+          totalAmount == 0 ? 0 : (lineTotal / totalAmount) * totalDiscount;
 
-    tax += ((lineTotal - lineDiscount) * taxPercentage) / 100;
+      tax += ((lineTotal - lineDiscount) * taxPercentage) / 100;
+    }
+
+    return _r(tax);
   }
 
-  return _r(tax);
-}
-   Map<String, dynamic> CalculatedValue() {
+  Map<String, dynamic> CalculatedValue() {
     final double taxamt = _ifVat == 1 ? calculateTax() : 0;
     roundoff = _roundoff.text.trim();
     final double rundff = AppState().roundOffAllowedInInvoice == false
         ? 0
         : (double.tryParse(roundoff) ?? 0);
-final double discountInput =
-    double.tryParse(_discountData.text.trim()) ?? 0;
+    final double discountInput =
+        double.tryParse(_discountData.text.trim()) ?? 0;
 
 // Round the discount amount first, like the server does
-final double discountAmount =
-    _r(_isPercentage ? totalAmount * discountInput / 100 : discountInput);   // 91.73
+    final double discountAmount = _r(_isPercentage
+        ? totalAmount * discountInput / 100
+        : discountInput); // 91.73
 
-final double netAmount = _r(totalAmount - discountAmount);  // 825.52
-final double grandTotal = _r(netAmount + taxamt);           // 866.80
+    final double netAmount = _r(totalAmount - discountAmount); // 825.52
+    final double grandTotal = _r(netAmount + taxamt); // 866.80
 
     final double roundOffValue = roundoff.isEmpty ? 0.0 : _r(rundff);
     final double roundedGrandTotal = _r(grandTotal + roundOffValue);
@@ -226,6 +228,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
   Future<void> clearCart() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.remove('selected_products');
+    if (!mounted) return; // NEW: dispose aayaal setState crash aavilla
     setState(() {
       savedProducts.clear();
     });
@@ -406,7 +409,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
     Map<String, dynamic> grandTotalMap = CalculatedValue();
 
     double tax = _ifVat == 1 ? calculateTax() : 0;
-      final double roundedGrandTotal = grandTotalMap['rounded'];
+    final double roundedGrandTotal = grandTotalMap['rounded'];
     final double roundOffValue = grandTotalMap['roundOffValue'];
     double total;
     if (ModalRoute.of(context)!.settings.arguments != null) {
@@ -466,11 +469,11 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
           'product_type': productTypes,
           'total_tax': tax,
           "discount": _discountData.text.isEmpty ? '0' : _discountData.text,
-      "total": _r(totalAmount),
+          "total": _r(totalAmount),
           "round_off": roundOffValue,
           "grand_total": roundedGrandTotal,
           'remarks': _remarksText,
-                 'serial_numbers': serialNumbers,
+          'serial_numbers': serialNumbers,
           'cash_card': _billType,
           'app_version': AppInfo.version,
           'build_number': AppInfo.buildNumber,
@@ -486,9 +489,47 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
         );
 
         if (response.statusCode == 200) {
+          print('SAVE RESPONSE: ${response.body}');
+
           var responseBody = json.decode(response.body);
-          int dataId = responseBody['data']['id'];
-          int saleId = responseBody['data']['id'];
+
+          // NEW: server success:false + message thannal athu kaanikkum
+          if (responseBody is Map && responseBody['success'] == false) {
+            final m = responseBody['messages'] ?? responseBody['message'];
+            final msg = m is List && m.isNotEmpty
+                ? m.join('\n')
+                : (m?.toString() ?? 'Save failed');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(msg), backgroundColor: Colors.red),
+              );
+            }
+            return;
+          }
+
+          final d = responseBody['data'];
+
+          // NEW: data List aanenkilum Map aanenkilum work aavum
+          final Map<String, dynamic>? dataMap = d is List
+              ? (d.isNotEmpty ? Map<String, dynamic>.from(d.first) : null)
+              : (d is Map ? Map<String, dynamic>.from(d) : null);
+
+          final int? dataId = int.tryParse(dataMap?['id']?.toString() ?? '');
+          final int? saleId = dataId;
+
+          // NEW: id kittiyillenkil crash aavathe response kaanikkum
+          if (dataId == null) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Unexpected response: ${response.body}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+            return;
+          }
+
           if (mounted) {
             CommonWidgets.showDialogueBox(
                     context: context,
@@ -496,7 +537,8 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                     msg: "Created Successfully")
                 .then(
               (value) {
-                clearCart();
+                clearCart(); // NEW: aadyam, screen pop aayalum cart clear aavum
+                if (!mounted) return; // NEW
                 Navigator.pushReplacementNamed(
                     context, Customerreturndetail.routeName,
                     arguments: {
@@ -518,7 +560,8 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Save failed (${response.statusCode}): ${response.body}'),
+                content: Text(
+                    'Save failed (${response.statusCode}): ${response.body}'),
                 backgroundColor: Colors.red,
               ),
             );
@@ -532,9 +575,12 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
           );
         }
       } finally {
-        setState(() {
-          _isButtonDisabled = false;
-        });
+        // NEW: screen pop aayaal setState crash aavilla
+        if (mounted) {
+          setState(() {
+            _isButtonDisabled = false;
+          });
+        }
       }
     }
 
@@ -765,7 +811,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                fontSize: AppFontSizes.label,
+                                    fontSize: AppFontSizes.label,
                                     fontWeight: FontWeight.w600,
                                     color: const Color(0xFF252525),
                                     letterSpacing: 0.05,
@@ -815,12 +861,11 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                               : const Color(0xFFF7F7F7),
                                           child: FittedBox(
                                             fit: BoxFit.scaleDown,
-                                          child: Text(
-  AppState().taxLabel,
-  maxLines: 1,
+                                            child: Text(
+                                              AppState().taxLabel,
+                                              maxLines: 1,
                                               style: TextStyle(
-                                           fontSize: AppFontSizes.body,
-
+                                                fontSize: AppFontSizes.body,
                                                 fontWeight: FontWeight.w600,
                                                 color: (_ifVat == 1)
                                                     ? Colors.white
@@ -855,12 +900,11 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                               : const Color(0xFFF7F7F7),
                                           child: FittedBox(
                                             fit: BoxFit.scaleDown,
-                                           child: Text(
-  'NO ${AppState().taxLabel}',
-  maxLines: 1,
+                                            child: Text(
+                                              'NO ${AppState().taxLabel}',
+                                              maxLines: 1,
                                               style: TextStyle(
-                                         fontSize: AppFontSizes.body,
-
+                                                fontSize: AppFontSizes.body,
                                                 fontWeight: FontWeight.w600,
                                                 color: (_ifVat == 0)
                                                     ? Colors.white
@@ -904,9 +948,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
 
                               return Column(
                                 children: [
-                                  // ============================================================
-                                  // TABLE HEADER
-                                  // ============================================================
+                                
                                   Container(
                                     height: 34,
                                     decoration: const BoxDecoration(
@@ -927,7 +969,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                             child: Text(
                                               '#',
                                               style: TextStyle(
-                                             fontSize: AppFontSizes.value,
+                                                fontSize: AppFontSizes.value,
                                                 fontWeight: FontWeight.w700,
                                                 color: AppConfig.colorPrimary,
                                               ),
@@ -943,7 +985,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                             child: Text(
                                               'Item Details',
                                               style: TextStyle(
-                                           fontSize: AppFontSizes.value,
+                                                fontSize: AppFontSizes.value,
                                                 fontWeight: FontWeight.w700,
                                                 color: AppConfig.colorPrimary,
                                               ),
@@ -958,7 +1000,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                             child: Text(
                                               'Qty',
                                               style: TextStyle(
-                                           fontSize: AppFontSizes.label,
+                                                fontSize: AppFontSizes.label,
                                                 fontWeight: FontWeight.w700,
                                                 color: AppConfig.colorPrimary,
                                               ),
@@ -973,7 +1015,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                             child: Text(
                                               'Rate',
                                               style: TextStyle(
-                                         fontSize: AppFontSizes.label,
+                                                fontSize: AppFontSizes.label,
                                                 fontWeight: FontWeight.w700,
                                                 color: AppConfig.colorPrimary,
                                               ),
@@ -988,7 +1030,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                             child: Text(
                                               'Amt',
                                               style: TextStyle(
-                                          fontSize: AppFontSizes.label,
+                                                fontSize: AppFontSizes.label,
                                                 fontWeight: FontWeight.w700,
                                                 color: AppConfig.colorPrimary,
                                               ),
@@ -1132,8 +1174,9 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                                 '${index + 1}',
                                                                 style:
                                                                     const TextStyle(
-                                                              fontSize: AppFontSizes.body,
-
+                                                                  fontSize:
+                                                                      AppFontSizes
+                                                                          .body,
                                                                   fontWeight:
                                                                       FontWeight
                                                                           .w600,
@@ -1176,7 +1219,9 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                                           .visible,
                                                                   style:
                                                                       const TextStyle(
-                                                                   fontSize: AppFontSizes.label,
+                                                                    fontSize:
+                                                                        AppFontSizes
+                                                                            .label,
                                                                     height:
                                                                         1.15,
                                                                     fontWeight:
@@ -1211,7 +1256,8 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                                         typeName,
                                                                         style:
                                                                             const TextStyle(
-    fontSize: AppFontSizes.badge,
+                                                                          fontSize:
+                                                                              AppFontSizes.badge,
                                                                           fontWeight:
                                                                               FontWeight.w500,
                                                                           color:
@@ -1243,7 +1289,8 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                                         unitName,
                                                                         style:
                                                                             const TextStyle(
-                                                                           fontSize: AppFontSizes.badge,
+                                                                          fontSize:
+                                                                              AppFontSizes.badge,
                                                                           color:
                                                                               Color(0xFF555555),
                                                                         ),
@@ -1271,7 +1318,9 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                                       .toString(),
                                                               style:
                                                                   const TextStyle(
-                                                                fontSize: AppFontSizes.body,
+                                                                fontSize:
+                                                                    AppFontSizes
+                                                                        .body,
                                                                 fontWeight:
                                                                     FontWeight
                                                                         .w500,
@@ -1294,7 +1343,9 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                                       3),
                                                               style:
                                                                   const TextStyle(
-                                                          fontSize: AppFontSizes.tableCellSmall,
+                                                                fontSize:
+                                                                    AppFontSizes
+                                                                        .tableCellSmall,
                                                                 fontWeight:
                                                                     FontWeight
                                                                         .w500,
@@ -1320,7 +1371,9 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                               ),
                                                               style:
                                                                   const TextStyle(
-                                                            fontSize: AppFontSizes.tableCellSmall,
+                                                                fontSize:
+                                                                    AppFontSizes
+                                                                        .tableCellSmall,
                                                                 fontWeight:
                                                                     FontWeight
                                                                         .w600,
@@ -1394,8 +1447,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                             Text(
                                               'Add Item',
                                               style: TextStyle(
-                                          fontSize: AppFontSizes.body,
-
+                                                fontSize: AppFontSizes.body,
                                                 fontWeight: FontWeight.w600,
                                                 color: AppConfig.colorPrimary,
                                               ),
@@ -1421,7 +1473,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                             final bool isVerySmall = screenWidth < 340;
                             final bool isSmall = screenWidth < 380;
 
-                    final double labelWidth = isVerySmall ? 52 : 60;
+                            final double labelWidth = isVerySmall ? 52 : 60;
                             final double sectionGap = isVerySmall ? 8 : 14;
                             final double sectionPadding = isVerySmall ? 8 : 14;
 
@@ -1477,7 +1529,8 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                       child: const Text(
                                                         'Bill Type',
                                                         style: TextStyle(
-                                                    fontSize: AppFontSizes.label,
+                                                          fontSize: AppFontSizes
+                                                              .label,
                                                           fontWeight:
                                                               FontWeight.w600,
                                                           color:
@@ -1602,7 +1655,8 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                       child: const Text(
                                                         'Remarks',
                                                         style: TextStyle(
-                                                     fontSize: AppFontSizes.label,
+                                                          fontSize: AppFontSizes
+                                                              .label,
                                                           fontWeight:
                                                               FontWeight.w600,
                                                           color:
@@ -1693,7 +1747,9 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                                 TextOverflow
                                                                     .ellipsis,
                                                             style: TextStyle(
-                                                        fontSize: AppFontSizes.label,
+                                                              fontSize:
+                                                                  AppFontSizes
+                                                                      .label,
                                                               color: _remarksText
                                                                       .isEmpty
                                                                   ? const Color(
@@ -1720,7 +1776,9 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                         child: const Text(
                                                           'Discount',
                                                           style: TextStyle(
-                                                          fontSize: AppFontSizes.label,
+                                                            fontSize:
+                                                                AppFontSizes
+                                                                    .label,
                                                             fontWeight:
                                                                 FontWeight.w600,
                                                             color: Color(
@@ -1845,7 +1903,9 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                                 .center,
                                                             style:
                                                                 const TextStyle(
-                                                         fontSize: AppFontSizes.value,
+                                                              fontSize:
+                                                                  AppFontSizes
+                                                                      .value,
                                                               fontWeight:
                                                                   FontWeight
                                                                       .w500,
@@ -1930,7 +1990,8 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                     const Text(
                                                       'Total',
                                                       style: TextStyle(
-                                                    fontSize: AppFontSizes.label,
+                                                        fontSize:
+                                                            AppFontSizes.label,
                                                         fontWeight:
                                                             FontWeight.w600,
                                                         color:
@@ -1948,7 +2009,8 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                         textAlign:
                                                             TextAlign.right,
                                                         style: const TextStyle(
-                                                     fontSize: AppFontSizes.value,
+                                                          fontSize: AppFontSizes
+                                                              .value,
                                                           fontWeight:
                                                               FontWeight.w600,
                                                           color:
@@ -1967,14 +2029,15 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                       MainAxisAlignment
                                                           .spaceBetween,
                                                   children: [
-                                                   Flexible(
-  child: Text(
-    AppState().taxLabel,
-    maxLines: 1,
+                                                    Flexible(
+                                                      child: Text(
+                                                        AppState().taxLabel,
+                                                        maxLines: 1,
                                                         overflow: TextOverflow
                                                             .ellipsis,
                                                         style: const TextStyle(
-                                                      fontSize: AppFontSizes.label,
+                                                          fontSize: AppFontSizes
+                                                              .label,
                                                           fontWeight:
                                                               FontWeight.w600,
                                                           color:
@@ -1992,7 +2055,8 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                         textAlign:
                                                             TextAlign.right,
                                                         style: const TextStyle(
-                                                      fontSize: AppFontSizes.value,
+                                                          fontSize: AppFontSizes
+                                                              .value,
                                                           fontWeight:
                                                               FontWeight.w600,
                                                           color:
@@ -2016,7 +2080,9 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                         child: Text(
                                                           'Round Off',
                                                           style: TextStyle(
-                                                      fontSize: AppFontSizes.label,
+                                                            fontSize:
+                                                                AppFontSizes
+                                                                    .label,
                                                             fontWeight:
                                                                 FontWeight.w600,
                                                             color: Color(
@@ -2152,10 +2218,16 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                             fit: BoxFit
                                                                 .scaleDown,
                                                             child: Text(
-                                                          roundOffValue.toStringAsFixed(AppState().noOfDecimals ?? 2),
+                                                              roundOffValue
+                                                                  .toStringAsFixed(
+                                                                      AppState()
+                                                                              .noOfDecimals ??
+                                                                          2),
                                                               style:
                                                                   const TextStyle(
-                                                            fontSize: AppFontSizes.value,
+                                                                fontSize:
+                                                                    AppFontSizes
+                                                                        .value,
                                                                 fontWeight:
                                                                     FontWeight
                                                                         .w500,
@@ -2183,32 +2255,41 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                 const SizedBox(height: 7),
 
                                                 // ================= GRAND TOTAL =================
-                                              Row(
-  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  crossAxisAlignment: CrossAxisAlignment.center,
-  children: [
-    const Text(
-      'Grand Total',
-      style: TextStyle(
-        fontSize: AppFontSizes.label,
-        fontWeight: FontWeight.w700,
-        color: Color(0xFF222222),
-      ),
-    ),
-    const SizedBox(width: 4),
-    Expanded(
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerRight,
-        child: Text(
-          roundedGrandTotal
+                                                Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.center,
+                                                  children: [
+                                                    const Text(
+                                                      'Grand Total',
+                                                      style: TextStyle(
+                                                        fontSize:
+                                                            AppFontSizes.label,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color:
+                                                            Color(0xFF222222),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Expanded(
+                                                      child: FittedBox(
+                                                        fit: BoxFit.scaleDown,
+                                                        alignment: Alignment
+                                                            .centerRight,
+                                                        child: Text(
+                                                          roundedGrandTotal
                                                               .toStringAsFixed(
                                                             AppState()
                                                                     .noOfDecimals ??
                                                                 2,
                                                           ),
                                                           style: TextStyle(
-                                                    fontSize: AppFontSizes.grandTotal,
+                                                            fontSize:
+                                                                AppFontSizes
+                                                                    .grandTotal,
                                                             fontWeight:
                                                                 FontWeight.w700,
                                                             color: AppConfig
@@ -2268,7 +2349,8 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                 Text(
                                                   'CLEAR ALL',
                                                   style: TextStyle(
-                                            fontSize: AppFontSizes.label,
+                                                    fontSize:
+                                                        AppFontSizes.label,
                                                     fontWeight: FontWeight.bold,
                                                     color: Colors.red,
                                                   ),
@@ -2315,7 +2397,8 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                 Text(
                                                   'ADD TO CART',
                                                   style: TextStyle(
-                                             fontSize: AppFontSizes.label,
+                                                    fontSize:
+                                                        AppFontSizes.label,
                                                     fontWeight: FontWeight.bold,
                                                     color:
                                                         AppConfig.colorPrimary,
@@ -2373,7 +2456,8 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                 Text(
                                                   'SAVE SALE',
                                                   style: TextStyle(
-                                                fontSize: AppFontSizes.label,
+                                                    fontSize:
+                                                        AppFontSizes.label,
                                                     fontWeight: FontWeight.bold,
                                                     color: Colors.white,
                                                   ),
@@ -2523,7 +2607,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
             child: Text(
               text,
               style: const TextStyle(
-             fontSize: AppFontSizes.value,
+                fontSize: AppFontSizes.value,
                 fontWeight: FontWeight.w600,
                 color: Colors.black87,
               ),
@@ -2710,7 +2794,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                         const Text(
                                           'Avail. Qty',
                                           style: TextStyle(
-                                      fontSize: AppFontSizes.label,
+                                            fontSize: AppFontSizes.label,
                                             color: kGreen,
                                             fontWeight: FontWeight.w600,
                                           ),
@@ -3429,7 +3513,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                       '(${applicableMinRate.toStringAsFixed(3)})',
                                       style: const TextStyle(
                                         color: Colors.red,
-                                      fontSize: AppFontSizes.label,
+                                        fontSize: AppFontSizes.label,
                                       ),
                                     ),
                                   ),
@@ -3473,7 +3557,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                         child: Text(
                                           'Calculated',
                                           style: TextStyle(
-                                         fontSize: AppFontSizes.body,
+                                            fontSize: AppFontSizes.body,
                                             color: kPrimary,
                                             fontWeight: FontWeight.w600,
                                           ),
@@ -3514,7 +3598,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                   : 'Price Source: Standard Unit Price',
                                               softWrap: true,
                                               style: const TextStyle(
-                                             fontSize: AppFontSizes.label,
+                                                fontSize: AppFontSizes.label,
                                                 fontWeight: FontWeight.w600,
                                                 color: kGreen,
                                               ),
@@ -3526,7 +3610,7 @@ final double grandTotal = _r(netAmount + taxamt);           // 866.80
                                                 'Rate: ${matchedSlab['rate']!.toStringAsFixed(2)}  |  Min Allowed Rate: ${applicableMinRate.toStringAsFixed(2)}',
                                                 softWrap: true,
                                                 style: const TextStyle(
-                                             fontSize: AppFontSizes.label,
+                                                  fontSize: AppFontSizes.label,
                                                   color: kGreen,
                                                 ),
                                               ),
