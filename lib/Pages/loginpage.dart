@@ -256,7 +256,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       // Get FCM token
-     final fcmToken = await FirebaseMessaging.instance.getToken();
+          final fcmToken = await _getFcmTokenSafe();
       print("FCM TOKEN LOGIN: $fcmToken");
 
       // Get Device ID
