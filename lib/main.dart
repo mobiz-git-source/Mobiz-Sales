@@ -105,14 +105,15 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print("📩 Background message: ${message.notification?.title}");
 }
 
-// -----------------------------------------------------------------------------
-// DEVICE + TOKEN
-// -----------------------------------------------------------------------------
 Future<String> getDeviceId() async {
   final info = DeviceInfoPlugin();
   if (Platform.isAndroid) {
     final android = await info.androidInfo;
     return android.id ?? "UNKNOWN";
+  }
+  if (Platform.isIOS) {
+    final ios = await info.iosInfo;
+    return ios.identifierForVendor ?? "UNKNOWN";
   }
   return "UNKNOWN";
 }
@@ -139,50 +140,76 @@ Future<void> sendTokenToBackend(String token) async {
     print("❌ Token Send Error: $e");
   }
 }
+Future<void> _setupFcm() async {
+  try {
+    if (Platform.isIOS) {
+      // APNs token varan kurachu neram edukkum
+      String? apns;
+      for (var i = 0; i < 10 && apns == null; i++) {
+        apns = await FirebaseMessaging.instance.getAPNSToken();
+        if (apns == null) await Future.delayed(const Duration(seconds: 1));
+      }
+    }
+    final token = await FirebaseMessaging.instance.getToken();
+    print("📌 FCM Token: $token");
+    if (token != null) sendTokenToBackend(token);
 
+    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+      print("♻ Token refreshed: $newToken");
+      sendTokenToBackend(newToken);
+    });
+  } catch (e) {
+    print("❌ FCM setup error: $e");
+  }
+}
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    await Firebase.initializeApp(
-      options: FirebaseOptions(
-        apiKey: "AIzaSyCdNIIk0gxNgYTbDUWGHKNa4T1nA9vhrXM",
-        appId: "1:662520788670:android:968ca037f5ddbe336b50ef",
-        messagingSenderId: "662520788670",
-        projectId: "mobiz-sales-b54ca",
-      ),
-    );
-
+    if (Platform.isIOS) {
+      await Firebase.initializeApp(); // GoogleService-Info.plist use cheyyum
+    } else {
+      await Firebase.initializeApp(
+        options: FirebaseOptions(
+          apiKey: "AIzaSyCdNIIk0gxNgYTbDUWGHKNa4T1nA9vhrXM",
+          appId: "1:662520788670:android:968ca037f5ddbe336b50ef",
+          messagingSenderId: "662520788670",
+          projectId: "mobiz-sales-b54ca",
+        ),
+      );
+    }
     print("🔥 Firebase initialized");
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   } catch (e) {
     print("❌ Firebase init error: $e");
   }
 
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  try {
+    const AndroidInitializationSettings androidInit =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const DarwinInitializationSettings iosInit = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    await flutterLocalNotificationsPlugin.initialize(
+      const InitializationSettings(android: androidInit, iOS: iosInit),
+    );
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+  } catch (e) {
+    print("❌ Local notification init error: $e");
+  }
 
-  const AndroidInitializationSettings androidInit =
-  AndroidInitializationSettings('@mipmap/ic_launcher');
+  _setupFcm(); // await cheyyanda, app start thadayilla
 
-  const InitializationSettings initSettings =
-  InitializationSettings(android: androidInit);
-
-  await flutterLocalNotificationsPlugin.initialize(initSettings);
-
-  await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<
-      AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(channel);
-
-  String? token = await FirebaseMessaging.instance.getToken();
-  print("📌 FCM Token: $token");
-
-  if (token != null) sendTokenToBackend(token);
-
-  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
-    print("♻ Token refreshed: $newToken");
-    sendTokenToBackend(newToken);
-  });
-  await AppInfo.init();   // ← puthiyathu
+  try {
+    await AppInfo.init();
+  } catch (e) {
+    print("❌ AppInfo init error: $e");
+  }
   print("Code: ${AppState().minor}");
   runApp(MyApp());
 }
