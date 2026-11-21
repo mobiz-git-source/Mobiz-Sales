@@ -134,10 +134,12 @@ void drawSalesOrder(ImageReportBuilder b, Invoice.InvoiceData invoice,
   b.divider();
 
   // ---- 5. Totals ----
+ // ---- 5. Totals ----
   final double total = (d.total ?? 0).toDouble();
 
-  // Discount AMOUNT: discounted_amount undenkil athu, illenkil discount
-  final double disc = d.effectiveDiscount.toDouble();
+  // Server thanna discount_info mathram upayogikkuka
+  final discInfo = d.discountInfo;
+  final double disc = (discInfo?.amount ?? 0).toDouble();
 
   final double subTotal = total - disc;
   final double roundOff = double.tryParse('${d.roundOff ?? 0}') ?? 0;
@@ -150,8 +152,11 @@ void drawSalesOrder(ImageReportBuilder b, Invoice.InvoiceData invoice,
   }
 
   leftRight('Van: $van', 'Total: ${money(total)}');
-  leftRight('Salesman: $salesman',
-      disc > 0 ? '${d.discountLabel}: ${money(disc)}' : '');
+  leftRight(
+      'Salesman: $salesman',
+      (discInfo != null && discInfo.hasDiscount)
+          ? '${discInfo.label}: ${money(discInfo.amount)}'
+          : '');
   leftRight('', 'Sub Total: ${money(subTotal)}');
   leftRight('', '${AppState().taxLabel}: ${money(d.totalTax)}');
   if (roundOff != 0) {

@@ -1,3 +1,5 @@
+import 'discount_info.dart';
+
 class VanSaleProducts {
   List<Data>? data;
   bool? success;
@@ -36,8 +38,9 @@ class Data {
   num? otherCharge;
   num? discount;
   String? roundOff;
-   String? discount_type;
+     String? discount_type;
   num? discount_amount;
+  DiscountInfo? discountInfo;
   num? total;
   num? totalTax;
   num? grandTotal;
@@ -65,6 +68,7 @@ class Data {
       this.invoiceNo,
           this.discount_type,
       this.discount_amount,
+      this.discountInfo,
       this.deliveryNo,
       this.deliverlocation,
       this.otherCharge,
@@ -101,8 +105,9 @@ class Data {
     otherCharge = json['other_charge'] ?? 0;
        discount = json['discount'] ?? 0;
     discount_type = json['discount_type']?.toString() ?? '';
-    discount_amount =
+        discount_amount =
         num.tryParse(json['discount_amount']?.toString() ?? '') ?? 0;
+    discountInfo = DiscountInfo.tryParse(json['discount_info']);
     roundOff = json['round_off'] ?? '';
     total = json['total'] ?? 0;
     totalTax = json['total_tax'] ?? 0;
@@ -146,8 +151,7 @@ class Data {
     data['delivery_no'] = this.deliveryNo;
     data['delivery_location'] = this.deliverlocation;
     data['other_charge'] = this.otherCharge;
-   data['discount'] = this.discount;
-    data['discount'] = this.discount;
+       data['discount'] = this.discount;
     data['discount_type'] = this.discount_type;
     data['discount_amount'] = this.discount_amount;
     data['round_off'] = this.roundOff;

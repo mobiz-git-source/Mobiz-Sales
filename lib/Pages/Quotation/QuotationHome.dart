@@ -796,9 +796,10 @@ final String address = addressLines.join('\n');
       Offset(pageSize.width, tableBottom + 15),
     );
 
+  final discInfo = invoice.data!.discountInfo;
     // Draw invoice details at the bottom right.
     String bottomInvoiceDetails = '''
-  ${num.parse(invoice.data!.roundOff.toString()) != 0 ? 'Discount: ${invoice.data!.discount}' : '\t'}
+  ${(discInfo != null && discInfo.hasDiscount) ? '${discInfo.label}: ${discInfo.amount.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : '\t'}
   Total: ${invoice.data!.total}
   Vat: ${invoice.data!.totalTax!.toStringAsFixed(AppState().noOfDecimals ?? 2)}
 ${invoice.data?.roundOff != null && double.tryParse(invoice.data!.roundOff.toString()) != 0

@@ -16,6 +16,7 @@ import '../Models/invoicedata.dart' as Invoice;
 import 'dart:typed_data';
 import '../Components/commonwidgets.dart';
 import '../Models/appstate.dart';
+import '../Models/discount_info.dart';
 import '../Models/pdfgenerate.dart';
 import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
@@ -309,27 +310,13 @@ Future<void> _printHomeReturnImage(Invoice.InvoiceData invoice) async {
     );
   }
 String _discountText(VanReturn data) {
-  final dec = AppState().noOfDecimals ?? 2;
-  final String type = (data.discount_type ?? '').trim().toLowerCase();
-  final bool isPercentage = type == '1' || type == 'percentage';
-
-  num amount = data.discount_amount ?? 0;
-
-  if (amount == 0 && (data.discount ?? 0) > 0) {
-    amount = isPercentage
-        ? (data.total ?? 0) * data.discount! / 100
-        : data.discount!;
+    final dec = AppState().noOfDecimals ?? 2;
+    final info = data.discountInfo;
+    if (info != null) {
+      return '${info.label}: ${info.amount.toStringAsFixed(dec)}';
+    }
+    return 'Discount: ${(0).toStringAsFixed(dec)}';
   }
-
-  String label = 'Discount';
-  if (isPercentage && (data.discount ?? 0) > 0) {
-    final s = data.discount!
-        .toStringAsFixed(2)
-        .replaceFirst(RegExp(r'\.?0+$'), '');
-    label = 'Discount ($s%)';
-  }
-  return '$label: ${amount.toStringAsFixed(dec)}';
-}
   Widget _productsCard(VanReturn data, int index) {
     return Card(
       elevation: 1,
@@ -790,17 +777,17 @@ final String address = addressLines.join('\n');
       Offset(pageSize.width, tableBottom + 15),
     );
 
-    // Draw invoice details at the bottom right.
-    // ${num.parse(invoice.data!.roundOff.toString()) != 0 ? 'Discount: ${invoice.data!.discount}' : '\t'}
-       final dec = AppState().noOfDecimals ?? 2;
+  final dec = AppState().noOfDecimals ?? 2;
     final inv = invoice.data!;
     final roundOffVal = num.tryParse(inv.roundOff?.toString() ?? '') ?? 0;
-    final disc = inv.effectiveDiscount;
+    final discInfo = inv.discountInfo;
+    final disc = discInfo?.amount ?? 0;
     final subTotal = (inv.total ?? 0) - disc;
 
     final totalsLines = <String>[
       'Total: ${(inv.total ?? 0).toStringAsFixed(dec)}',
-      if (disc > 0) '${inv.discountLabel}: ${disc.toStringAsFixed(dec)}',
+      if (discInfo != null && discInfo.hasDiscount)
+        '${discInfo.label}: ${discInfo.amount.toStringAsFixed(dec)}',
       'Sub Total: ${subTotal.toStringAsFixed(dec)}',
       '${AppState().taxLabel}: ${(inv.totalTax ?? 0).toStringAsFixed(dec)}',
       if (roundOffVal != 0) 'Round off: ${roundOffVal.toStringAsFixed(dec)}',
@@ -931,10 +918,11 @@ lastPage.graphics.drawString(
     String grandTotal = invoice.data!.grandTotal
             ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
         '0.00';
+   final discInfo = invoice.data!.discountInfo;
     String discount = '';
-    if (invoice.data!.effectiveDiscount > 0) {
+    if (discInfo != null && discInfo.hasDiscount) {
       discount =
-          "Discount: ${invoice.data!.effectiveDiscount.toStringAsFixed(AppState().noOfDecimals ?? 2)}";
+          "${discInfo.label}: ${discInfo.amount.toStringAsFixed(AppState().noOfDecimals ?? 2)}";
     }
     String amountInWords =
         "Amount in Words: ${AppState().code} ${NumberToWord().convert('en-in', invoice.data!.grandTotal?.toInt() ?? 0).toUpperCase()} ONLY";
@@ -1069,8 +1057,9 @@ lastPage.graphics.drawString(
     String grandTotal = invoice.data!.grandTotal
             ?.toStringAsFixed(AppState().noOfDecimals ?? 2) ??
         '0.00';
-        final String Discount = invoice.data!.effectiveDiscount > 0
-        ? "${invoice.data!.discountLabel}: ${invoice.data!.effectiveDiscount.toStringAsFixed(AppState().noOfDecimals ?? 2)}"
+     final discInfo = invoice.data!.discountInfo;
+    final String Discount = (discInfo != null && discInfo.hasDiscount)
+        ? "${discInfo.label}: ${discInfo.amount.toStringAsFixed(AppState().noOfDecimals ?? 2)}"
         : '';
        final amountInWords = _amountInWords(invoice.data!.grandTotal ?? 0);
     String van = invoice.data!.van?.firstOrNull?.name ?? 'N/A';
@@ -1185,8 +1174,8 @@ lastPage.graphics.drawString(
     }
     printer.printCustom("-" * 70, 1, 1);
 
-    final subTotalVal =
-        (invoice.data!.total ?? 0) - invoice.data!.effectiveDiscount;
+  final subTotalVal =
+        (invoice.data!.total ?? 0) - (discInfo?.amount ?? 0);
     final subTotal =
         subTotalVal.toStringAsFixed(AppState().noOfDecimals ?? 2);
 
@@ -1616,8 +1605,9 @@ class VanReturn {
   num? discount;
   String? roundOff;
    String? status_text;
-  String? discount_type;
+String? discount_type;
   num? discount_amount;
+  DiscountInfo? discountInfo;
   num? total;
   num? totalTax;
   num? grandTotal;
@@ -1676,9 +1666,10 @@ class VanReturn {
     deliveryNo = json['delivery_no'] ?? '';
     otherCharge = json['other_charge'] ?? 0;
     discount = json['discount'] ?? 0;
-     discount_type = json['discount_type']?.toString() ?? '';
+discount_type = json['discount_type']?.toString() ?? '';
     discount_amount =
         num.tryParse(json['discount_amount']?.toString() ?? '') ?? 0;
+    discountInfo = DiscountInfo.tryParse(json['discount_info']);
     roundOff = json['round_off'] ?? '';
     status_text = json['status_text'] ?? '';
        total = num.tryParse(json['total']?.toString() ?? '') ?? 0;

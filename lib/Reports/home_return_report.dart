@@ -147,11 +147,12 @@ void drawHomeReturnReport(
     align: PAlign.right),
   ], size: 20);
 
-      final discount = data.effectiveDiscount.toDouble();
-  if (discount > 0) {
+final discInfo = data.discountInfo;
+  if (discInfo != null && discInfo.hasDiscount) {
+    final discount = discInfo.amount.toDouble();
     b.row([
       const Col('', flex: 3),
-      Col('${data.discountLabel}: ${money(discount)}', flex: 2, align: PAlign.right),
+      Col('${discInfo.label}: ${money(discount)}', flex: 2, align: PAlign.right),
     ], size: 20);
     b.row([
       const Col('', flex: 3),
@@ -159,7 +160,6 @@ void drawHomeReturnReport(
           flex: 2, align: PAlign.right),
     ], size: 20);
   }
-
   final roundOff = double.tryParse('${data.roundOff ?? 0}') ?? 0;
   if (roundOff != 0) {
     b.row([

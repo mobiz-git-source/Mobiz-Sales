@@ -111,16 +111,28 @@ void initState() {
           });
         }
 
+       final discInfo = summary['discount_info'];
+        final bool isPct = discInfo is Map
+            ? discInfo['type'] == 'percent'
+            : (summary['discount_type']?.toString() == 'percentage' ||
+                summary['discount_type']?.toString() == '1');
+        final dynamic discVal = discInfo is Map
+            ? (isPct ? discInfo['percent'] : discInfo['amount'])
+            : summary['discount'];
+
         setState(() {
           savedProducts = fetchedProducts;
-          _discountData.text = summary['discount'].toString();
+          _isPercentage = isPct;
+          _discountData.text =
+              (discVal != null && num.tryParse(discVal.toString()) != 0)
+                  ? discVal.toString()
+                  : '';
           _ifVat = summary['if_vat'] ?? 1;
           _remarksText = summary['delivery_location'] ?? '';
           _remarksController.text = _remarksText;
           _updateCalculations();
           _initDone = true;
         });
-
         final prefs = await SharedPreferences.getInstance();
         await prefs.setStringList('selected_products', savedProducts.map((p) => jsonEncode(p)).toList());
       }

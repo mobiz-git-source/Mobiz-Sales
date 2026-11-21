@@ -21,6 +21,7 @@ import '../Models/LoginModelClass.dart';
 import '../Utilities/rest_ds.dart';
 import '../Utilities/date_helper.dart';
 import '../confg/appconfig.dart';
+import '../confg/apptextsizes.dart';
 import '../confg/sizeconfig.dart';
 import 'homepage_Driver.dart';
 
@@ -35,21 +36,25 @@ class ExpenseAdd extends StatefulWidget {
 
 class _ExpenseAddState extends State<ExpenseAdd> {
   // ---------------------------------------------------------------------
-  // UI-only constants (design). Change these to retheme the screen.
+  // UI-only constants. Colors / font sizes follow the Home, Payment
+  // Collection and Sales Invoice screens (AppConfig + AppFontSizes).
   // ---------------------------------------------------------------------
-  static const Color _uiPrimary = Color(0xFF4A3AC4);
-  static const Color _uiPrimaryDark = Color(0xFF3B2DA3);
-  static const Color _uiHeaderStart = Color(0xFF5B4BD0);
-  static const Color _uiHeaderEnd = Color(0xFF4636B8);
-  static const Color _uiSoft = Color(0xFFE9E5FC);
-  static const Color _uiLabel = Color(0xFF3A22B8);
-  static const Color _uiBorder = Color(0xFFDCD7F6);
-  static const Color _uiText = Color(0xFF1E1B4B);
-  static const Color _uiHint = Color(0xFF8E89B8);
+  static const Color _uiPrimary = AppConfig.colorPrimary;
+  static final Color _uiSoft = AppConfig.colorPrimary.withOpacity(0.10);
+  static final Color _uiSoftStrong = AppConfig.colorPrimary.withOpacity(0.16);
+  static const Color _uiPageBg = Color(0xFFF3F4F8); // same as Payment screen
+  static const Color _uiCardBorder = Color(0xFFE8E8EE);
+  static const Color _uiFieldBorder = Color(0xFFD4D4D4);
+  static const Color _uiText = Color(0xFF222222);
+  static const Color _uiHint = Color(0xFF777777);
   static const String _uiCurrency = 'AED';
 
   // Max digits allowed after the decimal point in Amount / Vat Amount.
   static const int _maxDecimalInput = 3;
+
+  // Layout scale derived from screen height (set in build) so the whole
+  // form fits on smaller / zoomed phones without needing to scroll.
+  double _k = 1.0;
 
   late Future<VisitReasonResponse> futureExpenseReason;
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
@@ -93,40 +98,43 @@ class _ExpenseAddState extends State<ExpenseAdd> {
     bool filled = false,
   }) {
     OutlineInputBorder border(Color c, [double w = 1]) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: c, width: w),
         );
 
     return InputDecoration(
       isDense: true,
       hintText: hint,
-      hintStyle: const TextStyle(color: _uiHint, fontWeight: FontWeight.w400),
+      hintStyle: const TextStyle(
+        color: _uiHint,
+        fontWeight: FontWeight.w400,
+        fontSize: AppFontSizes.payFieldValue,
+      ),
       filled: filled,
-      fillColor: filled ? const Color(0xFFE6E4F2) : null,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-      enabledBorder: border(const Color(0xFFB9B1EA)),
+      fillColor: filled ? const Color(0xFFEDEDF3) : null,
+      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 11 * _k),
+      enabledBorder: border(_uiFieldBorder),
       focusedBorder: border(_uiPrimary, 1.5),
       errorBorder: border(Colors.red.shade400),
       focusedErrorBorder: border(Colors.red.shade400, 1.5),
-      border: border(const Color(0xFFB9B1EA)),
+      border: border(_uiFieldBorder),
       suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
       suffixIcon: showCurrency
           ? Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: _uiSoft,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Text(
                   _uiCurrency,
                   style: TextStyle(
-                    color: Color(0xFF3F3A66),
+                    color: _uiHint,
                     fontWeight: FontWeight.w600,
-                    fontSize: 13,
+                    fontSize: AppFontSizes.payInfoSub,
                   ),
                 ),
               ),
@@ -154,7 +162,7 @@ class _ExpenseAddState extends State<ExpenseAdd> {
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: const ColorScheme.light(
-            primary: _uiPrimaryDark,
+            primary: _uiPrimary,
             onPrimary: Colors.white,
             onSurface: _uiText,
           ),
@@ -170,6 +178,19 @@ class _ExpenseAddState extends State<ExpenseAdd> {
     }
   }
 
+  BoxDecoration _cardDecoration() => BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _uiCardBorder, width: 0.8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      );
+
   Widget _fieldCard({
     required IconData icon,
     required String label,
@@ -177,39 +198,34 @@ class _ExpenseAddState extends State<ExpenseAdd> {
     required Widget child,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _uiBorder),
-      ),
+      margin: EdgeInsets.only(bottom: 8 * _k),
+      padding: EdgeInsets.fromLTRB(12, 8 * _k, 12, 8 * _k),
+      decoration: _cardDecoration(),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 56,
-            height: 56,
-            margin: const EdgeInsets.only(top: 6),
-            decoration: const BoxDecoration(
+            width: 42 * _k,
+            height: 42 * _k,
+            margin: const EdgeInsets.only(top: 4),
+            decoration: BoxDecoration(
               color: _uiSoft,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: _uiPrimaryDark, size: 28),
+            child: Icon(icon, color: _uiPrimary, size: 21),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 2),
                 Text.rich(
                   TextSpan(
                     text: label,
                     style: const TextStyle(
-                      color: _uiLabel,
+                      color: _uiPrimary,
                       fontWeight: FontWeight.w600,
-                      fontSize: 16,
+                      fontSize: AppFontSizes.payFieldLabel,
                     ),
                     children: required
                         ? const [
@@ -221,7 +237,7 @@ class _ExpenseAddState extends State<ExpenseAdd> {
                         : null,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 child,
               ],
             ),
@@ -243,45 +259,41 @@ class _ExpenseAddState extends State<ExpenseAdd> {
 
   Widget _attachmentCard() {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: 8 * _k),
       clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _uiBorder),
-      ),
+      decoration: _cardDecoration(),
       child: Column(
         children: [
           Container(
-            color: _uiSoft.withOpacity(0.7),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            color: _uiSoft,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
-                const Icon(Icons.attach_file, color: _uiPrimaryDark, size: 24),
-                const SizedBox(width: 10),
+                const Icon(Icons.attach_file, color: _uiPrimary, size: 20),
+                const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
                     'Attachment',
                     style: TextStyle(
-                      color: _uiLabel,
+                      color: _uiPrimary,
                       fontWeight: FontWeight.w700,
-                      fontSize: 17,
+                      fontSize: AppFontSizes.payFieldLabel,
                     ),
                   ),
                 ),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFD9D2FA),
+                    color: _uiSoftStrong,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     '${_attachedImages.length} File(s)',
                     style: const TextStyle(
-                      color: _uiLabel,
+                      color: _uiPrimary,
                       fontWeight: FontWeight.w600,
-                      fontSize: 13,
+                      fontSize: AppFontSizes.payInfoSub,
                     ),
                   ),
                 ),
@@ -292,11 +304,11 @@ class _ExpenseAddState extends State<ExpenseAdd> {
             final index = entry.key;
             final file = entry.value;
             return Container(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
               decoration: BoxDecoration(
                 border: index == 0
                     ? null
-                    : const Border(top: BorderSide(color: _uiBorder)),
+                    : const Border(top: BorderSide(color: _uiCardBorder)),
               ),
               child: Row(
                 children: [
@@ -304,19 +316,19 @@ class _ExpenseAddState extends State<ExpenseAdd> {
                     borderRadius: BorderRadius.circular(6),
                     child: Image.file(
                       file,
-                      width: 52,
-                      height: 60,
+                      width: 44,
+                      height: 50,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) => Container(
-                        width: 52,
-                        height: 60,
+                        width: 44,
+                        height: 50,
                         color: _uiSoft,
                         child: const Icon(Icons.broken_image,
-                            color: _uiHint, size: 24),
+                            color: _uiHint, size: 22),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -327,15 +339,17 @@ class _ExpenseAddState extends State<ExpenseAdd> {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: _uiText,
-                            fontSize: 15,
+                            fontSize: AppFontSizes.payFieldValue,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           _fileSizeLabel(file),
-                          style:
-                              const TextStyle(color: _uiHint, fontSize: 13),
+                          style: const TextStyle(
+                            color: _uiHint,
+                            fontSize: AppFontSizes.payInfoSub,
+                          ),
                         ),
                       ],
                     ),
@@ -348,14 +362,14 @@ class _ExpenseAddState extends State<ExpenseAdd> {
                       });
                     },
                     child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: const BoxDecoration(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
                         color: _uiSoft,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close,
-                          color: _uiPrimaryDark, size: 22),
+                      child:
+                          const Icon(Icons.close, color: _uiPrimary, size: 18),
                     ),
                   ),
                 ],
@@ -370,25 +384,25 @@ class _ExpenseAddState extends State<ExpenseAdd> {
   Widget _bottomButtons() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       child: SafeArea(
         top: false,
         child: Row(
           children: [
             Expanded(
               child: SizedBox(
-                height: 54,
+                height: 44 * _k,
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: _uiPrimaryDark,
-                    side: const BorderSide(color: _uiPrimary, width: 1.2),
+                    foregroundColor: _uiPrimary,
+                    side: const BorderSide(color: _uiPrimary, width: 0.9),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    backgroundColor: const Color(0xFFF7F5FF),
+                    backgroundColor: Colors.white,
                   ),
                   onPressed: _attachDocuments,
-                  icon: const Icon(Icons.attach_file, size: 22),
+                  icon: const Icon(Icons.attach_file, size: 18),
                   label: const FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
@@ -396,24 +410,24 @@ class _ExpenseAddState extends State<ExpenseAdd> {
                       maxLines: 1,
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
-                        fontSize: 15,
+                        fontSize: AppFontSizes.payButton,
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: SizedBox(
-                height: 54,
+                height: 44 * _k,
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _uiPrimaryDark,
+                    backgroundColor: AppConfig.colorPrimary,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                   onPressed: () {
@@ -421,7 +435,7 @@ class _ExpenseAddState extends State<ExpenseAdd> {
                       postData();
                     }
                   },
-                  icon: const Icon(Icons.send, size: 22),
+                  icon: const Icon(Icons.send, size: 18),
                   label: const FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
@@ -429,7 +443,7 @@ class _ExpenseAddState extends State<ExpenseAdd> {
                       maxLines: 1,
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
-                        fontSize: 15,
+                        fontSize: AppFontSizes.payButton,
                       ),
                     ),
                   ),
@@ -458,269 +472,273 @@ class _ExpenseAddState extends State<ExpenseAdd> {
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
+    _k = (mq.size.height / 800).clamp(0.78, 1.0).toDouble();
     // Keeps the layout stable on phones with very large / small system font.
     return MediaQuery(
       data: mq.copyWith(
         textScaler: mq.textScaler
-            .clamp(minScaleFactor: 0.85, maxScaleFactor: 1.15),
+            .clamp(minScaleFactor: 0.85, maxScaleFactor: 1.0),
       ),
       child: Scaffold(
-      backgroundColor: const Color(0xFFF8F7FD),
-      appBar: AppBar(
-        elevation: 0,
-        centerTitle: false,
-        titleSpacing: 0,
-        backgroundColor: _uiPrimary,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [_uiHeaderStart, _uiHeaderEnd],
+        backgroundColor: _uiPageBg,
+        // Heading: same AppBar as the other screens.
+        appBar: AppBar(
+          leading: GestureDetector(
+            onTap: () {
+              Navigator.pop(context);
+            },
+            child: const Icon(
+              Icons.arrow_back,
+              color: Colors.white,
             ),
           ),
-        ),
-        leading: IconButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          icon: const Icon(
-            Icons.arrow_back,
-            color: Colors.white,
+          backgroundColor: AppConfig.colorPrimary,
+          title: const Text(
+            'Expense',
+            style: AppConfig.pageTitleStyle,
           ),
-        ),
-        title: const Text(
-          'Expense',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        actions: [
-          IconButton(
-            onPressed: _clearForm,
-            icon: const Icon(Icons.delete, color: Colors.white, size: 28),
-          ),
-          const SizedBox(width: 6),
-        ],
-      ),
-      body: FutureBuilder(
-        future: futureExpenseReason,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Shimmer.fromColors(
-              baseColor: AppConfig.buttonDeactiveColor.withOpacity(0.1),
-              highlightColor: AppConfig.backButtonColor,
-              child: Center(
-                child: Column(
-                  children: List.generate(
-                    6,
-                    (index) => CommonWidgets.loadingContainers(
-                      height: SizeConfig.blockSizeVertical * 10,
-                      width: SizeConfig.blockSizeHorizontal * 90,
-                    ),
-                  ),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 10.0),
+              child: GestureDetector(
+                onTap: _clearForm,
+                child: const Icon(
+                  Icons.delete,
+                  color: Colors.white,
                 ),
               ),
-            );
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Text('${snapshot.error}'),
-            );
-          } else if (snapshot.hasData) {
-            return Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.fromLTRB(14, 16, 14, 24),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Date bar
-                          GestureDetector(
-                            onTap: _pickDate,
-                            behavior: HitTestBehavior.opaque,
-                            child: Container(
-                            height: 64,
-                            margin: const EdgeInsets.only(bottom: 14),
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 18),
-                            decoration: BoxDecoration(
-                              color: _uiSoft,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.calendar_month,
-                                    color: _uiPrimaryDark, size: 30),
-                                Expanded(
-                                  child: Text(
-                                    _selectedDate == null
-                                        ? 'Select Date'
-                                        : DateHelper.displayFromDateTime(
-                                            _selectedDate!),
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: _uiText,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                                const Icon(Icons.keyboard_arrow_down,
-                                    color: _uiPrimaryDark, size: 28),
-                              ],
-                            ),
-                            ),
-                          ),
-
-                          // Amount
-                          _fieldCard(
-                            icon: Icons.account_balance_wallet,
-                            label: 'Amount',
-                            required: true,
-                            child: TextFormField(
-                              keyboardType: const TextInputType.numberWithOptions(
-                                  decimal: true),
-                              inputFormatters: _amountFormatters,
-                              controller: _amountController,
-                              style: const TextStyle(
-                                  color: _uiText, fontSize: 18),
-                              decoration:
-                                  _inputDecoration(showCurrency: true),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter an amount';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-
-                          // Vat Amount
-                          _fieldCard(
-                            icon: Icons.percent,
-                            label: 'Vat Amount',
-                            child: TextFormField(
-                              keyboardType: const TextInputType.numberWithOptions(
-                                  decimal: true),
-                              inputFormatters: _amountFormatters,
-                              controller: _vatAmountController,
-                              style: const TextStyle(
-                                  color: _uiText, fontSize: 18),
-                              decoration:
-                                  _inputDecoration(showCurrency: true),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter vat amount';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-
-                          // Total Amount (read only)
-                          _fieldCard(
-                            icon: Icons.functions,
-                            label: 'Total Amount',
-                            child: TextFormField(
-                              readOnly: true,
-                              keyboardType: TextInputType.number,
-                              controller: _totalAmountController,
-                              style: const TextStyle(
-                                  color: Color(0xFF55527A), fontSize: 18),
-                              decoration: _inputDecoration(
-                                  showCurrency: true, filled: true),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Total amount cannot be empty';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-
-                          // Category
-                          _fieldCard(
-                            icon: Icons.format_list_bulleted,
-                            label: 'Category',
-                            required: true,
-                            child: DropdownButtonFormField<Expense>(
-                              isExpanded: true,
-                              icon: const Icon(Icons.keyboard_arrow_down,
-                                  color: _uiPrimaryDark),
-                              decoration: _inputDecoration(),
-                              style: const TextStyle(
-                                  color: _uiText, fontSize: 17),
-                              hint: const Text(
-                                'Select from list',
-                                style: TextStyle(
-                                  color: _uiHint,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                              ),
-                              value: selectedexpense,
-                              onChanged: (Expense? newValue) {
-                                setState(() {
-                                  selectedexpense = newValue;
-                                });
-                              },
-                              validator: (value) {
-                                if (value == null) {
-                                  return 'Please select an expense';
-                                }
-                                return null;
-                              },
-                              items: snapshot.data!.data
-                                  .map((Expense expense) {
-                                return DropdownMenuItem<Expense>(
-                                  value: expense,
-                                  child: Text(
-                                    expense.name,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-
-                          // Remarks
-                          _fieldCard(
-                            icon: Icons.chat,
-                            label: 'Remarks',
-                            child: TextFormField(
-                              controller: remark,
-                              maxLines: 3,
-                              style: const TextStyle(
-                                  color: _uiText, fontSize: 16),
-                              decoration: _inputDecoration(
-                                  hint: 'Enter Remarks here...'),
-                            ),
-                          ),
-
-                          // Attachments
-                          if (_attachedImages.isNotEmpty) _attachmentCard(),
-                        ],
+            ),
+          ],
+        ),
+        body: FutureBuilder(
+          future: futureExpenseReason,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Shimmer.fromColors(
+                baseColor: AppConfig.buttonDeactiveColor.withOpacity(0.1),
+                highlightColor: AppConfig.backButtonColor,
+                child: Center(
+                  child: Column(
+                    children: List.generate(
+                      6,
+                      (index) => CommonWidgets.loadingContainers(
+                        height: SizeConfig.blockSizeVertical * 10,
+                        width: SizeConfig.blockSizeHorizontal * 90,
                       ),
                     ),
                   ),
                 ),
-                // Hidden while the keyboard is open so the form never gets
-                // squeezed (that squeeze caused the yellow/black overflow bar).
-                if (MediaQuery.of(context).viewInsets.bottom == 0)
-                  _bottomButtons(),
-              ],
-            );
-          } else {
-            return Center(child: Text('No Data Available'));
-          }
-        },
-      ),
+              );
+            } else if (snapshot.hasError) {
+              return Center(
+                child: Text('${snapshot.error}'),
+              );
+            } else if (snapshot.hasData) {
+              return Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Date bar
+                            GestureDetector(
+                              onTap: _pickDate,
+                              behavior: HitTestBehavior.opaque,
+                              child: Container(
+                                height: 46 * _k,
+                                margin: EdgeInsets.only(bottom: 10 * _k),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 14),
+                                decoration: BoxDecoration(
+                                  color: _uiSoft,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.calendar_month,
+                                        color: _uiPrimary, size: 22),
+                                    Expanded(
+                                      child: Text(
+                                        _selectedDate == null
+                                            ? 'Select Date'
+                                            : DateHelper.displayFromDateTime(
+                                                _selectedDate!),
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          color: _uiText,
+                                          fontSize: AppFontSizes.payFieldValue,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                    const Icon(Icons.keyboard_arrow_down,
+                                        color: _uiPrimary, size: 22),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            // Amount
+                            _fieldCard(
+                              icon: Icons.account_balance_wallet,
+                              label: 'Amount',
+                              required: true,
+                              child: TextFormField(
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                inputFormatters: _amountFormatters,
+                                controller: _amountController,
+                                style: const TextStyle(
+                                  color: _uiText,
+                                  fontSize: AppFontSizes.payFieldValue,
+                                ),
+                                decoration:
+                                    _inputDecoration(showCurrency: true),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please enter an amount';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+
+                            // Vat Amount
+                            _fieldCard(
+                              icon: Icons.percent,
+                              label: 'Vat Amount',
+                              child: TextFormField(
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                inputFormatters: _amountFormatters,
+                                controller: _vatAmountController,
+                                style: const TextStyle(
+                                  color: _uiText,
+                                  fontSize: AppFontSizes.payFieldValue,
+                                ),
+                                decoration:
+                                    _inputDecoration(showCurrency: true),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please enter vat amount';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+
+                            // Total Amount (read only)
+                            _fieldCard(
+                              icon: Icons.functions,
+                              label: 'Total Amount',
+                              child: TextFormField(
+                                readOnly: true,
+                                keyboardType: TextInputType.number,
+                                controller: _totalAmountController,
+                                style: const TextStyle(
+                                  color: _uiHint,
+                                  fontSize: AppFontSizes.payFieldValue,
+                                ),
+                                decoration: _inputDecoration(
+                                    showCurrency: true, filled: true),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Total amount cannot be empty';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+
+                            // Category
+                            _fieldCard(
+                              icon: Icons.format_list_bulleted,
+                              label: 'Category',
+                              required: true,
+                              child: DropdownButtonFormField<Expense>(
+                                isExpanded: true,
+                                icon: const Icon(Icons.keyboard_arrow_down,
+                                    color: _uiPrimary),
+                                decoration: _inputDecoration(),
+                                style: const TextStyle(
+                                  color: _uiText,
+                                  fontSize: AppFontSizes.payFieldValue,
+                                ),
+                                hint: const Text(
+                                  'Select from list',
+                                  style: TextStyle(
+                                    color: _uiHint,
+                                    fontWeight: FontWeight.w400,
+                                    fontSize: AppFontSizes.payFieldValue,
+                                  ),
+                                ),
+                                value: selectedexpense,
+                                onChanged: (Expense? newValue) {
+                                  setState(() {
+                                    selectedexpense = newValue;
+                                  });
+                                },
+                                validator: (value) {
+                                  if (value == null) {
+                                    return 'Please select an expense';
+                                  }
+                                  return null;
+                                },
+                                items: snapshot.data!.data
+                                    .map((Expense expense) {
+                                  return DropdownMenuItem<Expense>(
+                                    value: expense,
+                                    child: Text(
+                                      expense.name,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+
+                            // Remarks
+                            _fieldCard(
+                              icon: Icons.chat,
+                              label: 'Remarks',
+                              child: TextFormField(
+                                controller: remark,
+                                maxLines: 2,
+                                style: const TextStyle(
+                                  color: _uiText,
+                                  fontSize: AppFontSizes.payFieldValue,
+                                ),
+                                decoration: _inputDecoration(
+                                    hint: 'Enter Remarks here...'),
+                              ),
+                            ),
+
+                            // Attachments
+                            if (_attachedImages.isNotEmpty) _attachmentCard(),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Hidden while the keyboard is open so the form never gets
+                  // squeezed (that squeeze caused the yellow/black overflow).
+                  if (MediaQuery.of(context).viewInsets.bottom == 0)
+                    _bottomButtons(),
+                ],
+              );
+            } else {
+              return Center(child: Text('No Data Available'));
+            }
+          },
+        ),
       ),
     );
   }

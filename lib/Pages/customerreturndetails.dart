@@ -602,7 +602,7 @@ Map<String, dynamic> grandTotal() {
           'if_vat': _ifVat == 1 ? 1 : 0,
           'product_type': productTypesList,
           'total_tax': tax,
-          'discount_type': _isPercentage ? '1' : '0',
+          'discount_type': _isPercentage ? 'percentage' : 'amount',
           'discount': _discountData.text.isEmpty ? '0' : _discountData.text,
           'total': _r(total),
           'round_off': roundOffValue,

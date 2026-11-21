@@ -450,17 +450,19 @@ void didChangeDependencies() {
     printer.printCustom("-" * 70, 1, 1);
 
     // Totals
+// Totals
     final total = (d.total ?? 0).toDouble();
-    final double discount = d.effectiveDiscount.toDouble();
+    final discInfo = d.discountInfo;
+    final double discount = (discInfo?.amount ?? 0).toDouble();
     final subTotal = total - discount;
     final tax = (d.totalTax ?? 0).toStringAsFixed(decimals);
     final grandTotal = (d.grandTotal ?? 0).toStringAsFixed(decimals);
 
     printAlignedText(
         "Van      : $van", "Total: ${total.toStringAsFixed(decimals)}");
-    if (discount > 0) {
-          printAlignedText("Salesman : $salesman",
-          "${d.discountLabel}: ${discount.toStringAsFixed(decimals)}");
+    if (discInfo != null && discInfo.hasDiscount) {
+      printAlignedText("Salesman : $salesman",
+          "${discInfo.label}: ${discInfo.amount.toStringAsFixed(decimals)}");
     } else {
       printAlignedText("Salesman : $salesman", "");
     }
@@ -692,22 +694,15 @@ if (routeArgs is Map) {
     );
   }
 String _discountText(Data data) {
-  final String type = (data.discount_type ?? '').trim().toLowerCase();
-  final bool isPercentage = type == '1' || type == 'percentage';
-  final num pct = data.discount ?? 0;
-  num amount = data.discount_amount ?? 0;
-
-  if (amount == 0 && pct > 0) {
-    amount = isPercentage ? (data.total ?? 0) * pct / 100 : pct;
+  final dec = AppState().noOfDecimals ?? 2;
+  final info = data.discountInfo;
+  if (info != null) {
+    return '${info.label}: ${info.amount.toStringAsFixed(dec)}';
   }
+  return 'Discount: ${(0).toStringAsFixed(dec)}';
+}
 
-  String label = 'Discount';
-  if (isPercentage && pct > 0) {
-    final s = pct.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
-    label = 'Discount ($s%)';
-  }
-  return '$label: ${amount.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
-}Widget _merchCard(Map<String, dynamic> m) {
+Widget _merchCard(Map<String, dynamic> m) {
   final int id = m['id'];
   final cust = (m['customer'] ?? {}) as Map;
    final details = (m['detail'] as List?) ?? [];
@@ -1287,9 +1282,10 @@ final String address = addressLines.join('\n');
       Offset(pageSize.width, tableBottom + 15),
     );
 
+ final discInfo = invoice.data!.discountInfo;
     // Draw invoice details at the bottom right.
     String bottomInvoiceDetails = '''
-  ${invoice.data!.effectiveDiscount > 0 ? '${invoice.data!.discountLabel}: ${invoice.data!.effectiveDiscount.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : '\t'}
+  ${(discInfo != null && discInfo.hasDiscount) ? '${discInfo.label}: ${discInfo.amount.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : '\t'}
   Total: ${invoice.data!.total}
    ${AppState().taxLabel}: ${(invoice.data!.totalTax ?? 0).toStringAsFixed(AppState().noOfDecimals ?? 2)}
 ${invoice.data?.roundOff != null && double.tryParse(invoice.data!.roundOff.toString()) != 0

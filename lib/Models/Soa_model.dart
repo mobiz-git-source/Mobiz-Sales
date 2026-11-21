@@ -122,7 +122,7 @@ class Transaction {
       invoiceNo: json['invoice_no'],
       deliveryNo: json['delivery_no'],
       otherCharge: json['other_charge']?.toDouble() ?? 0.0,
-      discount: json['discount']?.toDouble() ?? 0.0,
+    discount: double.tryParse(json['discount']?.toString() ?? '') ?? 0.0,
       roundOff: json['round_off'],
       total: json['total']?.toDouble() ?? 0.0,
       totalTax: json['total_tax']?.toDouble() ?? 0.0,

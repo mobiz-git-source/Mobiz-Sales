@@ -1,3 +1,5 @@
+import 'package:mobizapp/Models/discount_info.dart';
+
 import 'TestMos.dart';
 
 double _toDouble(dynamic value) {
@@ -65,7 +67,8 @@ class SaleReturn {
   final String invoiceNo;
   final double total;
   final double grandTotal;
-  final double discount;
+    final double discount;
+  final DiscountInfo? discountInfo;
   final double totalTax;
   final List<Detail> detail;
   final Customer? customer;
@@ -82,7 +85,8 @@ class SaleReturn {
     required this.invoiceNo,
     required this.total,
     required this.grandTotal,
-    required this.discount,
+       required this.discount,
+    this.discountInfo,
     required this.totalTax,
     required this.detail,
     this.customer,
@@ -104,6 +108,7 @@ class SaleReturn {
       total: _toDouble(json['total']),
       grandTotal: _toDouble(json['grand_total']),
       discount: _toDouble(json['discount']),
+      discountInfo: DiscountInfo.tryParse(json['discount_info']),
       totalTax: _toDouble(json['total_tax']),
       detail: detailList,
       customer: json['customer'] != null && (json['customer'] as List).isNotEmpty
@@ -423,8 +428,9 @@ class Sale {
   final double totalTax;
   final String invoiceNo;
   final String cashCard;
-  final double total;
+   final double total;
   final double grandTotal;
+  final DiscountInfo? discountInfo;
   final List<Detail> detail;
   final Store? store;
   final Customer? customer;
@@ -440,8 +446,9 @@ class Sale {
     required this.totalTax,
     required this.invoiceNo,
     required this.cashCard,
-    required this.total,
+        required this.total,
     required this.grandTotal,
+    this.discountInfo,
     required this.detail,
     this.store,
     this.customer,
@@ -462,6 +469,7 @@ class Sale {
       cashCard: json['cash_card']?.toString() ?? '',
       total: _toDouble(json['total']),
       grandTotal: _toDouble(json['grand_total']),
+      discountInfo: DiscountInfo.tryParse(json['discount_info']),
       detail: detailList,
       store: json['store'] != null && (json['store'] as List).isNotEmpty
           ? Store.fromJson(json['store'][0])

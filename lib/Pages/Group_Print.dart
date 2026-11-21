@@ -345,12 +345,12 @@ class _GroupPrintState extends State<GroupPrint> {
       String salesman = invoice.returnData!.user?.name ?? 'N/A';
       String van = invoice.returnData!.van?.name ?? invoice.sales?.van?.name ?? 'N/A';
 
-      String discountStr = '';
-      if (invoice.returnData!.discount > 0) {
+String discountStr = '';
+      final retDisc = invoice.returnData!.discountInfo;
+      if (retDisc != null && retDisc.hasDiscount) {
         discountStr =
-            "Discount: ${invoice.returnData!.discount.toStringAsFixed(AppState().noOfDecimals ?? 2)}";
+            "${retDisc.label}: ${retDisc.amount.toStringAsFixed(AppState().noOfDecimals ?? 2)}";
       }
-
       cpcl.boldText("RETURN", font: 5, lineGap: 30);
       cpcl.hLine(thickness: 1);
       cpcl.text("S.No Product             Qty    Rate   Total", font: 4, lineGap: 30);
@@ -578,10 +578,11 @@ class _GroupPrintState extends State<GroupPrint> {
       String salesman = invoice.returnData!.user?.name ?? 'N/A';
       String van = invoice.returnData!.van?.name ?? invoice.sales?.van?.name ?? 'N/A';
 
-      String discountStr = '';
-      if (invoice.returnData!.discount > 0) {
+     String discountStr = '';
+      final retDisc = invoice.returnData!.discountInfo;
+      if (retDisc != null && retDisc.hasDiscount) {
         discountStr =
-            "Discount: ${invoice.returnData!.discount.toStringAsFixed(AppState().noOfDecimals ?? 2)}";
+            "${retDisc.label}: ${retDisc.amount.toStringAsFixed(AppState().noOfDecimals ?? 2)}";
       }
 
       printer.printCustom("Return", 2, 0);

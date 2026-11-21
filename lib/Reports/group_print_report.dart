@@ -187,12 +187,17 @@ Col('Unit', flex: 2),
     b.text('RETURN', size: large - 4, bold: true);
     b.divider(thickness: 1, spacing: 2);
     itemTable(invoice.returnData!.detail);
-    b.divider();
-    final van = invoice.returnData!.van?.name ?? invoice.sales?.van?.name ?? 'N/A';
-    final discount = invoice.returnData!.discount;
+ final van = invoice.returnData!.van?.name ?? invoice.sales?.van?.name ?? 'N/A';
+    final retDisc = invoice.returnData!.discountInfo;
     b.row([
       Col('Van: $van', flex: 3),
-      Col(discount > 0 ? 'Discount: ${discount.toStringAsFixed(dec)}' : '', flex: 2, align: PAlign.right),
+      Col(
+        (retDisc != null && retDisc.hasDiscount)
+            ? '${retDisc.label}: ${retDisc.amount.toStringAsFixed(dec)}'
+            : '',
+        flex: 2,
+        align: PAlign.right,
+      ),
     ], size: normal);
     b.row([
       Col('Salesman: ${invoice.returnData!.user?.name ?? 'N/A'}', flex: 3),

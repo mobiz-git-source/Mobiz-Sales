@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'discount_info.dart';
 
 num? _toNum(dynamic v) {
   if (v == null) return null;
@@ -55,8 +56,9 @@ class Data {
   String? createdAt;
  String? discounted_amount;
   String? discountType;
-  num? discountAmount;
+   num? discountAmount;
   num? discountPercentage;
+  DiscountInfo? discountInfo;
   String? remarks;
   String? updatedAt;
   String? deletedAt;
@@ -127,10 +129,8 @@ class Data {
        discounted_amount = json['discounted_amount']?.toString();
     discountType = json['discount_type']?.toString();
        discountAmount = num.tryParse(json['discount_amount']?.toString() ?? '');
-    discountPercentage = _toNum(json['discount_percentage']);
-    debugPrint('DISC raw: discount=${json['discount']} type=${json['discount_type']} '
-        'amount=${json['discount_amount']} percentage=${json['discount_percentage']} '
-        'total=${json['total']} grand=${json['grand_total']}');
+      discountPercentage = _toNum(json['discount_percentage']);
+    discountInfo = DiscountInfo.tryParse(json['discount_info']);
     remarks = json['remarks'];
     updatedAt = json['updated_at'];
     deletedAt = json['deleted_at'];
@@ -166,50 +166,15 @@ class Data {
     }
   }
 
-  num get effectiveDiscount {
-  
-  final amt = discountAmount ?? 0;
-  if (amt > 0) return amt;
+   num get effectiveDiscount => discountInfo?.amount ?? 0;
 
-  
-  final gt = grandTotal ?? 0;
-  if (gt > 0) {
-    final ro = num.tryParse(roundOff ?? '') ?? 0;
-    final implied =
-        (total ?? 0) + (totalTax ?? 0) + (otherCharge ?? 0) + ro - gt;
-    return implied > 0.05 ? num.parse(implied.toStringAsFixed(2)) : 0;
-  }
-  return _rawDiscount;
-}
+  bool get isPercentageDiscount => discountInfo?.type == 'percent';
 
-    num get _rawDiscount {
-    final amt = discountAmount ?? 0;
-    if (amt > 0) return amt;
-    final d = discount ?? 0;
-    if (d <= 0) return 0;
-    final t = (discountType ?? '').toLowerCase();
-    final isPercentage = t == '1' || t == 'percentage';
-    return isPercentage ? (total ?? 0) * d / 100 : d;
-  }
+  num get discountPercent => discountInfo?.percent ?? 0;
 
-   bool get isPercentageDiscount {
-    final t = (discountType ?? '').trim().toLowerCase();
-    return t == '1' || t == 'percentage';
-  }
+  String get discountLabel => discountInfo?.label ?? 'Discount';
 
-  num get discountPercent {
-    if (!isPercentageDiscount || effectiveDiscount <= 0) return 0;
-    final pct = (discountPercentage ?? 0) > 0
-        ? discountPercentage!
-        : (discount ?? 0);
-    return pct;
-  }
-  String get discountLabel {
-    final p = discountPercent;
-    if (p <= 0) return 'Discount';
-    final s = p.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
-    return 'Discount ($s%)';
-  }
+  String get discountText => discountInfo?.text ?? '';
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = new Map<String, dynamic>();
@@ -222,7 +187,8 @@ class Data {
     data['invoice_no'] = this.invoiceNo;
     data['delivery_no'] = this.deliveryNo;
     data['other_charge'] = this.otherCharge;
-    data['discount'] = this.discount;
+       data['discount'] = this.discount;
+    data['discount_info'] = this.discountInfo?.toJson();
     data['round_off'] = this.roundOff;
     data['total'] = this.total;
     data['total_tax'] = this.totalTax;
