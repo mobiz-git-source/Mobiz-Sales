@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:open_file/open_file.dart' as open_file;
@@ -7,10 +8,8 @@ import 'package:path_provider/path_provider.dart' as path_provider;
 import 'package:printing/printing.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
-///To save the pdf file in the device
 Future<String> saveAndLaunchFile(
     List<int> bytes, String fileName, bool _isPrint) async {
-  //Get the storage folder location using path_provider package.
   String? path;
   if (Platform.isAndroid ||
       Platform.isIOS ||
@@ -25,8 +24,14 @@ Future<String> saveAndLaunchFile(
   final File file =
       File(Platform.isWindows ? '$path\\$fileName' : '$path/$fileName');
   await file.writeAsBytes(bytes, flush: true);
-  if (Platform.isAndroid || Platform.isIOS) {
-    // //Launch the file (used open_file package)
+
+  if (Platform.isIOS) {
+    // iOS: show PDF with printing preview (share / print available)
+    await Printing.layoutPdf(
+      name: fileName,
+      onLayout: (_) async => Uint8List.fromList(bytes),
+    );
+  } else if (Platform.isAndroid) {
     if (_isPrint) {
       final pdf = await rootBundle.load('$path/$fileName');
       await Printing.layoutPdf(onLayout: (_) => pdf.buffer.asUint8List());
@@ -41,8 +46,5 @@ Future<String> saveAndLaunchFile(
     await Process.run('xdg-open', <String>['$path/$fileName'],
         runInShell: true);
   }
-
-  // final pdf = await rootBundle.load('$path/$fileName');
-  // await Printing.layoutPdf(onLayout: (_) => pdf.buffer.asUint8List());
   return '$path/$fileName';
 }
