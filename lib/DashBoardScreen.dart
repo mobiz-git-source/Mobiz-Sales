@@ -497,7 +497,7 @@ void _onApprovalsChanged() {
                                           height:
                                               SizeConfig.safeBlockVertical! * 2,
                                         ),
-                                        Row(
+                                Row(
                                           mainAxisAlignment:
                                               MainAxisAlignment.spaceBetween,
                                           children: [
@@ -519,7 +519,7 @@ void _onApprovalsChanged() {
                                           height:
                                               SizeConfig.safeBlockVertical! * 2,
                                         ),
-                                                                         ],
+                                      ],
                                     ],
                                   ),
                                 );

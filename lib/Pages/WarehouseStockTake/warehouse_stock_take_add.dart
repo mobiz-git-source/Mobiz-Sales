@@ -121,7 +121,7 @@ class _WarehouseStockTakeAddPageState extends State<WarehouseStockTakeAddPage> {
     if (_purchased.isNotEmpty || _loadingPurchased) return;
     setState(() => _loadingPurchased = true);
     try {
-      // NOTE: path/params Arya-yodu confirm cheyyuka
+    
       final res = await RestDatasource().getDetails(
           "/api/products/purchased?store_id=${AppState().storeId}",
           AppState().token);
@@ -255,7 +255,7 @@ class _WarehouseStockTakeAddPageState extends State<WarehouseStockTakeAddPage> {
 
     for (final item in scannedItems) {
       final body = {
-        // TODO: key names Arya-yodu confirm cheyyuka (response-il ninnu guess)
+      
              "stock_take_id": widget.stockTake.id,
         "product_id": int.tryParse(item["product_id"].toString()) ?? 0,
         "unit_id": int.tryParse(item["unit_id"].toString()) ?? 0,

@@ -200,7 +200,7 @@ class _ChequeReceiptState extends State<ChequeReceipt> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                      // BEFORE
+                      
                         Text(
                           data.chequeDate??'',
                           style: TextStyle(
@@ -208,7 +208,7 @@ class _ChequeReceiptState extends State<ChequeReceipt> {
                           ),
                         ),
 
-// AFTER
+
                         Text(
                           DateHelper.displayDate(data.chequeDate),
                           style: TextStyle(

@@ -163,7 +163,7 @@ class _ApprovalListScreenState extends State<ApprovalListScreen>
   }
 
   Widget _tabBody(String tab, ApprovalListResult? r, String emptyText) {
-    // ListView, so pull-to-refresh error/empty state-ilum work aakum
+ 
     if (r == null || r.error != null) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -362,7 +362,7 @@ class _ApprovalListScreenState extends State<ApprovalListScreen>
     );
   }
 
-  /// innu aanenkil "9:40 AM", allenkil "Yesterday" / "23 Nov"
+ 
   String _fmtWhen(String raw) {
     final d = DateTime.tryParse(raw.replaceFirst(' ', 'T'));
     if (d == null) return raw;

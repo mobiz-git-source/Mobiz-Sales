@@ -34,7 +34,7 @@ class PushRouter {
     } catch (_) {}
   }
 
-  /// User push tap cheythu. coldStart = app close aayirunnu.
+ 
   static void onTap(Map<String, dynamic> d, {bool coldStart = false}) {
     if (d.isEmpty) return;
     if (coldStart) {
@@ -51,7 +51,7 @@ class PushRouter {
   }
 
  
-  /// Invoice approve / reject aayaal aa invoice-inte approval notifications read aakkum
+ 
   static Future<void> markInvoiceNotificationsRead(int invoiceId) async {
     try {
       final list = await NotificationService.getNotifications();
@@ -67,7 +67,7 @@ class PushRouter {
         if (id != null) await NotificationService.markAsRead(id);
       }
     } catch (_) {}
-    approvalsChanged.value++; // bell count + list refresh
+    approvalsChanged.value++;
   }
 
   static void consumePending() {

@@ -209,7 +209,7 @@ class _ReviewInvoiceScreenState extends State<ReviewInvoiceScreen> {
       children: [
         if (d.state != 'pending') _stateBanner(d.state),
 
-        // Reason box
+ 
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(

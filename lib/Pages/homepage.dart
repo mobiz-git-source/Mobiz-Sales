@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:lottie/lottie.dart';
 import 'package:mobizapp/Components/commonwidgets.dart';
+import 'package:mobizapp/InvoiceApproval/approval_list_screen.dart';
 import 'package:mobizapp/InvoiceApproval/push_router.dart';
 import 'package:mobizapp/Pages/AgeingSummary/AgeingSummaryScreen.dart';
 import 'package:mobizapp/Pages/Attendance.dart';
@@ -52,9 +53,7 @@ import '../selectproduct.dart';
 import 'Customer Dues/Customer Dues.dart';
 import 'Picking/pickingList.dart';
 import 'Production/ProductionOrder.dart';
-import 'WarehouseStockTake/warehouse_stock_take_list.dart'; // NEW (file njan ezhuthi tharum)
 import '../InvoiceApproval/invoice_approval_service.dart';
-import '../InvoiceApproval/approval_list_screen.dart';
 // import 'Picking/pickingList.dart';
 // import 'Picking/AddPicking.dart'; // TEMP
 // import 'Production/ProductionOrder.dart';
@@ -319,9 +318,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           appIcons = data['success'];
         } else if (data['success'] is Map) {
           appIcons = (data['success'] as Map<String, dynamic>).values.toList();
-        } else {
+     } else {
           appIcons = [];
         }
+        appIcons.removeWhere((e) =>
+            e is Map &&
+            e['icon'] is List &&
+            (e['icon'] as List).isNotEmpty &&
+            e['icon'][0]['url'] == 'WarehouseStockTake');
         _applyApprovalIcon();
       });
     } else {
@@ -505,19 +509,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         print(AppState().vanId);
                       },
                     ),
-                                      ListTile(
+                           ListTile(
                       leading: Icon(Icons.call),
                       title: const Text('Contact Us'),
                       onTap: () {},
-                    ),
-                    // TEMP: test kazhinjal kalayam
-                    ListTile(
-                      leading: Icon(Icons.warehouse),
-                      title: const Text('Warehouse ST (TEST)'),
-                      onTap: () {
-                        Navigator.pushNamed(
-                            context, WarehouseStockTakeListPage.routeName);
-                      },
                     ),
                     ListTile(
                       leading: Icon(Icons.print),
@@ -1177,11 +1172,8 @@ InkWell(
             case 'DUE':
               Navigator.pushNamed(context, CustomerDues.routeName);
               break;
-                   case 'Productionorder':
+         case 'Productionorder':
               Navigator.pushNamed(context, Productionorder.routeName);
-              break;
-            case 'WarehouseStockTake':       // NEW
-              Navigator.pushNamed(context, WarehouseStockTakeListPage.routeName);
               break;
                    case 'InvoiceApprovals':
               Navigator.push(

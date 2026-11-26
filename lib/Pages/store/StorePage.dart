@@ -69,15 +69,28 @@ final response = await http.get(
             appIcons = [];
           }
 
-          // Filter only specific icons you want
+        // Filter only specific icons you want
           appIcons = appIcons.where((iconData) {
             final iconList = iconData['icon'] as List?;
             if (iconList == null || iconList.isEmpty) return false;
             final iconName = iconList[0]['icon'];
-                     return iconName == 'transfer_within_a_station' ||
+            return iconName == 'transfer_within_a_station' ||
                 iconName == 'call_missed_outgoing_rounded' ||
                 iconName == 'warehouse'; // NEW
           }).toList();
+
+          // Warehouse Stock Take grid-inte last-il varaan
+          appIcons.sort((a, b) {
+            final aIcon = (a['icon'] as List?)?.isNotEmpty == true
+                ? a['icon'][0]['icon']
+                : '';
+            final bIcon = (b['icon'] as List?)?.isNotEmpty == true
+                ? b['icon'][0]['icon']
+                : '';
+            if (aIcon == 'warehouse') return 1;
+            if (bIcon == 'warehouse') return -1;
+            return 0;
+          });
 
           isLoading = false;
           if (appIcons.isEmpty) noData = true;

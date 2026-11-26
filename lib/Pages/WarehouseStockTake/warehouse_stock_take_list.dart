@@ -145,17 +145,21 @@ class _WarehouseStockTakeListPageState
       _error = null;
     });
     try {
-      // NOTE: query params (store_id / user_id) Arya-yodu confirm cheyyuka
+    
       final subUrl =
           "/api/warehouse-stock-takes/pending?store_id=${AppState().storeId}&user_id=${AppState().userId}";
            debugPrint('WST PENDING URL: ${RestDatasource().BASE_URL}$subUrl');
       final res = await RestDatasource().getDetails(subUrl, AppState().token);
       debugPrint('WST PENDING RESP: $res');
 
-      if (res != null && res['status'] == true) {
+   if (res != null && res['status'] == true) {
         final data = (res['data'] as List?) ?? [];
-        _list = data.map((e) => WarehouseStockTake.fromJson(e)).toList();
-      } else {
+        _list = data
+            .map((e) => WarehouseStockTake.fromJson(e))
+            .toList()
+            .reversed
+            .toList();
+      }else {
         _error = (res?['message'] ?? 'Failed to load').toString();
       }
     } catch (e) {
@@ -163,7 +167,7 @@ class _WarehouseStockTakeListPageState
     }
     if (mounted) setState(() => _loading = false);
   }
-  // Complete API backend ippo tharilla. Vannaal path confirm cheythu maattuka.
+ 
   static const String _completePath = '/api/warehouse-stock-takes/complete';
   final Set<int> _completingIds = {};
 
@@ -305,7 +309,7 @@ class _WarehouseStockTakeListPageState
         appBar: AppBar(
         title: Text(
           'Warehouse Stock Take',
-          style: AppConfig.pageTitleStyle.copyWith(color: Colors.white), // NEW
+          style: AppConfig.pageTitleStyle.copyWith(color: Colors.white), 
         ),
         backgroundColor: AppConfig.colorPrimary,
         iconTheme: const IconThemeData(color: Colors.white),
