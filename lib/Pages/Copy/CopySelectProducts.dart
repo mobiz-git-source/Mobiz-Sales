@@ -89,7 +89,17 @@ class _CopySelectProductState extends State<CopySelectProduct> {
       _filterProducts(query);
     });
   }
-
+String _buildImageUrl(String baseUrl, String proImage) {
+    final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    if (proImage.startsWith('http')) {
+      return proImage;
+    } else if (proImage.startsWith('uploads/')) {
+      return '$cleanBase/$proImage';
+    } else if (proImage.startsWith('/uploads/')) {
+      return '$cleanBase$proImage';
+    }
+    return '$cleanBase/uploads/product/$proImage';
+  }
   Future<void> fetchProducts(int page) async {
     if (isLoading) return;
 
@@ -343,7 +353,14 @@ class _CopySelectProductState extends State<CopySelectProduct> {
                       ));
                     }
 
-                    final product = filteredProducts[index];
+               final product = filteredProducts[index];
+                    final primaryUrl = _buildImageUrl(
+                        RestDatasource().Product_URL, product.proImage);
+                    final fallbackUrl1 = _buildImageUrl(
+                        RestDatasource().BASE_URL, product.proImage);
+                    final fallbackUrl2 = _buildImageUrl(
+                        RestDatasource().Image_URL, product.proImage);
+
                     return Card(
                       elevation: 3,
                       child: InkWell(
@@ -373,19 +390,40 @@ class _CopySelectProductState extends State<CopySelectProduct> {
                                   height: 50,
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(15.0),
-                                    child: FadeInImage(
-                                      image: NetworkImage(
-                                          '${RestDatasource().Product_URL}/uploads/product/${product.proImage}'),
-                                      placeholder: const AssetImage(
-                                          'Assets/Images/no_image.jpg'),
-                                      imageErrorBuilder:
-                                          (context, error, stackTrace) {
-                                        return Image.asset(
+                                 child: (product.proImage.isEmpty ||
+        product.proImage == 'defalut.jpg' ||
+        product.proImage == 'default.jpg')
+                                        ? Image.asset(
                                             'Assets/Images/no_image.jpg',
-                                            fit: BoxFit.fitWidth);
-                                      },
-                                      fit: BoxFit.fitWidth,
-                                    ),
+                                            fit: BoxFit.fitWidth,
+                                          )
+                                        : FadeInImage(
+                                            image: NetworkImage(primaryUrl),
+                                            placeholder: const AssetImage(
+                                                'Assets/Images/no_image.jpg'),
+                                            imageErrorBuilder:
+                                                (context, error, stackTrace) {
+                                              return Image.network(
+                                                fallbackUrl1,
+                                                fit: BoxFit.fitWidth,
+                                                errorBuilder: (context, error2,
+                                                    stackTrace2) {
+                                                  return Image.network(
+                                                    fallbackUrl2,
+                                                    fit: BoxFit.fitWidth,
+                                                    errorBuilder: (context,
+                                                        error3, stackTrace3) {
+                                                      return Image.asset(
+                                                        'Assets/Images/no_image.jpg',
+                                                        fit: BoxFit.fitWidth,
+                                                      );
+                                                    },
+                                                  );
+                                                },
+                                              );
+                                            },
+                                            fit: BoxFit.fitWidth,
+                                          ),
                                   ),
                                 ),
                                 CommonWidgets.horizontalSpace(3),

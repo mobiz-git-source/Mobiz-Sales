@@ -204,8 +204,7 @@ class _VanStockScreenState extends State<VanStockScreen>
       setState(() {
         _products =
             filteredProducts.cast<Product>(); // Cast to the correct type
-        _filteredProducts =
-            List.from(_products);
+        _filteredProducts = List.from(_products);
       });
     } catch (e) {
       print('Error: $e');
@@ -286,7 +285,7 @@ class _VanStockScreenState extends State<VanStockScreen>
           iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
           title: const Text(
             'Van Stocks',
-           style: AppConfig.pageTitleStyle,
+            style: AppConfig.pageTitleStyle,
           ),
           backgroundColor: AppConfig.colorPrimary,
           actions: [
@@ -435,30 +434,29 @@ class _VanStockScreenState extends State<VanStockScreen>
                                                         SizedBox(
                                                           width: 50,
                                                           height: 50,
-                                                          child: ClipRRect(
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .circular(
-                                                                        15.0),
-                                                            child: FadeInImage(
-                                                              image: NetworkImage(
-                                                                  '${RestDatasource().Product_URL}/uploads/product/${product.proImage}'),
-                                                              placeholder:
-                                                                  const AssetImage(
-                                                                      'Assets/Images/no_image.jpg'),
-                                                              imageErrorBuilder:
-                                                                  (context,
-                                                                      error,
-                                                                      stackTrace) {
-                                                                return Image.asset(
-                                                                    'Assets/Images/no_image.jpg',
-                                                                    fit: BoxFit
-                                                                        .fitWidth);
-                                                              },
-                                                              fit: BoxFit
-                                                                  .fitWidth,
-                                                            ),
-                                                          ),
+                                                         child: ClipRRect(
+  borderRadius: BorderRadius.circular(15.0),
+  child: (product.proImage.isEmpty ||
+          product.proImage == 'defalut.jpg' ||
+          product.proImage == 'default.jpg')
+      ? Image.asset(
+          'Assets/Images/no_image.jpg',
+          fit: BoxFit.fitWidth,
+        )
+      : FadeInImage(
+          image: NetworkImage(
+              '${RestDatasource().Product_URL}/uploads/product/${product.proImage}'),
+          placeholder: const AssetImage(
+              'Assets/Images/no_image.jpg'),
+          imageErrorBuilder:
+              (context, error, stackTrace) {
+            return Image.asset(
+                'Assets/Images/no_image.jpg',
+                fit: BoxFit.fitWidth);
+          },
+          fit: BoxFit.fitWidth,
+        ),
+),
                                                         ),
                                                         CommonWidgets
                                                             .horizontalSpace(3),
@@ -476,9 +474,12 @@ class _VanStockScreenState extends State<VanStockScreen>
                                                                         .blockSizeHorizontal *
                                                                     70,
                                                                 child: Text(
-  '${product.code} | ${product.name!.toUpperCase()}',
-  style: TextStyle(fontSize: AppConfig.textCaption2Size.sp),
-),
+                                                                  '${product.code} | ${product.name!.toUpperCase()}',
+                                                                  style: TextStyle(
+                                                                      fontSize: AppConfig
+                                                                          .textCaption2Size
+                                                                          .sp),
+                                                                ),
                                                               ),
                                                             ),
                                                             Row(
@@ -517,16 +518,16 @@ class _VanStockScreenState extends State<VanStockScreen>
                                                                     width: 10),
                                                                 Text(
                                                                   product.units !=
-                                                                      null &&
-                                                                      product.units.length >
-                                                                          2
+                                                                              null &&
+                                                                          product.units.length >
+                                                                              2
                                                                       ? '${product.units[2].name}:${product.units[2].stock}'
                                                                       : '',
                                                                   style:
-                                                                  TextStyle(
+                                                                      TextStyle(
                                                                     fontSize:
-                                                                    AppConfig
-                                                                        .textCaption3Size,
+                                                                        AppConfig
+                                                                            .textCaption3Size,
                                                                   ),
                                                                 )
                                                               ],
@@ -645,24 +646,36 @@ class _VanStockScreenState extends State<VanStockScreen>
                                                                 BorderRadius
                                                                     .circular(
                                                                         15.0),
-                                                            child: FadeInImage(
-                                                              image: NetworkImage(
-                                                                  '${RestDatasource().Product_URL}/uploads/product/${product.proImage}'),
-                                                              placeholder:
-                                                                  const AssetImage(
-                                                                      'Assets/Images/no_image.jpg'),
-                                                              imageErrorBuilder:
-                                                                  (context,
-                                                                      error,
-                                                                      stackTrace) {
-                                                                return Image.asset(
+                                                            child: (product
+                                                                        .proImage
+                                                                        .isEmpty ||
+                                                                    product.proImage ==
+                                                                        'defalut.jpg' ||
+                                                                    product.proImage ==
+                                                                        'default.jpg')
+                                                                ? Image.asset(
                                                                     'Assets/Images/no_image.jpg',
                                                                     fit: BoxFit
-                                                                        .fitWidth);
-                                                              },
-                                                              fit: BoxFit
-                                                                  .fitWidth,
-                                                            ),
+                                                                        .fitWidth,
+                                                                  )
+                                                                : FadeInImage(
+                                                                    image: NetworkImage(
+                                                                        '${RestDatasource().Product_URL}/uploads/product/${product.proImage}'),
+                                                                    placeholder:
+                                                                        const AssetImage(
+                                                                            'Assets/Images/no_image.jpg'),
+                                                                    imageErrorBuilder:
+                                                                        (context,
+                                                                            error,
+                                                                            stackTrace) {
+                                                                      return Image.asset(
+                                                                          'Assets/Images/no_image.jpg',
+                                                                          fit: BoxFit
+                                                                              .fitWidth);
+                                                                    },
+                                                                    fit: BoxFit
+                                                                        .fitWidth,
+                                                                  ),
                                                           ),
                                                         ),
                                                         CommonWidgets
@@ -754,83 +767,84 @@ class _VanStockScreenState extends State<VanStockScreen>
           ),
         ));
   }
-Future<void> _printVanStockAsImage({
-  required String title,
-  required List<VanStockPrintProduct> products,
-}) async {
-  final response = await http.get(Uri.parse(
-    '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}',
-  ));
 
-  if (response.statusCode != 200) {
-    throw Exception('Failed to load store details');
-  }
+  Future<void> _printVanStockAsImage({
+    required String title,
+    required List<VanStockPrintProduct> products,
+  }) async {
+    final response = await http.get(Uri.parse(
+      '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}',
+    ));
 
-  final storeDetail = StoreDetail.fromJson(json.decode(response.body));
-  final logoName = storeDetail.logos;
-  final logo = logoName != null && logoName.isNotEmpty
-      ? await loadLogo('https://erpadmin.mobiz.ae/uploads/store/$logoName')
-      : null;
-
-  await printReport(
-    printer,
-    _selectedDevice,
-    (builder) => drawVanStockReport(
-      builder,
-      companyName: '${storeDetail.name}',
-      title: title,
-      products: products,
-      logo: logo,
-    ),
-    widthDots: kLabelWidthDots,
-  );
-}
-
-Future<void> _printImageVanStock() async {
-  final seenProducts = <String>{};
-  final products = <VanStockPrintProduct>[];
-
-  for (final product in _filteredProducts) {
-    if (product.code.isEmpty || !seenProducts.add(product.code)) continue;
-
-    final seenUnits = <String>{};
-    final units = <VanStockPrintUnit>[];
-    for (final unit in product.units) {
-      final key = '${unit.name}-${unit.stock}';
-      if (seenUnits.add(key)) {
-        units.add(VanStockPrintUnit(
-          name: unit.name,
-          quantity: unit.stock.toString(),
-        ));
-      }
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load store details');
     }
 
-    products.add(VanStockPrintProduct(
-      name: product.name,
-      code: product.code,
-      units: units,
-    ));
+    final storeDetail = StoreDetail.fromJson(json.decode(response.body));
+    final logoName = storeDetail.logos;
+    final logo = logoName != null && logoName.isNotEmpty
+        ? await loadLogo('https://erpadmin.mobiz.ae/uploads/store/$logoName')
+        : null;
+
+    await printReport(
+      printer,
+      _selectedDevice,
+      (builder) => drawVanStockReport(
+        builder,
+        companyName: '${storeDetail.name}',
+        title: title,
+        products: products,
+        logo: logo,
+      ),
+      widthDots: kLabelWidthDots,
+    );
   }
 
-  await _printVanStockAsImage(title: 'Van Stock', products: products);
-}
+  Future<void> _printImageVanStock() async {
+    final seenProducts = <String>{};
+    final products = <VanStockPrintProduct>[];
 
-Future<void> _printImageVanReturn() async {
-  final products = _filteredProducts1.map((product) {
-    return VanStockPrintProduct(
-      name: product.name.toUpperCase(),
-      code: product.code,
-      units: product.units
-          .map((unit) => VanStockPrintUnit(
-                name: unit.name,
-                quantity: unit.stock.toString(),
-              ))
-          .toList(),
-    );
-  }).toList();
+    for (final product in _filteredProducts) {
+      if (product.code.isEmpty || !seenProducts.add(product.code)) continue;
 
-  await _printVanStockAsImage(title: 'Van Return', products: products);
-}
+      final seenUnits = <String>{};
+      final units = <VanStockPrintUnit>[];
+      for (final unit in product.units) {
+        final key = '${unit.name}-${unit.stock}';
+        if (seenUnits.add(key)) {
+          units.add(VanStockPrintUnit(
+            name: unit.name,
+            quantity: unit.stock.toString(),
+          ));
+        }
+      }
+
+      products.add(VanStockPrintProduct(
+        name: product.name,
+        code: product.code,
+        units: units,
+      ));
+    }
+
+    await _printVanStockAsImage(title: 'Van Stock', products: products);
+  }
+
+  Future<void> _printImageVanReturn() async {
+    final products = _filteredProducts1.map((product) {
+      return VanStockPrintProduct(
+        name: product.name.toUpperCase(),
+        code: product.code,
+        units: product.units
+            .map((unit) => VanStockPrintUnit(
+                  name: unit.name,
+                  quantity: unit.stock.toString(),
+                ))
+            .toList(),
+      );
+    }).toList();
+
+    await _printVanStockAsImage(title: 'Van Return', products: products);
+  }
   // Future<void> _printReturn() async {
   //   if (_connected) {
   //     // Print the top separator line
@@ -1156,11 +1170,11 @@ Future<void> _printImageVanReturn() async {
     await Future.delayed(const Duration(milliseconds: 500));
 
     try {
-    if (isZebraPrinter(_selectedDevice)) {
-  await _printImageVanReturn();
-} else {
-  await _printSewooReturn();
-}
+      if (isZebraPrinter(_selectedDevice)) {
+        await _printImageVanReturn();
+      } else {
+        await _printSewooReturn();
+      }
     } catch (e, st) {
       print('Print error: $e\n$st');
       if (mounted) {
@@ -1198,11 +1212,11 @@ Future<void> _printImageVanReturn() async {
     await Future.delayed(const Duration(milliseconds: 500));
 
     try {
-     if (isZebraPrinter(_selectedDevice)) {
-  await _printImageVanStock();
-} else {
-  await _printSewooStock();
-}
+      if (isZebraPrinter(_selectedDevice)) {
+        await _printImageVanStock();
+      } else {
+        await _printSewooStock();
+      }
     } catch (e, st) {
       print('Print error: $e\n$st');
       if (mounted) {
@@ -1251,7 +1265,8 @@ Future<void> _printImageVanReturn() async {
     cpcl.centerText("Van Return", font: 5, lineGap: 34);
     cpcl.hLine();
 
-    cpcl.text("S.No Product                   Unit      Qty", font: 4, lineGap: 30);
+    cpcl.text("S.No Product                   Unit      Qty",
+        font: 4, lineGap: 30);
     cpcl.hLine(thickness: 1);
 
     int serialNumber = 1;
@@ -1266,7 +1281,8 @@ Future<void> _printImageVanReturn() async {
           String qty = unit.stock.toString().padLeft(8);
 
           cpcl.text('$sNo$name', font: 4, lineGap: 28);
-          String details = '     [${product.code}]'.padRight(25) + '$unitName  $qty';
+          String details =
+              '     [${product.code}]'.padRight(25) + '$unitName  $qty';
           cpcl.text(details, font: 4, lineGap: 30);
 
           serialNumber++;
@@ -1276,7 +1292,8 @@ Future<void> _printImageVanReturn() async {
         String name = product.name.toUpperCase();
         if (name.length > 38) name = name.substring(0, 38);
         cpcl.text('$sNo$name', font: 4, lineGap: 28);
-        String details = '     [${product.code}]'.padRight(25) + '   N/A       0';
+        String details =
+            '     [${product.code}]'.padRight(25) + '   N/A       0';
         cpcl.text(details, font: 4, lineGap: 30);
         serialNumber++;
       }
@@ -1328,9 +1345,9 @@ Future<void> _printImageVanReturn() async {
       const int columnWidth4 = 10;
       const int columnWidth5 = 10;
 
-     String headers = "${'#'.padRight(columnWidth1)}"
-    "${'Product'.padRight(columnWidth2)} "
-    "${'Unit'.padRight(columnWidth3)}"
+      String headers = "${'#'.padRight(columnWidth1)}"
+          "${'Product'.padRight(columnWidth2)} "
+          "${'Unit'.padRight(columnWidth3)}"
           "${'Qty'.padRight(columnWidth5)}";
       printer.printCustom(headers, 1, 0);
       printer.printNewLine();
@@ -1345,7 +1362,8 @@ Future<void> _printImageVanReturn() async {
           for (var unit in product.units) {
             String productUnit = "${unit.name}";
             String productQty = "${unit.stock}";
-            List<String> descriptionLines = _splitText(productName, columnWidth2);
+            List<String> descriptionLines =
+                _splitText(productName, columnWidth2);
 
             for (int j = 0; j < descriptionLines.length; j++) {
               String line = j == 0
@@ -1430,7 +1448,8 @@ Future<void> _printImageVanReturn() async {
     cpcl.centerText("Van Stock", font: 5, lineGap: 34);
     cpcl.hLine();
 
-    cpcl.text("S.No Product                   Unit      Qty", font: 4, lineGap: 30);
+    cpcl.text("S.No Product                   Unit      Qty",
+        font: 4, lineGap: 30);
     cpcl.hLine(thickness: 1);
 
     int serialNumber = 1;
@@ -1457,7 +1476,8 @@ Future<void> _printImageVanReturn() async {
           String qty = unit.stock.toString().padLeft(8);
 
           cpcl.text('$sNo$name', font: 4, lineGap: 28);
-          String details = '     [${product.code}]'.padRight(25) + '$unitName  $qty';
+          String details =
+              '     [${product.code}]'.padRight(25) + '$unitName  $qty';
           cpcl.text(details, font: 4, lineGap: 30);
 
           serialNumber++;
@@ -1467,7 +1487,8 @@ Future<void> _printImageVanReturn() async {
         String name = product.name.toUpperCase();
         if (name.length > 38) name = name.substring(0, 38);
         cpcl.text('$sNo$name', font: 4, lineGap: 28);
-        String details = '     [${product.code}]'.padRight(25) + '   N/A       0';
+        String details =
+            '     [${product.code}]'.padRight(25) + '   N/A       0';
         cpcl.text(details, font: 4, lineGap: 30);
         serialNumber++;
       }
@@ -1545,7 +1566,8 @@ Future<void> _printImageVanReturn() async {
             String productCode = "${product.code}";
             String productUnit = "${unit.name}";
             String productQty = "${unit.stock}";
-            List<String> descriptionLines = _splitText(productName, columnWidth2);
+            List<String> descriptionLines =
+                _splitText(productName, columnWidth2);
 
             for (int j = 0; j < descriptionLines.length; j++) {
               String line = j == 0
@@ -1616,7 +1638,7 @@ Future<void> _printImageVanReturn() async {
   Future<ApiResponse> _getProducts() async {
     final response = await http.get(Uri.parse(
         '${RestDatasource().BASE_URL}/api/get_van_stock?store_id=${AppState().storeId}&van_id=${AppState().vanId}'));
-print(response.request);
+    print(response.request);
     if (response.statusCode == 200) {
       print(response.request);
       final data = json.decode(response.body);
@@ -1702,10 +1724,8 @@ class Product {
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       storeId: json['store_id'] ?? 0,
       status: json['status'] ?? 0,
-      units: (json['units'] as List?)
-          ?.map((x) => Unit.fromJson(x))
-          .toList() ??
-          [],
+      units:
+          (json['units'] as List?)?.map((x) => Unit.fromJson(x)).toList() ?? [],
     );
   }
   Product copyWith({List<Unit>? units}) {
@@ -1722,7 +1742,6 @@ class Product {
     );
   }
 }
-
 
 class Unit {
   int unit;
@@ -1746,9 +1765,12 @@ class Unit {
       unit: json['unit'] ?? 0, // Default to 0 if null
       id: json['id'] ?? 0, // Default to 0 if null
       name: json['name'] ?? '', // Default to empty string if null
-      price: double.tryParse(json['price']?.toString() ?? '') ?? 0.0, // Fallback to 0.0
-      minPrice: double.tryParse(json['min_price']?.toString() ?? '') ?? 0.0, // Fallback to 0.0
-      stock: (json['stock'] as num?)?.toDouble() ?? 0.0, // Safely convert to double
+      price: double.tryParse(json['price']?.toString() ?? '') ??
+          0.0, // Fallback to 0.0
+      minPrice: double.tryParse(json['min_price']?.toString() ?? '') ??
+          0.0, // Fallback to 0.0
+      stock: (json['stock'] as num?)?.toDouble() ??
+          0.0, // Safely convert to double
     );
   }
 }

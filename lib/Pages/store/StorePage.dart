@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../Models/appstate.dart';
 import '../../Utilities/sharepref.dart';
+import '../../Utilities/auth_client.dart';
 import '../../confg/appconfig.dart';
 import '../../confg/sizeconfig.dart';
 import '../../Components/commonwidgets.dart';
@@ -122,6 +123,7 @@ final response = await http.get(
         InkWell(
           onTap: () async {
             SharedPref().clear();
+            await TokenStore.clear();
             AppState().loginState = "";
             Navigator.of(context).pushNamedAndRemoveUntil(
                 LoginScreen.routeName, (Route<dynamic> route) => false);
@@ -323,7 +325,6 @@ final response = await http.get(
                   title: Text('Log Out'),
                   onTap: () {
                     conformation(context);
-                    clearSharedPreferences();
                   },
                 ),
                 const Divider(),

@@ -13,13 +13,16 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
 
-
-    <application
-        android:label="Mobiz Sales"
-        android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
-        <meta-data android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyD3t6H9yoFcwZV9a9_uQsKy7WAJjViZGrs"/>
+<application
+    android:label="Mobiz"
+    android:name="${applicationName}"
+    android:icon="@mipmap/launcher_icon"
+    android:usesCleartextTraffic="true">
+          <meta-data android:name="com.google.android.geo.API_KEY"
+            android:value="..."/>
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="approvals" />
         <activity
   android:name=".MainActivity"
             android:exported="true"

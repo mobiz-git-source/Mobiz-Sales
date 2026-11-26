@@ -13,6 +13,7 @@ import '../Components/commonwidgets.dart';
 import '../Models/LoginModelClass.dart';
 import '../Utilities/rest_ds.dart';
 import '../Utilities/sharepref.dart';
+import '../Utilities/auth_client.dart';
 import '../confg/sizeconfig.dart';
 import '../Models/appstate.dart';
 import '../Pages/homepage.dart';
@@ -390,10 +391,14 @@ try {
   appState.roundOffAllowedInInvoice = true;
 }
 
-// Pazhaya session clear cheythu, pinne ONNU thavana mathram save
 await sharedPref.removeAll();
 await sharedPref.save("app_state", appState);
 await appState.saveTaxName(); // removeAll-inu SESHAM thanne venam
+
+final apiToken = loginResp.authorisation!.token;
+if (apiToken != null && apiToken.toString().isNotEmpty) {
+  await TokenStore.save(apiToken.toString(), isLogin: true);
+}
 
    if (mounted) {
   final rolId = loginResp.user!.rolId;
@@ -408,10 +413,9 @@ await appState.saveTaxName(); // removeAll-inu SESHAM thanne venam
   } else if (rolId == 7) {
     Navigator.of(context).pushReplacementNamed(DashboardScreen.routeName);
   } else {
-    // unsupported role: don't leave the user "logged in"
-    appState.loginState = 'LOGGED_OUT';
+       appState.loginState = 'LOGGED_OUT';
     await sharedPref.removeAll();
-
+    await TokenStore.clear();
     CommonWidgets.showDialogueBox(
       context: context,
       title: "Unsupported Role",

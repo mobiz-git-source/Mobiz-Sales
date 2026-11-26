@@ -761,7 +761,7 @@ String? code;
                   });
               if (result == true && mounted) {
                 Navigator.pop(context,
-                    true); // 🆕 Shops list-നെ refresh ചെയ്യാൻ അറിയിക്കുന്നു
+                    true); 
               }
               break;
             case 'SOA':

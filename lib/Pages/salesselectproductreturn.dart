@@ -309,22 +309,29 @@ class _SalesselectproductreturnState extends State<Salesselectproductreturn> {
                                   SizedBox(
                                     width: 50,
                                     height: 50,
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(15.0),
-                                      child: FadeInImage(
-                                        image: NetworkImage(
-                                            '${RestDatasource().Product_URL}/uploads/product/${product.proImage}'),
-                                        placeholder: const AssetImage(
-                                            'Assets/Images/no_image.jpg'),
-                                        imageErrorBuilder:
-                                            (context, error, stackTrace) {
-                                          return Image.asset(
-                                              'Assets/Images/no_image.jpg',
-                                              fit: BoxFit.fitWidth);
-                                        },
-                                        fit: BoxFit.fitWidth,
-                                      ),
-                                    ),
+                                 child: ClipRRect(
+  borderRadius: BorderRadius.circular(15.0),
+  child: (product.proImage.isEmpty ||
+          product.proImage == 'defalut.jpg' ||
+          product.proImage == 'default.jpg')
+      ? Image.asset(
+          'Assets/Images/no_image.jpg',
+          fit: BoxFit.fitWidth,
+        )
+      : FadeInImage(
+          image: NetworkImage(
+              '${RestDatasource().Product_URL}/uploads/product/${product.proImage}'),
+          placeholder: const AssetImage(
+              'Assets/Images/no_image.jpg'),
+          imageErrorBuilder:
+              (context, error, stackTrace) {
+            return Image.asset(
+                'Assets/Images/no_image.jpg',
+                fit: BoxFit.fitWidth);
+          },
+          fit: BoxFit.fitWidth,
+        ),
+),
                                   ),
                                   CommonWidgets.horizontalSpace(3),
                                   Column(

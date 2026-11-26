@@ -122,21 +122,32 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
   // single biggest fix — without this, the TextField accepts arbitrarily
   // long decimal input (or garbage from autocorrect/paste), which is the
   // root cause of the huge floating point strings.
-  List<TextInputFormatter> decimalInputFormatters() {
-    final decimals = (AppState().noOfDecimals ?? 2).clamp(0, 4);
-    final pattern = RegExp(r'^\-?\d*\.?\d{0,' + decimals.toString() + r'}$');
-    return [
-      TextInputFormatter.withFunction((oldValue, newValue) {
-        if (newValue.text.isEmpty) return newValue;
-        // Reject the whole edit if the resulting text doesn't fully match
-        // the pattern (whole-string validation, not per-character).
-        if (pattern.hasMatch(newValue.text)) {
-          return newValue;
-        }
-        return oldValue;
-      }),
-    ];
-  }
+// ORIGINAL — thirich kondu vaa (Round Off & Allocate use cheyyunnu)
+List<TextInputFormatter> decimalInputFormatters() {
+  final decimals = (AppState().noOfDecimals ?? 2).clamp(0, 4);
+  final pattern = RegExp(r'^\-?\d*\.?\d{0,' + decimals.toString() + r'}$');
+  return [
+    TextInputFormatter.withFunction((oldValue, newValue) {
+      if (newValue.text.isEmpty) return newValue;
+      if (pattern.hasMatch(newValue.text)) {
+        return newValue;
+      }
+      return oldValue;
+    }),
+  ];
+}
+
+// NEW — Paid Amount-nu mathram
+List<TextInputFormatter> positiveDecimalInputFormatters() {
+  final decimals = (AppState().noOfDecimals ?? 2).clamp(0, 4);
+  final pattern = RegExp(r'^\d*\.?\d{0,' + decimals.toString() + r'}$');
+  return [
+    TextInputFormatter.withFunction((oldValue, newValue) {
+      if (newValue.text.isEmpty) return newValue;
+      return pattern.hasMatch(newValue.text) ? newValue : oldValue;
+    }),
+  ];
+}
 
   @override
   void initState() {
@@ -226,16 +237,15 @@ class _PaymentCollectionScreenState extends State<PaymentCollectionScreen> {
   // returns a rounded double. Previously this read _paidAmt.text directly
   // while the UI displayed the separate, un-rounded PaidAmt variable —
   // that mismatch was part of the bug.
-  double getPaidAmount() {
-    if (PaidAmt.trim().isEmpty) return 0.0;
-    final amount = double.tryParse(PaidAmt.trim());
-    if (amount == null) {
-      print('Invalid Paid Amount entered: $PaidAmt');
-      return 0.0;
-    }
-    return roundedDouble(amount); // FIX
+ double getPaidAmount() {
+  if (PaidAmt.trim().isEmpty) return 0.0;
+  final amount = double.tryParse(PaidAmt.trim());
+  if (amount == null || amount < 0) {
+    print('Invalid Paid Amount entered: $PaidAmt');
+    return 0.0;
   }
-
+  return roundedDouble(amount);
+}
   // FIX: same fix as getPaidAmount() — single source of truth (RoundOff),
   // always rounded, guards against garbage input.
   double getRoundOff() {
@@ -1405,16 +1415,18 @@ Expanded(
                 ),
               ),
 
-              onPressed: (!isSaving &&
-                      ((PaidAmount > 0 &&
-                              roundedDouble(
-                                      PaidAmount - roundOff) ==
-                                  roundedDouble(
-                                      allocatedAmount)) ||
-                          (getBalanceAmount() == 0.0 &&
-                              selectedIndex != null &&
-                              enteredValues[selectedIndex!]
-                                  .isNotEmpty)))
+             onPressed: (!isSaving &&
+        ((PaidAmount > 0 &&
+                roundedDouble(
+                        PaidAmount - roundOff) ==
+                    roundedDouble(
+                        allocatedAmount)) ||
+            (PaidAmount > 0 &&                          // added
+                getBalanceAmount() == 0.0 &&
+                selectedIndex != null &&
+                selectedIndex! < enteredValues.length && // added
+                enteredValues[selectedIndex!]
+                    .isNotEmpty)))
                   ? () async {
                       setState(() {
                         isSaving = true;
@@ -1645,8 +1657,7 @@ Widget _amountColumn(
             autofocus: true,
             keyboardType: const TextInputType.numberWithOptions(
                 decimal: true, signed: false),
-            inputFormatters: decimalInputFormatters(),
-            onChanged: (value) {
+inputFormatters: positiveDecimalInputFormatters(),            onChanged: (value) {
               setState(() {
                 PaidAmt = value; // rounded on commit below
               });
@@ -1658,15 +1669,14 @@ Widget _amountColumn(
               color: AppConfig.colorPrimary,
               textColor: Colors.white,
               child: const Text('OK'),
-              onPressed: () {
-                // FIX: hard round on commit, same pattern as Round Off
-                setState(() {
-                  PaidAmt =
-                      roundedString(double.tryParse(_paidAmt.text) ?? 0.0);
-                  _paidAmt.text = PaidAmt;
-                });
-                Navigator.of(context).pop();
-              },
+            onPressed: () {
+  setState(() {
+    final parsed = double.tryParse(_paidAmt.text) ?? 0.0;
+    PaidAmt = roundedString(parsed < 0 ? 0.0 : parsed);
+    _paidAmt.text = PaidAmt;
+  });
+  Navigator.of(context).pop();
+},
             ),
           ],
         );

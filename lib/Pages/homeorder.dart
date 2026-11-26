@@ -1359,8 +1359,9 @@ Salesman: ${invoice.data!.user?.firstOrNull?.name ?? ''}
 
   Future<Uint8List> _readImageData(String? image) async {
     try {
-      final response = await http
-          .get(Uri.parse('${RestDatasource().Image_URL}/uploads/store/$image'));
+ final response = await http
+          .get(Uri.parse('${RestDatasource().Image_URL}/uploads/store/$image'))
+          .timeout(const Duration(seconds: 10));
 
       print('Response Data $response');
 

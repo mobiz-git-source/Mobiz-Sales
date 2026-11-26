@@ -8,6 +8,7 @@ import 'package:mobizapp/Pages/loginpage.dart';
 import 'package:mobizapp/Pages/schedule_Driver.dart';
 import 'package:mobizapp/Utilities/rest_ds.dart';
 import 'package:mobizapp/Utilities/sharepref.dart';
+import 'package:mobizapp/Utilities/auth_client.dart';
 import 'package:mobizapp/confg/appconfig.dart';
 import 'package:mobizapp/confg/sizeconfig.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -631,6 +632,7 @@ class _HomepageDriverState extends State<HomepageDriver> {
         InkWell(
           onTap: () async {
             SharedPref().clear();
+            await TokenStore.clear();
             AppState().loginState = "";
             Navigator.of(context).pushNamedAndRemoveUntil(
                 LoginScreen.routeName, (Route<dynamic> route) => false);

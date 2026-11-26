@@ -36,6 +36,19 @@ class _ProductsScreenState extends State<ProductsScreen> {
   String? code;
   String? payment;
 
+  // Helper to build clean image URL (handles both "abc.jpg" and "uploads/product/abc.jpg")
+  String _buildImageUrl(String baseUrl, String proImage) {
+    final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    if (proImage.startsWith('http')) {
+      return proImage;
+    } else if (proImage.startsWith('uploads/')) {
+      return '$cleanBase/$proImage';
+    } else if (proImage.startsWith('/uploads/')) {
+      return '$cleanBase$proImage';
+    }
+    return '$cleanBase/uploads/product/$proImage';
+  }
+
   void addToCart(Product product) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String>? cartItems = prefs.getStringList('cartItems') ?? [];
@@ -108,28 +121,34 @@ class _ProductsScreenState extends State<ProductsScreen> {
       } else {
         _filteredProducts = _products
             .where((product) =>
-                product.name!.toLowerCase().contains(query.toLowerCase()) ||
-                product.code!.toLowerCase().contains(query.toLowerCase()))
+                product.name.toLowerCase().contains(query.toLowerCase()) ||
+                product.code.toLowerCase().contains(query.toLowerCase()))
             .toList();
       }
     });
 
     if (_filteredProducts.isEmpty && _hasMore) {
       await _fetchProducts();
-      _searchProducts(query); // Re-run the search after fetching more products
+      _searchProducts(query);
     }
   }
 
-  void _showImageDialog(String imageUrl) {
+  void _showImageDialog(String proImage) {
+    final url1 = _buildImageUrl(RestDatasource().Product_URL, proImage);
+    final url2 = _buildImageUrl(RestDatasource().BASE_URL, proImage);
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
         child: FadeInImage(
-          image: NetworkImage(imageUrl),
+          image: NetworkImage(url1),
           placeholder: const AssetImage('Assets/Images/no_image.jpg'),
           imageErrorBuilder: (context, error, stackTrace) {
-            return Image.asset(
-              'Assets/Images/no_image.jpg',
+            return Image.network(
+              url2,
+              errorBuilder: (context, error2, stackTrace2) {
+                return Image.asset('Assets/Images/no_image.jpg');
+              },
             );
           },
         ),
@@ -157,10 +176,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
     return Scaffold(
       appBar: AppBar(
         iconTheme: const IconThemeData(color: AppConfig.backgroundColor),
-     title: const Text(
-  'Products',
-  style: AppConfig.pageTitleStyle,
-),
+        title: const Text(
+          'Products',
+          style: AppConfig.pageTitleStyle,
+        ),
         backgroundColor: AppConfig.colorPrimary,
         actions: [
           (_search)
@@ -241,22 +260,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   itemBuilder: (context, index) {
                     if (index == _filteredProducts.length) {
                       return SizedBox.shrink();
-                      //   Shimmer.fromColors(
-                      //   baseColor:
-                      //       AppConfig.buttonDeactiveColor.withOpacity(0.1),
-                      //   highlightColor: AppConfig.backButtonColor,
-                      //   child: Center(
-                      //     child: Column(
-                      //       children: [
-                      //         CommonWidgets.loadingContainers(
-                      //             height: SizeConfig.blockSizeVertical * 10,
-                      //             width: SizeConfig.blockSizeHorizontal * 90),
-                      //       ],
-                      //     ),
-                      //   ),
-                      // );
                     }
                     final product = _filteredProducts[index];
+                    final primaryUrl = _buildImageUrl(
+                        RestDatasource().Product_URL, product.proImage);
+                    final fallbackUrl1 = _buildImageUrl(
+                        RestDatasource().BASE_URL, product.proImage);
+                    final fallbackUrl2 = _buildImageUrl(
+                        RestDatasource().Image_URL, product.proImage);
+
                     return Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 15.0, vertical: 2),
@@ -280,25 +292,54 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                   height: 50,
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(15.0),
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        _showImageDialog(
-                                          '${RestDatasource().Product_URL}/uploads/product/${product.proImage}',
-                                        );
-                                      },
-                                      child: FadeInImage(
-                                        image: NetworkImage(
-                                            '${RestDatasource().Product_URL}/uploads/product/${product.proImage}'),
-                                        placeholder: const AssetImage(
-                                            'Assets/Images/no_image.jpg'),
-                                        imageErrorBuilder:
-                                            (context, error, stackTrace) {
-                                          return Image.asset(
-                                              'Assets/Images/no_image.jpg',
-                                              fit: BoxFit.fitWidth);
-                                        },
-                                        fit: BoxFit.fitWidth,
-                                      ),
+                                   child: GestureDetector(
+  onTap: () {
+    if (product.proImage.isNotEmpty &&
+        product.proImage != 'defalut.jpg' &&
+        product.proImage != 'default.jpg') {
+      _showImageDialog(product.proImage);
+    }
+  },
+  child: (product.proImage.isEmpty ||
+          product.proImage == 'defalut.jpg' ||
+          product.proImage == 'default.jpg')
+      ? Image.asset(
+          'Assets/Images/no_image.jpg',
+          fit: BoxFit.fitWidth,
+        )
+      : FadeInImage(
+                                              image: NetworkImage(primaryUrl),
+                                              placeholder: const AssetImage(
+                                                  'Assets/Images/no_image.jpg'),
+                                              imageErrorBuilder:
+                                                  (context, error, stackTrace) {
+                                                debugPrint(
+                                                    'IMG_ERR_1 ($primaryUrl): $error');
+                                                return Image.network(
+                                                  fallbackUrl1,
+                                                  fit: BoxFit.fitWidth,
+                                                  errorBuilder: (context,
+                                                      error2, stackTrace2) {
+                                                    debugPrint(
+                                                        'IMG_ERR_2 ($fallbackUrl1): $error2');
+                                                    return Image.network(
+                                                      fallbackUrl2,
+                                                      fit: BoxFit.fitWidth,
+                                                      errorBuilder: (context,
+                                                          error3, stackTrace3) {
+                                                        debugPrint(
+                                                            'IMG_ERR_3 ($fallbackUrl2): $error3');
+                                                        return Image.asset(
+                                                          'Assets/Images/no_image.jpg',
+                                                          fit: BoxFit.fitWidth,
+                                                        );
+                                                      },
+                                                    );
+                                                  },
+                                                );
+                                              },
+                                              fit: BoxFit.fitWidth,
+                                            ),
                                     ),
                                   ),
                                 ),
@@ -307,12 +348,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Tooltip(
-                                      message: product.name!.toUpperCase(),
+                                      message: product.name.toUpperCase(),
                                       child: SizedBox(
                                         width:
                                             SizeConfig.blockSizeHorizontal * 70,
                                         child: Text(
-                                          '${product.code} | ${product.name!.toUpperCase()}',
+                                          '${product.code} | ${product.name.toUpperCase()}',
                                           style: TextStyle(
                                               fontSize:
                                                   AppConfig.textCaption2Size),
@@ -322,8 +363,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                     Row(
                                       children: [
                                         Text(
-                                          product.units != null &&
-                                                  product.units.length > 0
+                                          product.units.isNotEmpty
                                               ? '${product.units[0].name}:${product.units[0].stock}'
                                               : '',
                                           style: TextStyle(
@@ -335,8 +375,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                           width: 10,
                                         ),
                                         Text(
-                                          product.units != null &&
-                                                  product.units.length > 1
+                                          product.units.length > 1
                                               ? '${product.units[1].name}:${product.units[1].stock}'
                                               : '',
                                           style: TextStyle(
@@ -348,8 +387,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                           width: 10,
                                         ),
                                         Text(
-                                          product.units != null &&
-                                                  product.units.length > 2
+                                          product.units.length > 2
                                               ? '${product.units[2].name}:${product.units[2].stock}'
                                               : '',
                                           style: TextStyle(

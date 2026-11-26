@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:mobizapp/InvoiceApproval/push_router.dart';
 import 'package:mobizapp/Models/appstate.dart';
 import 'package:mobizapp/Pages/Attendance.dart';
 import 'package:mobizapp/Pages/CustomerStock.dart';
@@ -89,6 +90,7 @@ import 'Pages/schedule_Driver.dart';
 import 'Pages/store/StorePage.dart';
 import 'Pages/van_transfer.dart';
 import 'package:http/http.dart' as http;
+import 'package:mobizapp/Utilities/auth_client.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 FlutterLocalNotificationsPlugin();
@@ -98,6 +100,15 @@ const AndroidNotificationChannel channel = AndroidNotificationChannel(
   'High Importance Notifications',
   importance: Importance.max,
 );
+
+const AndroidNotificationChannel approvalsChannel = AndroidNotificationChannel(
+  'approvals',
+  'Invoice Approvals',
+  description: 'Invoice approval requests and results',
+  importance: Importance.high,
+);
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 // Background handler
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -119,6 +130,7 @@ Future<String> getDeviceId() async {
 }
 
 Future<void> sendTokenToBackend(String token) async {
+  if (AppState().userId == null) return; 
   final deviceId = await getDeviceId();
 
   const url = "http://68.183.92.8:3699/api/update-fcm-token";
@@ -131,7 +143,10 @@ Future<void> sendTokenToBackend(String token) async {
   try {
     final res = await http.post(
       Uri.parse(url),
-      headers: {"Accept": "application/json"},
+         headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+      },
       body: jsonEncode(body),
     );
     print("✔ Token sent: $body");
@@ -162,7 +177,11 @@ Future<void> _setupFcm() async {
     print("❌ FCM setup error: $e");
   }
 }
-void main() async {
+void main() {
+  http.runWithClient(_appMain, () => AuthClient());
+}
+
+Future<void> _appMain() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
@@ -192,25 +211,38 @@ void main() async {
       requestBadgePermission: false,
       requestSoundPermission: false,
     );
-    await flutterLocalNotificationsPlugin.initialize(
+     await flutterLocalNotificationsPlugin.initialize(
       const InitializationSettings(android: androidInit, iOS: iosInit),
+      onDidReceiveNotificationResponse: (resp) {
+        PushRouter.onLocalTap(resp.payload);
+      },
     );
-    await flutterLocalNotificationsPlugin
+    final androidPlugin = flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
+            AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.createNotificationChannel(channel);
+    await androidPlugin?.createNotificationChannel(approvalsChannel);
   } catch (e) {
     print("❌ Local notification init error: $e");
   }
 
-  _setupFcm(); // await cheyyanda, app start thadayilla
-
-  try {
+   try {
     await AppInfo.init();
   } catch (e) {
     print("❌ AppInfo init error: $e");
   }
   print("Code: ${AppState().minor}");
+
+  await TokenStore.load();
+
+  AuthClient.onSessionExpired = () {
+    navigatorKey.currentState?.pushNamedAndRemoveUntil(
+      LoginScreen.routeName,
+      (route) => false,
+    );
+  };
+
+    _setupFcm();
   runApp(MyApp());
 }
 
@@ -244,23 +276,40 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     requestNotificationPermission();
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       print("📩 Foreground: ${message.notification?.title}");
+      PushRouter.onForeground(); // badge/list refresh
 
-      // Display notification
+      final isInvoice =
+          '${message.data['type'] ?? ''}'.startsWith('invoice_');
+      final ch = isInvoice ? approvalsChannel : channel;
+
       flutterLocalNotificationsPlugin.show(
         message.hashCode,
         message.notification?.title ?? "No Title",
         message.notification?.body ?? "No Message",
         NotificationDetails(
           android: AndroidNotificationDetails(
-            channel.id,
-            channel.name,
+            ch.id,
+            ch.name,
             importance: Importance.max,
             priority: Priority.high,
           ),
         ),
+        payload: jsonEncode(PushRouter.payloadOf(message)),
       );
+    });
+
+   
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      PushRouter.onTap(PushRouter.payloadOf(message));
+    });
+
+   
+    FirebaseMessaging.instance.getInitialMessage().then((message) {
+      if (message != null) {
+        PushRouter.onTap(PushRouter.payloadOf(message), coldStart: true);
+      }
     });
 
     // When app is opened by tapping notification
@@ -275,7 +324,8 @@ class _MyAppState extends State<MyApp> {
       designSize: const Size(360, 690),
       minTextAdapt: true,
       splitScreenMode: true,
-            builder: (context, child) => MaterialApp(
+                builder: (context, child) => MaterialApp(
+          navigatorKey: navigatorKey,
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
             colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),

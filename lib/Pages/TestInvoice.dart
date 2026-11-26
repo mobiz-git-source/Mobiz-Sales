@@ -2057,8 +2057,9 @@ Salesman: ${invoice.data!.user![0].name}
     }
 
     try {
-      final response = await http
-          .get(Uri.parse('${RestDatasource().Image_URL}/uploads/store/$image'));
+   final response = await http
+          .get(Uri.parse('${RestDatasource().Image_URL}/uploads/store/$image'))
+          .timeout(const Duration(seconds: 10));
 
       print('Response Data $response');
 

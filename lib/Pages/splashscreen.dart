@@ -4,6 +4,7 @@ import 'package:mobizapp/Pages/loginpage.dart';
 
 import '../Models/appstate.dart';
 import '../Utilities/sharepref.dart';
+import '../Utilities/auth_client.dart';
 import '../confg/appconfig.dart';
 import '../confg/appconfigjc.dart';
 import '../confg/sizeconfig.dart';
@@ -105,7 +106,13 @@ class _SplashScreenState extends State<SplashScreen> {
  print("LOGIN STATE = ${appState.loginState}");
   print("ROLE = ${appState.rolId}");
 
-      if (appState.loginState == 'LOGGED_IN') {
+      final hasApiToken =
+          TokenStore.token != null && TokenStore.token!.isNotEmpty;
+      final loginAt = TokenStore.loginTime;
+      final sessionTooOld =
+          loginAt == null || DateTime.now().difference(loginAt).inDays >= 14;
+
+      if (appState.loginState == 'LOGGED_IN' && hasApiToken && !sessionTooOld) {
         if (mounted) {
           Navigator.of(context)
               .pushReplacementNamed(ErrorHandlingScreen.routeName);

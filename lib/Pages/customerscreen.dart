@@ -426,14 +426,20 @@ bool _initDone = false;
           resJson['data'].length > 0) {
         customer = CustomerData.fromJson(resJson);
         CustomersDataScreen.loadedCustomerList = customer.data ?? [];
-
-        if (mounted) {
-          setState(() {
-            filteredCustomers = customer.data!;
-            _nodata = false;
-            _initDone = true;
-          });
-        }
+if (mounted) {
+  setState(() {
+    if (searchQuery.isNotEmpty) {
+      filteredCustomers = customer.data!.where((c) {
+        return (c.name?.toLowerCase() ?? '')
+            .contains(searchQuery.toLowerCase());
+      }).toList();
+    } else {
+      filteredCustomers = customer.data!;
+    }
+    _nodata = false;
+    _initDone = true;
+  });
+}
       } else {
         if (mounted) {
           setState(() {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobizapp/InvoiceApproval/push_router.dart';
 import 'package:mobizapp/Models/appstate.dart';
 import 'package:mobizapp/Utilities/rest_ds.dart';
 import '../../confg/appconfig.dart';
@@ -48,10 +49,21 @@ class _NotificationPageState extends State<NotificationPage> {
   List<NotificationModel> notifications = [];
   bool loading = true;
 
-  @override
+   @override
   void initState() {
     super.initState();
     loadNotifications();
+    PushRouter.approvalsChanged.addListener(_onChanged);
+  }
+
+  @override
+  void dispose() {
+    PushRouter.approvalsChanged.removeListener(_onChanged);
+    super.dispose();
+  }
+
+  void _onChanged() {
+    if (mounted) silentRefresh().catchError((_) {});
   }
 
   Future<void> loadNotifications() async {
@@ -77,9 +89,19 @@ class _NotificationPageState extends State<NotificationPage> {
     });
   }
 
-  Future<void> handleTap(int index) async {
+    Future<void> handleTap(int index) async {
     var n = notifications[index];
 
+      if (n.type.startsWith('invoice_approval_') ||
+        n.type == 'invoice_approved' ||
+        n.type == 'invoice_rejected') {
+      PushRouter.onTap({
+        ...n.data,
+        'type': n.type,
+        '_title': n.title,
+        '_body': n.body,
+      }..remove('notification_id')); // thazhe mark-read already cheyyunnu
+    }
     if (n.isRead == false) {
       await NotificationService.markAsRead(n.id);
 

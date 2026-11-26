@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:lottie/lottie.dart';
 import 'package:mobizapp/Components/commonwidgets.dart';
+import 'package:mobizapp/InvoiceApproval/push_router.dart';
 import 'package:mobizapp/Pages/AgeingSummary/AgeingSummaryScreen.dart';
 import 'package:mobizapp/Pages/Attendance.dart';
 import 'package:mobizapp/Pages/BankReconciliation/BankReconciliationScreen.dart';
@@ -29,7 +30,9 @@ import 'package:mobizapp/Pages/vanstockrequest.dart';
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:mobizapp/Utilities/cpcl_helper.dart';
 import 'package:mobizapp/Utilities/rest_ds.dart';
+import 'package:mobizapp/Utilities/server_logout.dart';
 import 'package:mobizapp/Utilities/sharepref.dart';
+import 'package:mobizapp/Utilities/auth_client.dart';
 import 'package:mobizapp/confg/appconfig.dart';
 import 'package:mobizapp/confg/sizeconfig.dart';
 import 'package:mobizapp/Water.dart';
@@ -50,6 +53,8 @@ import 'Customer Dues/Customer Dues.dart';
 import 'Picking/pickingList.dart';
 import 'Production/ProductionOrder.dart';
 import 'WarehouseStockTake/warehouse_stock_take_list.dart'; // NEW (file njan ezhuthi tharum)
+import '../InvoiceApproval/invoice_approval_service.dart';
+import '../InvoiceApproval/approval_list_screen.dart';
 // import 'Picking/pickingList.dart';
 // import 'Picking/AddPicking.dart'; // TEMP
 // import 'Production/ProductionOrder.dart';
@@ -76,7 +81,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // ── NEW: palette used only for the redesigned UI. Data/API logic below is untouched. ──
   static const Color _screenBg = Color(0xFFF5F6FA);
   static const Color _darkText = Color(0xFF1F1147);
@@ -113,6 +118,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // exists yet in the code you shared, so it defaults to 0 (badge hidden).
   // Wire this to the real unread-count from your notifications API when ready.
   int notificationCount = 0;
+  bool _isApprover = false;
+  int _pendingApprovals = 0;
   int visit = 0;
   int orders = 0;
   int invoice = 0;
@@ -136,18 +143,41 @@ class _HomeScreenState extends State<HomeScreen> {
    @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    PushRouter.approvalsChanged.addListener(_onApprovalsChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _getUserDetails();
       fetchStoreDetail();
       _fetchAppVersion();
       fetchDashboardData();
       fetchAppIcons();
+    _loadApprovalSummary();
+      _loadUnreadCount();
+      PushRouter.consumePending();
     });
     print("Validate qty${AppState().validate_qtySales}");
     print("Validate salesoo${AppState().validate_qtySO}");
     _restoreTaxName();
   }
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    PushRouter.approvalsChanged.removeListener(_onApprovalsChanged);
+    super.dispose();
+  }
 
+ void _onApprovalsChanged() {
+    _loadApprovalSummary();
+    _loadUnreadCount();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+  if (state == AppLifecycleState.resumed) {
+      _loadApprovalSummary();
+      _loadUnreadCount();
+    }
+  }
   Future<void> _restoreTaxName() async {
     if ((AppState().taxName ?? '').trim().isNotEmpty) return;
     final prefs = await SharedPreferences.getInstance();
@@ -292,7 +322,7 @@ class _HomeScreenState extends State<HomeScreen> {
         } else {
           appIcons = [];
         }
-        paginatedIcons = _paginateList(appIcons, 16);
+        _applyApprovalIcon();
       });
     } else {
       throw Exception('Failed to load app icons');
@@ -315,6 +345,52 @@ class _HomeScreenState extends State<HomeScreen> {
       ));
     }
     return chunks;
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final list = await NotificationService.getNotifications();
+      final unread = list.where((e) {
+        if (e is! Map) return false;
+        final r = e['is_read'];
+        final isRead = r == true || r == 1 || r == '1';
+        return !isRead;
+      }).length;
+      if (!mounted) return;
+      setState(() => notificationCount = unread);
+    } catch (_) {}
+  }
+
+  Future<void> _loadApprovalSummary() async {
+    final s = await InvoiceApprovalService.getSummary();
+    if (!mounted) return;
+    setState(() {
+      _isApprover = s['is_approver'] == true;
+      _pendingApprovals = s['pending_count'] ?? 0;
+      _applyApprovalIcon();
+    });
+  }
+
+  /// backend icons-inte koode "Invoice Approvals" add cheyyum (approver aanenkil mathram)
+  void _applyApprovalIcon() {
+    appIcons.removeWhere((e) =>
+        e is Map &&
+        e['icon'] is List &&
+        (e['icon'] as List).isNotEmpty &&
+        e['icon'][0]['url'] == 'InvoiceApprovals');
+
+    if (_isApprover) {
+      appIcons.add({
+        'icon': [
+          {
+            'icon': 'fact_check',
+            'name': 'Invoice Approvals',
+            'url': 'InvoiceApprovals',
+          }
+        ]
+      });
+    }
+    paginatedIcons = _paginateList(appIcons, 16);
   }
 
   IconData? getIconData(String? iconName) {
@@ -373,6 +449,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return Icons.quora;
        case 'request_quote':
         return Icons.request_quote;
+          case 'fact_check':
+        return Icons.fact_check;
       case 'warehouse':                    // NEW
         return Icons.warehouse;
       default:
@@ -475,7 +553,6 @@ class _HomeScreenState extends State<HomeScreen> {
   title: Text('Log Out'),
                       onTap: () {
                         conformation(context);
-                        clearSharedPreferences();
                       },
                     ),
                     const Divider(),
@@ -548,10 +625,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                     (name?.trim().toLowerCase() == 'stock take')
                                         ? 'Van Stock Take'
                                         : (name ?? 'Unknown');
-                                return _iconButtons(
+                                                            return _iconButtons(
                                   title: displayName,
                                   routeName: url ?? '',
                                   icon: getIconData(iconName),
+                                  badge: url == 'InvoiceApprovals'
+                                      ? _pendingApprovals
+                                      : 0,
                                 );
                               },
                             );
@@ -685,8 +765,10 @@ InkWell(
     child: Icon(Icons.print, color: Colors.white, size: 24),
   ),
 ),
-
-Stack(
+InkWell(
+  onTap: () => Navigator.pushNamed(context, NotificationPage.routeName)
+      .then((_) => _loadUnreadCount()),
+  child: Stack(
   clipBehavior: Clip.none,
   children: [
     const Icon(
@@ -723,7 +805,7 @@ Stack(
       ),
   ],
 ),
-             ]   ),
+          )  ]   ),
             const SizedBox(height: 18),
             Text(
               'Hello, ${AppState().name}',
@@ -971,12 +1053,12 @@ Stack(
     );
   }
 
-  // ── NEW: light rounded card with a soft-purple circular icon, same tap logic as before ──
-  Widget _iconButtons({
+   Widget _iconButtons({
     IconData? icon,
     required String title,
     String? image,
     String? routeName,
+    int badge = 0,
   }) {
     void navigateAndRefresh(String route) {
       Navigator.pushNamed(context, route).then((_) {
@@ -1101,6 +1183,15 @@ Stack(
             case 'WarehouseStockTake':       // NEW
               Navigator.pushNamed(context, WarehouseStockTakeListPage.routeName);
               break;
+                   case 'InvoiceApprovals':
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ApprovalListScreen()),
+              ).then((_) {
+                fetchDashboardData();
+                _loadApprovalSummary();
+              });
+              break;
             default:
               Navigator.pushNamed(context, routeName);
           }
@@ -1124,18 +1215,38 @@ Stack(
           children: [
             // NEW: rounded-square gradient badge instead of the plain
             // light-purple circle — bolder, more colorful icon container.
-            SizedBox(
-              width: 44,
-              height: 44,
-              child: icon != null
-                  ? Icon(icon, color: _brandColor, size: 30)
-                  : (image != null
-                      ? Image.asset(image,
-                          width: 26,
-                          height: 26,
-                          fit: BoxFit.contain,
-                          color: _brandColor)
-                      : const SizedBox.shrink()),
+                     Stack(
+              clipBehavior: Clip.none,
+              children: [
+                SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: icon != null
+                      ? Icon(icon, color: _brandColor, size: 30)
+                      : (image != null
+                          ? Image.asset(image,
+                              width: 26,
+                              height: 26,
+                              fit: BoxFit.contain,
+                              color: _brandColor)
+                          : const SizedBox.shrink()),
+                ),
+                if (badge > 0)
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                          color: Color(0xFFE8253A), shape: BoxShape.circle),
+                      child: Text(badge > 9 ? '9+' : '$badge',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 7),
             SizedBox(
@@ -1188,7 +1299,9 @@ Stack(
         ),
         InkWell(
           onTap: () async {
+            await serverLogout(); 
             SharedPref().clear();
+            await TokenStore.clear();
             AppState().loginState = "";
             Navigator.of(context).pushNamedAndRemoveUntil(
                 LoginScreen.routeName, (Route<dynamic> route) => false);

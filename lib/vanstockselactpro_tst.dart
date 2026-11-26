@@ -291,22 +291,29 @@ class _SelectProductsScreenoffState extends State<SelectProductsScreenoff> {
                                 SizedBox(
                                   width: 50,
                                   height: 50,
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(15.0),
-                                    child: FadeInImage(
-                                      image: NetworkImage(
-                                          '${RestDatasource().Product_URL}/uploads/product/${product.proImage}'),
-                                      placeholder: const AssetImage(
-                                          'Assets/Images/no_image.jpg'),
-                                      imageErrorBuilder:
-                                          (context, error, stackTrace) {
-                                        return Image.asset(
-                                            'Assets/Images/no_image.jpg',
-                                            fit: BoxFit.fitWidth);
-                                      },
-                                      fit: BoxFit.fitWidth,
-                                    ),
-                                  ),
+                            child: ClipRRect(
+  borderRadius: BorderRadius.circular(15.0),
+  child: (product.proImage.isEmpty ||
+          product.proImage == 'defalut.jpg' ||
+          product.proImage == 'default.jpg')
+      ? Image.asset(
+          'Assets/Images/no_image.jpg',
+          fit: BoxFit.fitWidth,
+        )
+      : FadeInImage(
+          image: NetworkImage(
+              '${RestDatasource().Product_URL}/uploads/product/${product.proImage}'),
+          placeholder: const AssetImage(
+              'Assets/Images/no_image.jpg'),
+          imageErrorBuilder:
+              (context, error, stackTrace) {
+            return Image.asset(
+                'Assets/Images/no_image.jpg',
+                fit: BoxFit.fitWidth);
+          },
+          fit: BoxFit.fitWidth,
+        ),
+),
                                 ),
                                 CommonWidgets.horizontalSpace(3),
                                 Column(
@@ -409,19 +416,24 @@ class _SelectProductsScreenoffState extends State<SelectProductsScreenoff> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            Image.network(
-                              '${RestDatasource().Product_URL}/uploads/product/${product.proImage}',
-                              height: 50.h,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Image.asset('Assets/Images/no_image.jpg',
-                                    height: 50.h);
-                              },
-                            ),
-                          ],
-                        ),
+                     Row(
+  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  children: [
+    (product.proImage.isEmpty ||
+            product.proImage == 'defalut.jpg' ||
+            product.proImage == 'default.jpg')
+        ? Image.asset('Assets/Images/no_image.jpg',
+            height: 50.h)
+        : Image.network(
+            '${RestDatasource().Product_URL}/uploads/product/${product.proImage}',
+            height: 50.h,
+            errorBuilder: (context, error, stackTrace) {
+              return Image.asset('Assets/Images/no_image.jpg',
+                  height: 50.h);
+            },
+          ),
+  ],
+),
                         SizedBox(height: 5.h),
                         if (selectedUnit != null) ...[
                           Text(

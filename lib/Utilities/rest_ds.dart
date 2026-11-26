@@ -12,6 +12,7 @@ import 'package:http_parser/http_parser.dart';
 import '../Components/commonwidgets.dart';
 import '../Models/appstate.dart';
 import 'network_util.dart';
+import 'auth_client.dart';
 
 class RestDatasource {
   final NetworkUtil _netUtil = NetworkUtil();
@@ -24,7 +25,7 @@ class RestDatasource {
   RestDatasource() {
     BASE_URL = "http://68.183.92.8:3699";
     Image_URL = "https://erpadmin.mobiz.ae";
-    Product_URL = "http://68.183.92.8:3696";
+   Product_URL = "http://68.183.92.8:3699";
   }
 
   Future<String> _timeZone() async {
@@ -63,10 +64,10 @@ class RestDatasource {
         'Content-Type': 'application/json; charset=UTF-8',
       };
     } else {
-      print("token a ${_appState.token}");
+      // print("token a ${_appState.token}");
       header = {
         'Content-Type': 'application/json; charset=UTF-8',
-        HttpHeaders.authorizationHeader: "token $token"
+              HttpHeaders.authorizationHeader: "Bearer $token"
       };
     }
 
@@ -107,7 +108,7 @@ class RestDatasource {
     } else {
       header = {
         'Content-Type': 'application/json; charset=UTF-8',
-        HttpHeaders.authorizationHeader: "bearer $token"
+        HttpHeaders.authorizationHeader: "Bearer $token"
       };
     }
 
@@ -208,9 +209,12 @@ class RestDatasource {
 
     Dio dio = Dio();
 
-    dio.interceptors.add(InterceptorsWrapper(
-      onError: (DioException e, handler) {
-        if (e.response?.statusCode == 413) {
+      dio.interceptors.add(InterceptorsWrapper(
+      onError: (DioException e, handler) async {
+        if (e.response?.statusCode == 401) {
+          await TokenStore.clear();
+          AuthClient.onSessionExpired?.call();
+        } else if (e.response?.statusCode == 413) {
           if (context != null) {
             CommonWidgets.showDialogueBox(
               context: context,
@@ -227,12 +231,15 @@ class RestDatasource {
       },
     ));
 
+    await AuthClient.ensureFresh(Uri.parse(SIGNUP__URL));
+    final authToken = TokenStore.token ?? token;
     Options options = Options(
-      headers: token != null
-          ? {HttpHeaders.authorizationHeader: "bearer $token"}
-          : null,
+      headers: {
+        if (authToken != null)
+          HttpHeaders.authorizationHeader: "Bearer $authToken",
+        'app-version': TokenStore.appVersion,
+      },
     );
-
     print("========== CUSTOMER UPDATE ==========");
     print("URL: $SIGNUP__URL");
     print("Customer ID: ${bodyJson['id']}");
