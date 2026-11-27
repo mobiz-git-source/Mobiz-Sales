@@ -10,6 +10,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import 'package:mobizapp/Components/commonwidgets.dart';
 import 'package:mobizapp/Models/appstate.dart';
+import 'package:mobizapp/Models/pdfgenerate.dart';
 import 'package:mobizapp/Utilities/rest_ds.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
@@ -236,6 +237,26 @@ Future<void> _printReceiptImage(ReportData data) async {
   // NEW: Renders Arabic text to a PNG bitmap for thermal printing — same
 // approach as the invoice screen's _arabicTextToImageBytes(). ESC/POS
 // text commands only cover Latin/ASCII, so Arabic must go as an image.
+String _pdfSafe(String? s) => (s ?? '')
+      .replaceAll(RegExp(r'[^\x20-\x7E]'), '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+
+  Future<Uint8List?> _fetchStoreLogo(String? logoName) async {
+    if (logoName == null || logoName.trim().isEmpty) return null;
+    try {
+      final url = '${RestDatasource().Image_URL}/uploads/store/$logoName';
+      final resp = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 10));
+      if (resp.statusCode == 200 && resp.bodyBytes.isNotEmpty) {
+        return resp.bodyBytes;
+      }
+    } catch (e) {
+      debugPrint('Logo fetch error: $e');
+    }
+    return null;
+  }
   Future<Uint8List> _arabicTextToImageBytes(
     String text, {
     double fontSize = 26,
@@ -288,30 +309,46 @@ Future<void> _printReceiptImage(ReportData data) async {
     return pw.Font.ttf(fontData);
   }
 
-  Future<void> generatePdf(ReportData data) async {
-    String outstanding = await _getOutstanding(data.customerId);
-    final response = await http.get(Uri.parse(
-        '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
-    if (response.statusCode == 200) {
+Future<void> generatePdf(ReportData data) async {
+    try {
+      pdfStage = 'receipt: fetch';
+      String outstanding = await _getOutstanding(data.customerId);
+      final response = await http
+          .get(Uri.parse(
+              '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'))
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to load store details');
+      }
+
       StoreDetail storeDetail =
           StoreDetail.fromJson(json.decode(response.body));
 
-      final pdf = pw.Document();
-      final String api =
-          '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
-      final logoResponse = await http.get(Uri.parse(api));
-      if (logoResponse.statusCode != 200) {
-        throw Exception('Failed to load logo image');
-      }
-      final Uint8List logoBytes = logoResponse.bodyBytes;
+      final Uint8List? logoBytes = await _fetchStoreLogo(storeDetail.logos);
 
-      // NEW: load Arabic font ONCE, before build() — build() is sync,
-      // so the font can't be awaited inside it.
       final pw.Font? arabicFont = (storeDetail.name_ar != null &&
               storeDetail.name_ar!.trim().isNotEmpty)
           ? await _loadArabicPwFont()
           : null;
 
+      final cust = (data.customer != null && data.customer!.isNotEmpty)
+          ? data.customer![0]
+          : null;
+      final firstSale =
+          (data.sales != null && data.sales!.isNotEmpty) ? data.sales![0] : null;
+      final vatLabel = (data.store != null && data.store!.isNotEmpty)
+          ? (data.store![0].vatLabel ?? 'TRN')
+          : 'TRN';
+      final vanName = (data.van != null && data.van!.isNotEmpty)
+          ? (data.van![0].name ?? 'N/A')
+          : 'N/A';
+      final salesmanName = (data.user != null && data.user!.isNotEmpty)
+          ? (data.user![0].name ?? 'N/A')
+          : 'N/A';
+
+      pdfStage = 'receipt: build';
+      final pdf = pw.Document();
       pdf.addPage(
         pw.MultiPage(
           build: (pw.Context context) => [
@@ -321,45 +358,46 @@ Future<void> _printReceiptImage(ReportData data) async {
                 pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Column(
-                          crossAxisAlignment: pw.CrossAxisAlignment.start,
-                          children: [
-                            pw.SizedBox(height: 10),
-                            pw.Text(
-                              storeDetail.name,
-                              style: pw.TextStyle(
-                                fontSize: 18,
-                                fontWeight: pw.FontWeight.bold,
-                              ),
-                            ),
-                            pw.SizedBox(height: 3),
-// NEW: Arabic company name — same size/weight/color as English name
-                            if (arabicFont != null)
+                      pw.Expanded(
+                        child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.SizedBox(height: 10),
                               pw.Text(
-                                storeDetail.name_ar!,
-                                textDirection: pw.TextDirection.rtl,
-                                textAlign: pw.TextAlign.right,
+                                _pdfSafe(storeDetail.name),
                                 style: pw.TextStyle(
-                                  font: arabicFont,
-                                  fontSize:
-                                      18, // was 14 → now matches English name's 18
+                                  fontSize: 18,
                                   fontWeight: pw.FontWeight.bold,
-                                  color: PdfColors
-                                      .black, // was default grey → now solid black
                                 ),
                               ),
-                            pw.SizedBox(height: 3),
-                            pw.Text('${storeDetail.address ?? 'N/A'}'),
-                            pw.SizedBox(height: 3),
-                            pw.Text('TRN: ${storeDetail.trn ?? 'N/A'}'),
-                            pw.SizedBox(height: 3),
-                          ]),
-                      pw.Image(
-                        pw.MemoryImage(logoBytes),
-                        height: 100,
-                        width: 100,
-                        fit: pw.BoxFit.fitWidth,
+                              pw.SizedBox(height: 3),
+                              if (arabicFont != null)
+                                pw.Text(
+                                  storeDetail.name_ar!,
+                                  textDirection: pw.TextDirection.rtl,
+                                  textAlign: pw.TextAlign.right,
+                                  style: pw.TextStyle(
+                                    font: arabicFont,
+                                    fontSize: 18,
+                                    fontWeight: pw.FontWeight.bold,
+                                    color: PdfColors.black,
+                                  ),
+                                ),
+                              pw.SizedBox(height: 3),
+                              pw.Text(_pdfSafe(storeDetail.address ?? 'N/A')),
+                              pw.SizedBox(height: 3),
+                              pw.Text(
+                                  'TRN: ${_pdfSafe(storeDetail.trn ?? 'N/A')}'),
+                              pw.SizedBox(height: 3),
+                            ]),
                       ),
+                      if (logoBytes != null)
+                        pw.Image(
+                          pw.MemoryImage(logoBytes),
+                          height: 100,
+                          width: 100,
+                          fit: pw.BoxFit.fitWidth,
+                        ),
                     ]),
                 pw.Center(
                   child: pw.Text(
@@ -383,35 +421,31 @@ Future<void> _printReceiptImage(ReportData data) async {
                             style:
                                 pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                         pw.Text(
-                          (data.customer!.isNotEmpty)
-                              ? data.customer![0].code ?? ''
-                              : '',
+                          _pdfSafe(cust?.code ?? ''),
                           style: pw.TextStyle(
                             fontSize: AppConfig.textCaption3Size,
                             fontWeight: pw.FontWeight.bold,
                           ),
                         ),
                         pw.SizedBox(height: 3),
-                        pw.Text('${data.customer![0].name}'),
-                        // pw.SizedBox(height: 3),
-                        // pw.Text('Market: ${data.customer![0].address}'),
+                        pw.Text(_pdfSafe(cust?.name ?? '')),
                         pw.SizedBox(height: 3),
                         pw.Text(
-                            '${data.store![0].vatLabel}: ${data.customer![0].trn}'),
+                            '${_pdfSafe(vatLabel)}: ${_pdfSafe(cust?.trn ?? '')}'),
                       ],
                     ),
                     pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         pw.Text(
-                          'Reference: ${data.sales![0].voucherNo ?? 'N/A'}',
+                          'Reference: ${_pdfSafe(firstSale?.voucherNo ?? data.voucherNo ?? 'N/A')}',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                         ),
                         pw.Text(
-                            'Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
-                        pw.Text('Time: ${data.sales![0].inTime}'),
+                            'Date: ${DateHelper.displayDate(firstSale?.inDate ?? data.inDate)}'),
+                        pw.Text('Time: ${firstSale?.inTime ?? data.inTime ?? ''}'),
                         pw.Text(
-                            'Due Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
+                            'Due Date: ${DateHelper.displayDate(firstSale?.inDate ?? data.inDate)}'),
                       ],
                     ),
                   ],
@@ -425,25 +459,24 @@ Future<void> _printReceiptImage(ReportData data) async {
                     if ((data.collectionType ?? '').toLowerCase() ==
                         'cheque') ...[
                       pw.Text('Collection Type: Cheque'),
-                      pw.Text('Bank Name: ${data.bank ?? 'N/A'}'),
-                      pw.Text('Cheque No: ${data.chequeNo ?? 'N/A'}'),
+                      pw.Text('Bank Name: ${_pdfSafe(data.bank ?? 'N/A')}'),
+                      pw.Text('Cheque No: ${_pdfSafe(data.chequeNo ?? 'N/A')}'),
                       pw.Text(
                           'Cheque Date: ${data.chequeDate != null ? DateHelper.displayDate(data.chequeDate) : 'N/A'}'),
                     ] else ...[
                       pw.Text(
-                          'Collection Type: ${data.collectionType ?? 'Cash'}'),
+                          'Collection Type: ${_pdfSafe(data.collectionType ?? 'Cash')}'),
                     ]
                   ],
                 ),
-                pw.SizedBox(height: 10),
-                pw.SizedBox(height: 10),
+                pw.SizedBox(height: 20),
               ],
             ),
-            _buildSalesTable(data.sales!),
+            _buildSalesTable(data.sales ?? []),
             pw.SizedBox(height: 20),
             pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
               pw.Text((data.roundoff != null &&
-                      double.parse(data.roundoff!) != 0)
+                      (double.tryParse(data.roundoff!) ?? 0) != 0)
                   ? 'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(AppState().noOfDecimals ?? 2)}'
                   : ''),
             ]),
@@ -454,83 +487,68 @@ Future<void> _printReceiptImage(ReportData data) async {
               pw.Text('Total Outstanding: $outstanding'),
             ]),
             pw.SizedBox(height: 20),
-            pw.Text('Van: ${data.van![0].name ?? 'N/A'}'),
-            pw.SizedBox(width: 20),
-            pw.Text('Salesman: ${data.user![0].name ?? 'N/A'}'),
+            pw.Text('Van: ${_pdfSafe(vanName)}'),
+            pw.Text('Salesman: ${_pdfSafe(salesmanName)}'),
           ],
         ),
       );
 
-      final output = await getTemporaryDirectory();
-      final file = File('${output.path}/receipt_report.pdf');
-      await file.writeAsBytes(await pdf.save());
-      await OpenFile.open(file.path);
-    } else {
-      throw Exception('Failed to load store details');
+      pdfStage = 'receipt: save';
+      final bytes = await pdf.save();
+      final docNo = data.voucherNo ?? firstSale?.voucherNo ?? 'receipt_report';
+      await saveAndLaunchFile(bytes, '$docNo.pdf', false);
+    } catch (e, st) {
+      debugPrint('Receipt PDF error: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 8),
+            content: Text('PDF failed at [$pdfStage]: $e'),
+          ),
+        );
+      }
     }
   }
 
-  Future<void> generateWifiPdf(ReportData data) async {
-    String outstanding = await _getOutstanding(data.customerId);
-    final response = await http.get(Uri.parse(
-        '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
-    if (response.statusCode == 200) {
+ Future<void> generateWifiPdf(ReportData data) async {
+    try {
+      pdfStage = 'receipt_wifi: fetch';
+      String outstanding = await _getOutstanding(data.customerId);
+      final response = await http
+          .get(Uri.parse(
+              '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'))
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to load store details');
+      }
+
       StoreDetail storeDetail =
           StoreDetail.fromJson(json.decode(response.body));
 
-      final pdf = pw.Document();
-      final String api =
-          '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
-      final logoResponse = await http.get(Uri.parse(api));
-      if (logoResponse.statusCode != 200) {
-        throw Exception('Failed to load logo image');
-      }
-      final Uint8List logoBytes = logoResponse.bodyBytes;
-
-      // NEW: same as generatePdf()
-      final pw.Font? arabicFont = (storeDetail.name_ar != null &&
-              storeDetail.name_ar!.trim().isNotEmpty)
-          ? await _loadArabicPwFont()
+      final cust = (data.customer != null && data.customer!.isNotEmpty)
+          ? data.customer![0]
           : null;
+      final firstSale =
+          (data.sales != null && data.sales!.isNotEmpty) ? data.sales![0] : null;
+      final vatLabel = (data.store != null && data.store!.isNotEmpty)
+          ? (data.store![0].vatLabel ?? 'TRN')
+          : 'TRN';
+      final vanName = (data.van != null && data.van!.isNotEmpty)
+          ? (data.van![0].name ?? 'N/A')
+          : 'N/A';
+      final salesmanName = (data.user != null && data.user!.isNotEmpty)
+          ? (data.user![0].name ?? 'N/A')
+          : 'N/A';
 
+      pdfStage = 'receipt_wifi: build';
+      final pdf = pw.Document();
       pdf.addPage(
         pw.MultiPage(
           build: (pw.Context context) => [
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                // pw.Center(
-                //   child: pw.Column(
-                //     children: [
-                //       pw.Image(
-                //         pw.MemoryImage(logoBytes),
-                //         height: 100,
-                //         width: 100,
-                //         fit: pw.BoxFit.cover,
-                //       ),
-                //       pw.SizedBox(height: 10),
-                //       pw.Text(
-                //         storeDetail.name,
-                //         style: pw.TextStyle(
-                //           fontSize: 18,
-                //           fontWeight: pw.FontWeight.bold,
-                //         ),
-                //       ),
-                //       pw.SizedBox(height: 3),
-                //       pw.Text('${storeDetail.address ?? 'N/A'}'),
-                //       pw.SizedBox(height: 3),
-                //       pw.Text('TRN: ${storeDetail.trn ?? 'N/A'}'),
-                //       pw.SizedBox(height: 3),
-                //       pw.Text(
-                //         'RECEIPT VOUCHER',
-                //         style: pw.TextStyle(
-                //           fontSize: 16,
-                //           fontWeight: pw.FontWeight.bold,
-                //         ),
-                //       ),
-                //     ],
-                //   ),
-                // ),
                 pw.Center(
                   child: pw.Text(
                     'RECEIPT VOUCHER',
@@ -553,34 +571,30 @@ Future<void> _printReceiptImage(ReportData data) async {
                             style:
                                 pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                         pw.Text(
-                          (data.customer!.isNotEmpty)
-                              ? data.customer![0].code ?? ''
-                              : '',
+                          _pdfSafe(cust?.code ?? ''),
                           style: pw.TextStyle(
                             fontSize: AppConfig.textCaption3Size,
                             fontWeight: pw.FontWeight.bold,
                           ),
                         ),
                         pw.SizedBox(height: 3),
-                        pw.Text('${data.customer![0].name}'),
-                        // pw.SizedBox(height: 3),
-                        // pw.Text('Market: ${data.customer![0].address}'),
+                        pw.Text(_pdfSafe(cust?.name ?? '')),
                         pw.SizedBox(height: 3),
                         pw.Text(
-                            '${data.store![0].vatLabel}: ${data.customer![0].trn}'),
+                            '${_pdfSafe(vatLabel)}: ${_pdfSafe(cust?.trn ?? '')}'),
                       ],
                     ),
                     pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         pw.Text(
-                          'Reference: ${data.sales![0].voucherNo ?? 'N/A'}',
+                          'Reference: ${_pdfSafe(firstSale?.voucherNo ?? data.voucherNo ?? 'N/A')}',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                         ),
                         pw.Text(
-                            'Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
+                            'Date: ${DateHelper.displayDate(firstSale?.inDate ?? data.inDate)}'),
                         pw.Text(
-                            'Due Date: ${DateHelper.displayDate(data.sales![0].inDate)}'),
+                            'Due Date: ${DateHelper.displayDate(firstSale?.inDate ?? data.inDate)}'),
                       ],
                     ),
                   ],
@@ -594,25 +608,24 @@ Future<void> _printReceiptImage(ReportData data) async {
                     if ((data.collectionType ?? '').toLowerCase() ==
                         'cheque') ...[
                       pw.Text('Collection Type: Cheque'),
-                      pw.Text('Bank Name: ${data.bank ?? 'N/A'}'),
-                      pw.Text('Cheque No: ${data.chequeNo ?? 'N/A'}'),
+                      pw.Text('Bank Name: ${_pdfSafe(data.bank ?? 'N/A')}'),
+                      pw.Text('Cheque No: ${_pdfSafe(data.chequeNo ?? 'N/A')}'),
                       pw.Text(
                           'Cheque Date: ${data.chequeDate != null ? DateHelper.displayDate(data.chequeDate) : 'N/A'}'),
                     ] else ...[
                       pw.Text(
-                          'Collection Type: ${data.collectionType ?? 'Cash'}'),
+                          'Collection Type: ${_pdfSafe(data.collectionType ?? 'Cash')}'),
                     ]
                   ],
                 ),
-                pw.SizedBox(height: 10),
-                pw.SizedBox(height: 10),
+                pw.SizedBox(height: 20),
               ],
             ),
-            _buildSalesTable(data.sales!),
+            _buildSalesTable(data.sales ?? []),
             pw.SizedBox(height: 20),
             pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
               pw.Text((data.roundoff != null &&
-                      double.parse(data.roundoff!) != 0)
+                      (double.tryParse(data.roundoff!) ?? 0) != 0)
                   ? 'Round Off: ${double.parse(data.roundoff!).toStringAsFixed(AppState().noOfDecimals ?? 2)}'
                   : ''),
             ]),
@@ -623,21 +636,28 @@ Future<void> _printReceiptImage(ReportData data) async {
               pw.Text('Total Outstanding: $outstanding'),
             ]),
             pw.SizedBox(height: 20),
-            pw.Text('Van: ${data.van![0].name ?? 'N/A'}'),
-            pw.SizedBox(width: 20),
-            pw.Text('Salesman: ${data.user![0].name ?? 'N/A'}'),
+            pw.Text('Van: ${_pdfSafe(vanName)}'),
+            pw.Text('Salesman: ${_pdfSafe(salesmanName)}'),
             pw.SizedBox(height: 20),
-            pw.Text("${storeDetail.invoice_footer}"),
+            pw.Text(_pdfSafe(storeDetail.invoice_footer ?? '')),
           ],
         ),
       );
 
-      final output = await getTemporaryDirectory();
-      final file = File('${output.path}/receipt_report.pdf');
-      await file.writeAsBytes(await pdf.save());
-      await OpenFile.open(file.path);
-    } else {
-      throw Exception('Failed to load store details');
+      pdfStage = 'receipt_wifi: save';
+      final bytes = await pdf.save();
+      final docNo = data.voucherNo ?? firstSale?.voucherNo ?? 'receipt_report';
+      await saveAndLaunchFile(bytes, '$docNo.pdf', false);
+    } catch (e, st) {
+      debugPrint('Receipt WiFi PDF error: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 8),
+            content: Text('PDF failed at [$pdfStage]: $e'),
+          ),
+        );
+      }
     }
   }
 

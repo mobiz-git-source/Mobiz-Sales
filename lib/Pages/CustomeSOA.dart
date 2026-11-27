@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:mobizapp/Models/appstate.dart';
+import 'package:mobizapp/Models/pdfgenerate.dart';
 import 'package:mobizapp/Reports/soa_report.dart';
 import 'package:mobizapp/Utilities/cpcl_helper.dart';
 import 'package:mobizapp/Utilities/report_printer.dart';
@@ -95,344 +96,265 @@ class _SOAState extends State<SOA> {
     });
   }
 
-  Future<void> _generateAndPrintPdf(
-      List data, double opening, double closing) async {
-    final response = await http.get(Uri.parse(
-        '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'));
-    if (response.statusCode != 200) {
-      throw Exception('Failed to load store details');
+  String _pdfSafe(String? s) => (s ?? '')
+      .replaceAll(RegExp(r'[^\x20-\x7E]'), '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+
+  Future<Uint8List?> _fetchStoreLogo(String? logoName) async {
+    if (logoName == null || logoName.trim().isEmpty) return null;
+    try {
+      final url = '${RestDatasource().Image_URL}/uploads/store/$logoName';
+      final resp =
+          await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      if (resp.statusCode == 200 && resp.bodyBytes.isNotEmpty) {
+        return resp.bodyBytes;
+      }
+    } catch (e) {
+      debugPrint('Logo fetch error: $e');
     }
-
-    StoreDetail storeDetail = StoreDetail.fromJson(json.decode(response.body));
-    final pdf = pw.Document();
-
-    final String api =
-        '${RestDatasource().Image_URL}/uploads/store/${storeDetail.logos}';
-    final logoResponse = await http.get(Uri.parse(api));
-    if (logoResponse.statusCode != 200) {
-      throw Exception('Failed to load logo image');
-    }
-    final Uint8List logoBytes = logoResponse.bodyBytes;
-    final int decimals = AppState().noOfDecimals ?? 2;
-
-    final textStyle = const pw.TextStyle(fontSize: 10);
-    final boldStyle =
-        pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold);
-
-    pw.Widget buildCell(String text,
-        {pw.Alignment alignment = pw.Alignment.centerLeft,
-        bool isBold = false}) {
-      return pw.Padding(
-        padding: const pw.EdgeInsets.all(3),
-        child: pw.Container(
-          alignment: alignment,
-          child: pw.Text(
-            text,
-            style: isBold ? boldStyle : textStyle,
-            textAlign: alignment == pw.Alignment.centerRight
-                ? pw.TextAlign.right
-                : pw.TextAlign.left,
-          ),
-        ),
-      );
-    }
-
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(30),
-        header: (pw.Context context) {
-          if (context.pageNumber != 1) return pw.Container();
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        storeDetail.name,
-                        style: pw.TextStyle(
-                          fontSize: 14,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      if (storeDetail.address != null)
-                        pw.Text(storeDetail.address!,
-                            style: const pw.TextStyle(fontSize: 10)),
-                      if (storeDetail.trn != null)
-                        pw.Text('TRN: ${storeDetail.trn}',
-                            style: const pw.TextStyle(fontSize: 10)),
-                    ],
-                  ),
-                  pw.Image(
-                    pw.MemoryImage(logoBytes),
-                    height: 50,
-                    width: 100,
-                    fit: pw.BoxFit.contain,
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 10),
-              pw.Divider(thickness: 0.5),
-              pw.SizedBox(height: 5),
-              pw.Center(
-                child: pw.Text(
-                  'Statement of Accounts',
-                  style: pw.TextStyle(
-                    fontSize: 14,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-              ),
-              pw.SizedBox(height: 10),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text('Customer: $name', style: boldStyle),
-                      if (address != null)
-                        pw.SizedBox(
-                          width: 250,
-                          child: pw.Text('Address: $address', style: textStyle),
-                        ),
-                    ],
-                  ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'From Date: ${_selectedDatefrom != null ? DateHelper.displayFromDateTime(_selectedDatefrom!) : '-'}',
-                        style: textStyle,
-                      ),
-                      pw.Text(
-                        'To Date: ${_selectedDateto != null ? DateHelper.displayFromDateTime(_selectedDateto!) : '-'}',
-                        style: textStyle,
-                      ),
-                      if (storeDetail.currency != null)
-                        pw.Text('Currency: ${storeDetail.currency}',
-                            style: textStyle),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 10),
-              pw.Divider(thickness: 0.5),
-              pw.SizedBox(height: 10),
-            ],
-          );
-        },
-        build: (pw.Context context) => [
-          pw.Table(
-            border: pw.TableBorder.all(width: 0.5, color: PdfColors.black),
-            columnWidths: const {
-              0: pw.FixedColumnWidth(80), // Date
-              1: pw.FixedColumnWidth(150), // Reference
-              2: pw.FixedColumnWidth(90), // Debit
-              3: pw.FixedColumnWidth(90), // Credit
-              4: pw.FixedColumnWidth(100), // Balance
-            },
-            children: [
-              // Header Row
-              pw.TableRow(
-                decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-                children: [
-                  buildCell('Date',
-                      alignment: pw.Alignment.center, isBold: true),
-                  buildCell('Reference', isBold: true),
-                  buildCell('Debit',
-                      alignment: pw.Alignment.centerRight, isBold: true),
-                  buildCell('Credit',
-                      alignment: pw.Alignment.centerRight, isBold: true),
-                  buildCell('Balance',
-                      alignment: pw.Alignment.centerRight, isBold: true),
-                ],
-              ),
-              // Opening Balance Row
-              pw.TableRow(
-                children: [
-                  buildCell(''),
-                  buildCell(''),
-                  buildCell(''),
-                  buildCell('Opening Balance',
-                      alignment: pw.Alignment.centerRight, isBold: true),
-                  buildCell(opening.toStringAsFixed(decimals),
-                      alignment: pw.Alignment.centerRight, isBold: true),
-                ],
-              ),
-              // Transaction Data Rows
-              ...data.map((row) {
-                final String dateStr =
-                    DateHelper.displayDate(row[0]?.toString());
-                final String refStr = row[1]?.toString() ?? '';
-                final double Debit = row[2] != null
-                    ? double.parse(row[2].toString()).abs()
-                    : 0.0;
-                final double Credit = row[3] != null
-                    ? double.parse(row[3].toString()).abs()
-                    : 0.0;
-                final double balance =
-                    row[4] != null ? double.parse(row[4].toString()) : 0.0;
-
-                return pw.TableRow(
-                  children: [
-                    buildCell(dateStr),
-                    buildCell(refStr),
-                    buildCell(Debit.toStringAsFixed(decimals),
-                        alignment: pw.Alignment.centerRight),
-                    buildCell(Credit.toStringAsFixed(decimals),
-                        alignment: pw.Alignment.centerRight),
-                    buildCell(balance.toStringAsFixed(decimals),
-                        alignment: pw.Alignment.centerRight),
-                  ],
-                );
-              }).toList(),
-              // Closing Balance Row
-              pw.TableRow(
-                children: [
-                  buildCell(''),
-                  buildCell(''),
-                  buildCell(''),
-                  buildCell('Closing Balance',
-                      alignment: pw.Alignment.centerRight, isBold: true),
-                  buildCell(closing.toStringAsFixed(decimals),
-                      alignment: pw.Alignment.centerRight, isBold: true),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-
-    final output = await getTemporaryDirectory();
-    final file = File('${output.path}/Custom SOA.pdf');
-    await file.writeAsBytes(await pdf.save());
-    await OpenFile.open(file.path);
+    return null;
   }
 
-  // void _printSOA(
-  //   StoreDetail store,
-  //   List<List<dynamic>> data,
-  //   double opening,
-  //   double closing,
-  // ) async {
-  //   if (!_connected) {
-  //     await _connect();
-  //   }
+  Future<void> _generateAndPrintPdf(
+      List data, double opening, double closing) async {
+    try {
+      pdfStage = 'soa: fetch';
+      final response = await http
+          .get(Uri.parse(
+              '${RestDatasource().BASE_URL}/api/get_store_detail?store_id=${AppState().storeId}'))
+          .timeout(const Duration(seconds: 15));
 
-  //   // 1. Print LOGO
-  //   final logoUrl =
-  //       '${RestDatasource().Image_URL}/uploads/store/${store.logos}';
-  //   final response = await http.get(Uri.parse(logoUrl));
+      if (response.statusCode != 200) {
+        throw Exception('Failed to load store details');
+      }
 
-  //   if (response.statusCode == 200) {
-  //     Uint8List imageBytes = response.bodyBytes;
-  //     img.Image? original = img.decodeImage(imageBytes);
-  //     if (original != null) {
-  //       img.Image mono = img.grayscale(original);
-  //       Uint8List finalLogo = Uint8List.fromList(img.encodePng(mono));
-  //       printer.printImageBytes(finalLogo);
-  //     }
-  //   }
+      StoreDetail storeDetail =
+          StoreDetail.fromJson(json.decode(response.body));
+      final Uint8List? logoBytes = await _fetchStoreLogo(storeDetail.logos);
+      final int decimals = AppState().noOfDecimals ?? 2;
 
-  //   printer.printNewLine();
+      final textStyle = const pw.TextStyle(fontSize: 10);
+      final boldStyle =
+          pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold);
 
-  //   // 2. Company Name + TRN + Address
-  //   printer.printCustom(store.name, 3, 1);
-  //   if (store.address != null) printer.printCustom(store.address!, 1, 1);
-  //   if (store.trn != null) printer.printCustom("TRN: ${store.trn}", 1, 1);
+      pw.Widget buildCell(String text,
+          {pw.Alignment alignment = pw.Alignment.centerLeft,
+          bool isBold = false}) {
+        return pw.Padding(
+          padding: const pw.EdgeInsets.all(3),
+          child: pw.Container(
+            alignment: alignment,
+            child: pw.Text(
+              _pdfSafe(text),
+              style: isBold ? boldStyle : textStyle,
+              textAlign: alignment == pw.Alignment.centerRight
+                  ? pw.TextAlign.right
+                  : pw.TextAlign.left,
+            ),
+          ),
+        );
+      }
 
-  //   printer.printNewLine();
+      pdfStage = 'soa: build';
+      final pdf = pw.Document();
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(30),
+          header: (pw.Context context) {
+            if (context.pageNumber != 1) return pw.Container();
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Expanded(
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            _pdfSafe(storeDetail.name),
+                            style: pw.TextStyle(
+                              fontSize: 14,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                          if (storeDetail.address != null)
+                            pw.Text(_pdfSafe(storeDetail.address!),
+                                style: const pw.TextStyle(fontSize: 10)),
+                          if (storeDetail.trn != null)
+                            pw.Text('TRN: ${_pdfSafe(storeDetail.trn)}',
+                                style: const pw.TextStyle(fontSize: 10)),
+                        ],
+                      ),
+                    ),
+                    if (logoBytes != null)
+                      pw.Image(
+                        pw.MemoryImage(logoBytes),
+                        height: 50,
+                        width: 100,
+                        fit: pw.BoxFit.contain,
+                      ),
+                  ],
+                ),
+                pw.SizedBox(height: 10),
+                pw.Divider(thickness: 0.5),
+                pw.SizedBox(height: 5),
+                pw.Center(
+                  child: pw.Text(
+                    'Statement of Accounts',
+                    style: pw.TextStyle(
+                      fontSize: 14,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('Customer: ${_pdfSafe(name ?? '')}',
+                            style: boldStyle),
+                        if (address != null && address!.trim().isNotEmpty)
+                          pw.SizedBox(
+                            width: 250,
+                            child: pw.Text('Address: ${_pdfSafe(address!)}',
+                                style: textStyle),
+                          ),
+                      ],
+                    ),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'From Date: ${_selectedDatefrom != null ? DateHelper.displayFromDateTime(_selectedDatefrom!) : '-'}',
+                          style: textStyle,
+                        ),
+                        pw.Text(
+                          'To Date: ${_selectedDateto != null ? DateHelper.displayFromDateTime(_selectedDateto!) : '-'}',
+                          style: textStyle,
+                        ),
+                        if (storeDetail.currency != null)
+                          pw.Text('Currency: ${_pdfSafe(storeDetail.currency)}',
+                              style: textStyle),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 10),
+                pw.Divider(thickness: 0.5),
+                pw.SizedBox(height: 10),
+              ],
+            );
+          },
+          build: (pw.Context context) => [
+            pw.Table(
+              border: pw.TableBorder.all(width: 0.5, color: PdfColors.black),
+              columnWidths: const {
+                0: pw.FixedColumnWidth(80), // Date
+                1: pw.FixedColumnWidth(150), // Reference
+                2: pw.FixedColumnWidth(90), // Debit
+                3: pw.FixedColumnWidth(90), // Credit
+                4: pw.FixedColumnWidth(100), // Balance
+              },
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                  children: [
+                    buildCell('Date',
+                        alignment: pw.Alignment.center, isBold: true),
+                    buildCell('Reference', isBold: true),
+                    buildCell('Debit',
+                        alignment: pw.Alignment.centerRight, isBold: true),
+                    buildCell('Credit',
+                        alignment: pw.Alignment.centerRight, isBold: true),
+                    buildCell('Balance',
+                        alignment: pw.Alignment.centerRight, isBold: true),
+                  ],
+                ),
+                pw.TableRow(
+                  children: [
+                    buildCell(''),
+                    buildCell(''),
+                    buildCell(''),
+                    buildCell('Opening Balance',
+                        alignment: pw.Alignment.centerRight, isBold: true),
+                    buildCell(opening.toStringAsFixed(decimals),
+                        alignment: pw.Alignment.centerRight, isBold: true),
+                  ],
+                ),
+                ...data.map((row) {
+                  final String dateStr =
+                      DateHelper.displayDate(row[0]?.toString());
+                  final String refStr = row[1]?.toString() ?? '';
+                  final double debit = row[2] != null
+                      ? (double.tryParse(row[2].toString()) ?? 0.0).abs()
+                      : 0.0;
+                  final double credit = row[3] != null
+                      ? (double.tryParse(row[3].toString()) ?? 0.0).abs()
+                      : 0.0;
+                  final double balance = row[4] != null
+                      ? (double.tryParse(row[4].toString()) ?? 0.0)
+                      : 0.0;
 
-  //   // 3. Title
-  //   printer.printCustom("STATEMENT OF ACCOUNTS", 2, 1);
-  //   printer.printCustom("-" * 68, 1, 1);
+                  return pw.TableRow(
+                    children: [
+                      buildCell(dateStr),
+                      buildCell(refStr),
+                      buildCell(debit.toStringAsFixed(decimals),
+                          alignment: pw.Alignment.centerRight),
+                      buildCell(credit.toStringAsFixed(decimals),
+                          alignment: pw.Alignment.centerRight),
+                      buildCell(balance.toStringAsFixed(decimals),
+                          alignment: pw.Alignment.centerRight),
+                    ],
+                  );
+                }).toList(),
+                pw.TableRow(
+                  children: [
+                    buildCell(''),
+                    buildCell(''),
+                    buildCell(''),
+                    buildCell('Closing Balance',
+                        alignment: pw.Alignment.centerRight, isBold: true),
+                    buildCell(closing.toStringAsFixed(decimals),
+                        alignment: pw.Alignment.centerRight, isBold: true),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
 
-  //   // 4. Customer + Date Range
-  //   printer.printCustom("Customer: $code | $name", 1, 0);
-  //   printer.printCustom("Address: $address", 1, 0);
-  //   printer.printCustom(
-  //       "From: ${DateHelper.displayFromDateTime(_selectedDatefrom!)}", 1, 0);
-
-  //   printer.printCustom(
-  //       "To     : ${DateHelper.displayFromDateTime(_selectedDateto!)}", 1, 0);
-
-  //   printer.printCustom("-" * 68, 1, 1);
-  //   const dateHeader = 'Date';
-  //   const refHeader = 'Ref';
-  //   const debitHeader = 'Debit';
-  //   const creditHeader = 'Credit';
-  //   const balHeader = 'Balance';
-
-  //   printer.printCustom(
-  //       '${dateHeader.padRight(12)}'
-  //       '${refHeader.padRight(8)}'
-  //       '${debitHeader.padLeft(9)}'
-  //       '${creditHeader.padLeft(9)}'
-  //       '${balHeader.padLeft(10)}',
-  //       1,
-  //       0);
-  //   printer.printCustom("-" * 68, 1, 0);
-
-  //   // 6. OPENING ROW
-  //   printer.printCustom(
-  //       "${''.padRight(10)} ${''.padRight(30)} ${''.padRight(7)} ${'Opening'.padRight(7)} ${opening.toStringAsFixed(AppState().noOfDecimals ?? 2)}",
-  //       1,
-  //       0);
-
-  //   // 7. ALL ROWS - Use balance from API (index 4)
-  //   for (var row in data) {
-  //     String date = DateHelper.displayDate(row[0].toString());
-  //     String ref = row[1].toString();
-  //     double Debit =
-  //         row[2] != null ? double.parse(row[2].toString()).abs() : 0.0;
-  //     double Credit =
-  //         row[3] != null ? double.parse(row[3].toString()).abs() : 0.0;
-  //     double balance = row[4] != null ? double.parse(row[4].toString()) : 0.0;
-
-  //     final dateStr = date.length > 12 ? date.substring(0, 12) : date;
-  //     final refStr = ref.length > 8 ? ref.substring(0, 8) : ref;
-
-  //     printer.printCustom(
-  //       '${dateStr.padRight(12)}'
-  //       '${refStr.padRight(8)}'
-  //       '${Debit.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(9)}'
-  //       '${Credit.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(9)}'
-  //       '${balance.toStringAsFixed(AppState().noOfDecimals ?? 2).padLeft(10)}',
-  //       1,
-  //       0,
-  //     );
-  //   }
-
-  //   printer.printCustom("-" * 68, 1, 1);
-
-  //   // 8. CLOSING BALANCE
-  //   printer.printCustom(
-  //       "Closing Balance: ${closing.toStringAsFixed(AppState().noOfDecimals ?? 2)}",
-  //       2,
-  //       1);
-
-  //   printer.printNewLine();
-
-  //   // FINAL CUT
-  //   printer.paperCut();
-  // }
-/// Main Print Dispatcher: Routes automatically to Zebra (CPCL) or Sewoo (ESC/POS)
-   /// Main Print Dispatcher: single shared image pipeline, auto-detects
-  /// Zebra vs Sewoo internally via printReport().
-  Future<void> _printSOA(
+      pdfStage = 'soa: save';
+      final bytes = await pdf.save();
+      final safeName = _pdfSafe(name ?? 'Customer').replaceAll(' ', '_');
+      await saveAndLaunchFile(bytes, 'SOA_$safeName.pdf', false);
+    } catch (e, st) {
+      debugPrint('SOA PDF error: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 8),
+            content: Text('PDF failed at [$pdfStage]: $e'),
+          ),
+        );
+      }
+    }
+  }
+Future<void> _printSOA(
     StoreDetail store,
     List<List<dynamic>> data,
     double opening,
     double closing,
-    ) async {
-    // Printer must be known BEFORE choosing Zebra/Sewoo
+  ) async {
     if (_selectedDevice == null) await _getBluetoothDevices();
     if (_selectedDevice == null) {
       if (mounted) {
@@ -442,46 +364,46 @@ class _SOAState extends State<SOA> {
       }
       return;
     }
-    print('PRINT route: zebra=${isZebraPrinter(_selectedDevice)} '
-        'name=${_selectedDevice?.name} addr=${_selectedDevice?.address}');
 
     if (!_connected) await _connect();
     if (!_connected) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Printer not connected')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Printer not connected')),
+        );
+      }
       return;
     }
-   try {
-  if (isZebraPrinter(_selectedDevice)) {
-    final logoFile = store.logos;
-    final logo = (logoFile != null && logoFile.isNotEmpty)
-        ? await loadLogo(
-            '${RestDatasource().Image_URL}/uploads/store/$logoFile',
-          )
-        : null;
+    try {
+      if (isZebraPrinter(_selectedDevice)) {
+        final logoFile = store.logos;
+        final logo = (logoFile != null && logoFile.isNotEmpty)
+            ? await loadLogo(
+                '${RestDatasource().Image_URL}/uploads/store/$logoFile',
+              )
+            : null;
 
-    await printReport(
-      printer,
-      _selectedDevice,
-      (b) => drawSoaReport(
-        b,
-        store,
-        data,
-        opening,
-        closing,
-        logo: logo,
-        customerCode: code,
-        customerName: name,
-        customerAddress: address,
-        fromDate: _selectedDatefrom,
-        toDate: _selectedDateto,
-      ),
-    );
-  } else {
-    await _printSewooSOA(store, data, opening, closing);
-  }
-} catch (e, st) {
+        await printReport(
+          printer,
+          _selectedDevice,
+          (b) => drawSoaReport(
+            b,
+            store,
+            data,
+            opening,
+            closing,
+            logo: logo,
+            customerCode: code,
+            customerName: name,
+            customerAddress: address,
+            fromDate: _selectedDatefrom,
+            toDate: _selectedDateto,
+          ),
+        );
+      } else {
+        await _printSewooSOA(store, data, opening, closing);
+      }
+    } catch (e, st) {
       print('Print error: $e\n$st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -490,12 +412,6 @@ class _SOAState extends State<SOA> {
       }
     }
   }
-  // ═══════════════════════════════════════════════════════════════
-  // 1. ZEBRA ENGINE (CPCL Mode)
-  // ═══════════════════════════════════════════════════════════════
- // ═══════════════════════════════════════════════════════════════
-  // 1. ZEBRA ENGINE (CPCL Mode - Clean Layout, No Overlap)
-  // ═══════════════════════════════════════════════════════════════
   Future<void> _printZebraSOA(
     StoreDetail store,
     List<List<dynamic>> data,
@@ -543,19 +459,22 @@ class _SOAState extends State<SOA> {
       cpcl.text("Address: $address");
     }
     if (_selectedDatefrom != null) {
-      cpcl.twoColumn("From: ${DateHelper.displayFromDateTime(_selectedDatefrom!)}", 
+      cpcl.twoColumn(
+          "From: ${DateHelper.displayFromDateTime(_selectedDatefrom!)}",
           "To: ${_selectedDateto != null ? DateHelper.displayFromDateTime(_selectedDateto!) : ''}");
     }
     cpcl.hLine();
 
     // ---- 4. Table Header (Max 42 characters) ----
     // Format: Date (10) | Ref (10) | Debit (7) | Credit (7) | Bal (8) = 42 chars
-    cpcl.text("Date       Ref        Debit  Credit   Balance", font: 4, lineGap: 30);
+    cpcl.text("Date       Ref        Debit  Credit   Balance",
+        font: 4, lineGap: 30);
     cpcl.hLine(thickness: 1);
 
     // ---- 5. Opening balance row ----
     String openAmt = opening.toStringAsFixed(decimals).padLeft(8);
-    cpcl.text("                      Opening Balance:$openAmt", font: 4, lineGap: 28);
+    cpcl.text("                      Opening Balance:$openAmt",
+        font: 4, lineGap: 28);
 
     // ---- 6. Transaction rows (Clean 42-char alignment) ----
     for (var row in data) {
@@ -571,11 +490,12 @@ class _SOAState extends State<SOA> {
           row[2] != null ? double.parse(row[2].toString()).abs() : 0.0;
       double credit =
           row[3] != null ? double.parse(row[3].toString()).abs() : 0.0;
-      double balance =
-          row[4] != null ? double.parse(row[4].toString()) : 0.0;
+      double balance = row[4] != null ? double.parse(row[4].toString()) : 0.0;
 
-      String dStr = debit > 0 ? debit.toStringAsFixed(decimals).padLeft(7) : "       ";
-      String cStr = credit > 0 ? credit.toStringAsFixed(decimals).padLeft(7) : "       ";
+      String dStr =
+          debit > 0 ? debit.toStringAsFixed(decimals).padLeft(7) : "       ";
+      String cStr =
+          credit > 0 ? credit.toStringAsFixed(decimals).padLeft(7) : "       ";
       String bStr = balance.toStringAsFixed(decimals).padLeft(8);
 
       cpcl.text('$dateStr$refStr$dStr $cStr $bStr', font: 4, lineGap: 28);
@@ -592,6 +512,7 @@ class _SOAState extends State<SOA> {
     final bytes = cpcl.build();
     await sendCpcl(printer, bytes);
   }
+
   // ═══════════════════════════════════════════════════════════════
   // 2. SEWOO ENGINE (Original Exact ESC/POS Size & Formatting)
   // ═══════════════════════════════════════════════════════════════
@@ -602,7 +523,7 @@ class _SOAState extends State<SOA> {
     double closing,
   ) async {
     // 1. Print LOGO
-      final logoUrl =
+    final logoUrl =
         '${RestDatasource().Image_URL}/uploads/store/${store.logos}';
     final logoBytes = await buildSewooLogoBytes(logoUrl);
     if (logoBytes != null) {
@@ -728,13 +649,12 @@ class _SOAState extends State<SOA> {
   void initState() {
     super.initState();
     _initPrinter();
-   _selectedDatefrom =
-    DateTime(DateTime.now().year, DateTime.now().month, 1);
+    _selectedDatefrom = DateTime(DateTime.now().year, DateTime.now().month, 1);
 
-_selectedDateto =
-    DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
+    _selectedDateto =
+        DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
 
-_refreshData();
+    _refreshData();
   }
 
   void didChangeDependencies() {
@@ -835,7 +755,7 @@ _refreshData();
                             const TextStyle(color: Colors.grey, fontSize: 15),
                       ),
                     ),
-                                      Padding(
+                    Padding(
                       padding: const EdgeInsets.fromLTRB(8.0, 4.0, 16.0, 4.0),
                       child: Wrap(
                         spacing: 6,
@@ -919,7 +839,7 @@ _refreshData();
                               ),
                             ],
                           ),
-                                                    Row(
+                          Row(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
