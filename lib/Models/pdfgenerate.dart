@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' show Rect;
 
+import 'package:flutter/material.dart';
+import 'package:mobizapp/main.dart' show navigatorKey;
 import 'package:open_file/open_file.dart' as open_file;
 import 'package:path_provider/path_provider.dart' as path_provider;
 // ignore: depend_on_referenced_packages
@@ -43,15 +45,14 @@ Future<String> saveAndLaunchFile(
   if (isPrint) {
     await Printing.layoutPdf(name: safeName, onLayout: (_) async => data);
   } else if (Platform.isIOS) {
-    try {
-      await Printing.sharePdf(
-        bytes: data,
-        filename: safeName,
-        bounds: shareOrigin,
-      );
-    } catch (_) {
-      // Share sheet failed to open: show native preview instead
-      await Printing.layoutPdf(name: safeName, onLayout: (_) async => data);
+    // iPhone / iPad / Mac: direct PDF viewer
+    final nav = navigatorKey.currentState;
+    if (nav != null) {
+      await nav.push(MaterialPageRoute(
+        builder: (_) => _PdfViewerPage(name: safeName, bytes: data),
+      ));
+    } else {
+      await open_file.OpenFile.open(fullPath);
     }
   } else if (Platform.isAndroid) {
     await open_file.OpenFile.open(fullPath);
@@ -65,4 +66,26 @@ Future<String> saveAndLaunchFile(
 
   pdfStage = 'done';
   return fullPath;
+}
+
+class _PdfViewerPage extends StatelessWidget {
+  final String name;
+  final Uint8List bytes;
+  const _PdfViewerPage({required this.name, required this.bytes});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(name)),
+      body: PdfPreview(
+        build: (_) async => bytes,
+        pdfFileName: name,
+        allowPrinting: true,
+        allowSharing: true,
+        canChangePageFormat: false,
+        canChangeOrientation: false,
+        canDebug: false,
+      ),
+    );
+  }
 }

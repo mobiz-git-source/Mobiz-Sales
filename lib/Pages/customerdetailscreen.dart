@@ -2,8 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'MapScreen.dart'; 
+import 'package:url_launcher/url_launcher.dart';
 import 'package:mobizapp/Components/commonwidgets.dart';
 import 'package:mobizapp/Models/appstate.dart';
 import 'package:mobizapp/Pages/CustomeSOA.dart';
@@ -38,24 +37,21 @@ class CustomerDetailsScreen extends StatefulWidget {
 }
 
 class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
-  @override
   Timer? _timer;
   bool _isFirstLoad = true;
   bool _isArgsLoaded = false;
-// AFTER
+
+  @override
   void initState() {
     super.initState();
-    // NOTE: args (id, storeId-dependent calls) are only available once
-    // didChangeDependencies() has fired, so all initial API calls happen
-    // there — calling them here too was causing every request to fire
-    // twice on screen open.
+    // args didChangeDependencies()-il aanu kittunnathu, API calls avide.
   }
 
+  @override
   void dispose() {
     _timer?.cancel();
     super.dispose();
   }
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -134,7 +130,26 @@ String? code;
     ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
- // AFTER
+   Future<void> _navigateToLocation() async {
+    print("LOCATION: $location"); // debug, check kazhinj remove cheyyam
+    if (location != null && location!.contains(',')) {
+      final parts = location!.split(',');
+      final lat = double.tryParse(parts[0].trim());
+      final lng = double.tryParse(parts[1].trim());
+      if (lat != null && lng != null) {
+        final uri = Uri.parse(
+            'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving');
+        final opened =
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (opened) return;
+      }
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+          content: Text('Location not available for this customer')),
+    );
+  }
   Future<void> fetchCustomerIcons() async {
     try {
       final response = await http
@@ -302,22 +317,8 @@ String? code;
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // CommonWidgets.verticalSpace(1),
-                       InkWell(
-  onTap: () {
-    if (location != null && location!.contains(',')) {
-      final parts = location!.split(',');
-      final lat = double.tryParse(parts[0].trim());
-      final lng = double.tryParse(parts[1].trim());
-      if (lat != null && lng != null) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => MapScreen(initialLocation: LatLng(lat, lng)),
-          ),
-        );
-      }
-    }
-  },
+               InkWell(
+  onTap: _navigateToLocation,
   child: Row(
     children: [
       const Icon(
