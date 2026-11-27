@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'MapScreen.dart'; 
 import 'package:mobizapp/Components/commonwidgets.dart';
 import 'package:mobizapp/Models/appstate.dart';
 import 'package:mobizapp/Pages/customerscreen.dart';
@@ -59,7 +61,7 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
 
 
 
-  void _getLocation() async {
+void _getLocation() async {
     Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high);
     setState(() {
@@ -67,6 +69,43 @@ class _CustomerRegistrationState extends State<CustomerRegistration> {
       _longitude = position.longitude;
     });
     _updateLocationTextField(_latitude!, _longitude!);
+  }
+
+  Future<void> _openMapPicker() async {
+    LatLng startPoint;
+
+    if (_latitude != null && _longitude != null) {
+      startPoint = LatLng(_latitude!, _longitude!);
+    } else {
+      try {
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        Position pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+        startPoint = LatLng(pos.latitude, pos.longitude);
+      } catch (_) {
+        startPoint = const LatLng(25.2048, 55.2708);
+      }
+    }
+
+    if (!mounted) return;
+    final LatLng? picked = await Navigator.push<LatLng>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapScreen(initialLocation: startPoint),
+      ),
+    );
+
+    if (picked != null && mounted) {
+      setState(() {
+        _latitude = picked.latitude;
+        _longitude = picked.longitude;
+      });
+      _updateLocationTextField(picked.latitude, picked.longitude);
+    }
   }
 
   void _updateLocationTextField(double latitude, double longitude) {
@@ -142,8 +181,17 @@ int? id;
           _contactNumberController.text = params['phone'] ?? '';
           _whatsappNumberController.text = params['whatsappNumber'] ?? '';
           _trnController.text = params['trn'] ?? '';
-   img = params['cust_image'];
-_location = params['location'] ?? 'Click the icon to fetch the data';
+ img = params['cust_image'];
+   final existingLoc = params['location']?.toString() ?? '';
+   if (existingLoc.isNotEmpty && existingLoc.contains(',')) {
+     _locationController.text = existingLoc;
+     _location = existingLoc;
+     final parts = existingLoc.split(',');
+     _latitude = double.tryParse(parts[0].trim());
+     _longitude = double.tryParse(parts[1].trim());
+   } else {
+     _location = 'Tap map icon to pick location';
+   }
           _selectPaymentTerms =
               params['paymentTerms'] == '' ? null : params['paymentTerms'];
           _selectedProvinceid =
@@ -545,23 +593,36 @@ _location = params['location'] ?? 'Click the icon to fetch the data';
                                   },
                                 ),
                                 CommonWidgets.verticalSpace(2),
-                                TextField(
-                                  controller: _locationController,
-                                  readOnly: true,
-                                  decoration: InputDecoration(
-                                    border: const OutlineInputBorder(
-                                        borderSide: BorderSide(
-                                            color: AppConfig.colorPrimary)),
-                                    focusedBorder: const OutlineInputBorder(
-                                        borderSide: BorderSide(
-                                            color: AppConfig.colorPrimary)),
-                                    hintText: _location,
-                                    suffixIcon: IconButton(
-                                      icon: const Icon(Icons.my_location),
-                                      onPressed: _getLocation,
-                                    ),
-                                  ),
-                                ),
+                               TextField(
+  controller: _locationController,
+  readOnly: true,
+  onTap: _openMapPicker,
+  decoration: InputDecoration(
+    labelText: 'Location (Tap to pick on map)',
+    border: const OutlineInputBorder(
+        borderSide: BorderSide(
+            color: AppConfig.colorPrimary)),
+    focusedBorder: const OutlineInputBorder(
+        borderSide: BorderSide(
+            color: AppConfig.colorPrimary)),
+    hintText: _location,
+    suffixIcon: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: 'Pick on Map',
+          icon: const Icon(Icons.map, color: AppConfig.colorPrimary),
+          onPressed: _openMapPicker,
+        ),
+        IconButton(
+          tooltip: 'Current GPS',
+          icon: const Icon(Icons.my_location),
+          onPressed: _getLocation,
+        ),
+      ],
+    ),
+  ),
+),
                                 CommonWidgets.verticalSpace(2),
                                 TextFormField(
                                   focusNode: trnfocus,

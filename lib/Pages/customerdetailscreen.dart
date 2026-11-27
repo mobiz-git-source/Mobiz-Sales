@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'MapScreen.dart'; 
 import 'package:mobizapp/Components/commonwidgets.dart';
 import 'package:mobizapp/Models/appstate.dart';
 import 'package:mobizapp/Pages/CustomeSOA.dart';
@@ -300,17 +302,34 @@ String? code;
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // CommonWidgets.verticalSpace(1),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.location_on,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(
-                                width: SizeConfig.blockSizeHorizontal * 40,
-                                child: Text(address ?? '')),
-                          ],
-                        ),
+                       InkWell(
+  onTap: () {
+    if (location != null && location!.contains(',')) {
+      final parts = location!.split(',');
+      final lat = double.tryParse(parts[0].trim());
+      final lng = double.tryParse(parts[1].trim());
+      if (lat != null && lng != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MapScreen(initialLocation: LatLng(lat, lng)),
+          ),
+        );
+      }
+    }
+  },
+  child: Row(
+    children: [
+      const Icon(
+        Icons.location_on,
+        color: Colors.red,
+      ),
+      SizedBox(
+          width: SizeConfig.blockSizeHorizontal * 40,
+          child: Text(address ?? '')),
+    ],
+  ),
+),
                         Row(
                           children: [
                             const Icon(
