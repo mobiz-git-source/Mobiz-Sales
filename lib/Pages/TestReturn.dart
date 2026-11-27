@@ -580,7 +580,7 @@ String _discountText(VanReturn data) {
 // ----- LEFT COLUMN TEXT -----
 // Store Name
     page.graphics.drawString(
-      invoice.data!.store![0].name.toString(),
+      _pdfSafe(invoice.data!.store![0].name ?? ''),
       PdfStandardFont(PdfFontFamily.helvetica, 20, style: PdfFontStyle.bold),
       bounds: Rect.fromLTWH(leftX, currentY, pageSize.width - 160, 25),
     );
@@ -588,7 +588,7 @@ String _discountText(VanReturn data) {
 
 // Address
     page.graphics.drawString(
-      invoice.data!.store![0].address ?? 'N/A',
+      _pdfSafe(invoice.data!.store![0].address ?? 'N/A'),
       PdfStandardFont(PdfFontFamily.helvetica, 12),
       bounds: Rect.fromLTWH(leftX, currentY, pageSize.width - 160, 20),
     );
@@ -596,7 +596,7 @@ String _discountText(VanReturn data) {
 
 // Email
     page.graphics.drawString(
-      invoice.data!.store![0].email ?? 'N/A',
+      _pdfSafe(invoice.data!.store![0].email ?? 'N/A'),
       PdfStandardFont(PdfFontFamily.helvetica, 12),
       bounds: Rect.fromLTWH(leftX, currentY, pageSize.width - 160, 20),
     );
@@ -653,7 +653,7 @@ final addressLines = <String>[
   if (custContact.isNotEmpty) 'Contact No: $custContact',
   if (custTrn.isNotEmpty) 'TRN: $custTrn',
 ];
-final String address = addressLines.join('\n');
+final String address = addressLines.map(_pdfSafe).join('\n');
 
     String invoiceDetails = '''
   Reference No: ${invoice.data!.invoiceNo!}
@@ -709,13 +709,13 @@ final String address = addressLines.join('\n');
        headerRow.cells[7].value = AppState().taxLabel;
     headerRow.cells[8].value = 'Amount';
 
-    for (int k = 0; k < invoice.data!.detail!.length; k++) {
+   for (int k = 0; k < invoice.data!.detail!.length; k++) {
       final PdfGridRow row = grid.rows.add();
       row.cells[0].value = '${k + 1}';
-      row.cells[1].value = '${invoice.data!.detail![k].name}';
-      row.cells[2].value = '${invoice.data!.detail![k].unit}';
+      row.cells[1].value = _pdfSafe('${invoice.data!.detail![k].name}');
+      row.cells[2].value = _pdfSafe('${invoice.data!.detail![k].unit}');
       row.cells[3].value = '${invoice.data!.detail![k].quantity}';
-           row.cells[4].value = invoice.data!.detail![k].productType ?? '';
+      row.cells[4].value = _pdfSafe(invoice.data!.detail![k].productType ?? '');
       // row.cells[4].value = (invoice.data!.detail![k].productType!.toLowerCase() == "foc" || invoice.data!.detail![k].productType!.toLowerCase() == "FOC" || invoice.data!.detail![k].productType!.toLowerCase() == "Change") ? 'Normal' : 'Normal';
       row.cells[5].value = '${invoice.data!.detail![k].mrp}';
       row.cells[6].value = '${invoice.data!.detail![k].taxable}';
@@ -817,8 +817,8 @@ final salesmanName =
         ? invoice.data!.user![0].name ?? ''
         : '';
 final String bottomVanDetails = '''
-Van: $vanName
-Salesman: $salesmanName
+Van: ${_pdfSafe(vanName)}
+Salesman: ${_pdfSafe(salesmanName)}
 ''';
 
 // Wrapped, centered amount in words (grows in height as needed)
@@ -1507,10 +1507,16 @@ String _pdfSafe(String s) => s
       dynamic response = await api.getDetails(
           '/api/get_sales_return_invoice?id=$id', AppState().token);
 
-      if (response['data'] != null) {
-        invoice = Invoice.InvoiceData.fromJson(response);
-        await _createPdf(invoice, isPrint);
+    if (response['data'] == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No data returned for this return')),
+          );
+        }
+        return;
       }
+      invoice = Invoice.InvoiceData.fromJson(response);
+      await _createPdf(invoice, isPrint);
     } catch (e, st) {
       print('Return PDF error: $e\n$st');
       if (mounted) {

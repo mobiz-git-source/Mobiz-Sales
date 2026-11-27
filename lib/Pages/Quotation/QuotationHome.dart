@@ -69,6 +69,24 @@ String _discountText(Data data) {
   }
   // type 0 -> direct amount, percentage kaanikkaruthu
   return 'Discount: ${disc.toStringAsFixed(dec)}';
+}String _pdfSafe(String? s) => (s ?? '')
+    .replaceAll(RegExp(r'[^\x20-\x7E]'), '')
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();
+
+String _amountInWords(num amount) {
+  final dec = AppState().noOfDecimals ?? 2;
+  final parts = amount.toStringAsFixed(dec).split('.');
+  final whole = int.parse(parts[0]);
+  final minor = parts.length > 1 ? int.parse(parts[1]) : 0;
+
+  var words = "Amount in Words: ${AppState().code} "
+      "${NumberToWord().convert('en-in', whole).toUpperCase()}";
+  if (minor > 0) {
+    words += " AND ${NumberToWord().convert('en-in', minor).toUpperCase()} "
+        "${AppState().minor}";
+  }
+  return "$words ONLY";
 }
   @override
   void dispose() {
@@ -589,25 +607,25 @@ Widget _productsCard(Data data, int index) {
     final page = document.pages.add();
     final Size pageSize = page.getClientSize();
 
-    final double pageWidth = pageSize.width;
-    final Uint8List? imageData = await _readImageData(invoice.data!.store![0].logo);
+  final double pageWidth = pageSize.width;
+    final Uint8List? imageData =
+        await _readImageData(invoice.data!.store?.firstOrNull?.logo);
     if (imageData != null && imageData.isNotEmpty) {
       final PdfBitmap image = PdfBitmap(imageData);
-      // Position logo at top-right (adjust width/height as needed)
       page.graphics.drawImage(
         image,
         Rect.fromLTWH(
-          pageWidth - 100, // Right-aligned with 100px width
-          30,             // Top margin
-          80,             // Logo width
-          80,             // Logo height
+          pageWidth - 100,
+          30,
+          80,
+          80,
         ),
       );
     }
 
     // Left-aligned company info
-    final String companyName = '${invoice.data!.store![0].name}';
-    final String rawAddress = invoice.data!.store![0].address ?? 'N/A';
+    final String companyName = _pdfSafe(invoice.data!.store?.firstOrNull?.name);
+    final String rawAddress = invoice.data!.store?.firstOrNull?.address ?? 'N/A';
 
 // Draw company name (bold, left-aligned)
     page.graphics.drawString(
@@ -623,9 +641,9 @@ Widget _productsCard(Data data, int index) {
 // Split the address by newlines and draw each line
     for (final line in rawAddress.split('\n')) {
       if (line.trim().isNotEmpty) { // Skip empty lines
-        page.graphics.drawString(
-          line.trim(),
-          detailsFont,
+      page.graphics.drawString(
+  _pdfSafe(line),
+  detailsFont,
           bounds: Rect.fromLTWH(30, currentY, pageWidth - 150, 15),
         );
         currentY += 15; // Move down for next line
@@ -674,7 +692,7 @@ final addressLines = <String>[
   if (custContact.isNotEmpty) 'Contact No: $custContact',
   if (custTrn.isNotEmpty) 'TRN: $custTrn',
 ];
-final String address = addressLines.join('\n');
+final String address = addressLines.map(_pdfSafe).join('\n');
 
   String invoiceDetails = '''
   Order No: ${invoice.data!.invoiceNo!}
@@ -724,22 +742,24 @@ final String address = addressLines.join('\n');
     headerRow.cells[3].value = 'Rate';
     headerRow.cells[4].value = 'Qty';
     headerRow.cells[5].value = 'Foc';
-    headerRow.cells[6].value = 'Vat';
+   headerRow.cells[6].value = AppState().taxLabel;
     headerRow.cells[7].value = 'Amount';
 
     for (int k = 0; k < invoice.data!.detail!.length; k++) {
       final PdfGridRow row = grid.rows.add();
       row.cells[0].value = '${k + 1}';
-      row.cells[1].value = '${invoice.data!.detail![k].name}';
-      row.cells[2].value = '${invoice.data!.detail![k].unit}';
-      row.cells[3].value = '${invoice.data!.detail![k].mrp}';
-      row.cells[4].value = '${invoice.data!.detail![k].quantity}';
-      row.cells[5].value =
-      (invoice.data!.detail![k].productType!.toLowerCase() == "foc")
-          ? '1'
-          : '0';
-      row.cells[6].value = '${invoice.data!.detail![k].taxAmt!.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
-      row.cells[7].value = '${invoice.data!.detail![k].amount!.toStringAsFixed(AppState().noOfDecimals ?? 2)}';
+    row.cells[1].value = _pdfSafe(invoice.data!.detail![k].name);
+row.cells[2].value = _pdfSafe(invoice.data!.detail![k].unit);
+row.cells[3].value = '${invoice.data!.detail![k].mrp}';
+row.cells[4].value = '${invoice.data!.detail![k].quantity}';
+row.cells[5].value =
+    ((invoice.data!.detail![k].productType ?? '').toLowerCase() == 'foc')
+        ? '1'
+        : '0';
+row.cells[6].value = (invoice.data!.detail![k].taxAmt ?? 0)
+    .toStringAsFixed(AppState().noOfDecimals ?? 2);
+row.cells[7].value = (invoice.data!.detail![k].amount ?? 0)
+    .toStringAsFixed(AppState().noOfDecimals ?? 2);
     }
 
     // Define no border style
@@ -798,16 +818,21 @@ final String address = addressLines.join('\n');
 
   final discInfo = invoice.data!.discountInfo;
     // Draw invoice details at the bottom right.
-    String bottomInvoiceDetails = '''
-  ${(discInfo != null && discInfo.hasDiscount) ? '${discInfo.label}: ${discInfo.amount.toStringAsFixed(AppState().noOfDecimals ?? 2)}' : '\t'}
-  Total: ${invoice.data!.total}
-  Vat: ${invoice.data!.totalTax!.toStringAsFixed(AppState().noOfDecimals ?? 2)}
-${invoice.data?.roundOff != null && double.tryParse(invoice.data!.roundOff.toString()) != 0
-        ? 'Round off: ${double.tryParse(invoice.data!.roundOff.toString())?.toStringAsFixed(AppState().noOfDecimals ?? 2) ?? '0.00'}\nGrand Total: ${invoice.data!.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)}'
-        : 'Grand Total: ${invoice.data!.grandTotal!.toStringAsFixed(AppState().noOfDecimals ?? 2)}'}
+final dec = AppState().noOfDecimals ?? 2;
+final inv = invoice.data!;
+final ro = num.tryParse(inv.roundOff?.toString() ?? '') ?? 0;
+final disc = discInfo?.amount ?? 0;
 
+final totalsLines = <String>[
+  'Total: ${(inv.total ?? 0).toStringAsFixed(dec)}',
+  if (discInfo != null && discInfo.hasDiscount)
+    '${discInfo.label}: ${discInfo.amount.toStringAsFixed(dec)}',
+  'Sub Total: ${((inv.total ?? 0) - disc).toStringAsFixed(dec)}',
+  '${AppState().taxLabel}: ${(inv.totalTax ?? 0).toStringAsFixed(dec)}',
+  if (ro != 0) 'Round off: ${ro.toStringAsFixed(dec)}',
+  'Grand Total: ${(inv.grandTotal ?? 0).toStringAsFixed(dec)}',
+];String bottomInvoiceDetails = totalsLines.map(_pdfSafe).join('\n');
 
-  ''';
 
     lastPage.graphics.drawString(
       bottomInvoiceDetails,
@@ -824,16 +849,14 @@ ${invoice.data?.roundOff != null && double.tryParse(invoice.data!.roundOff.toStr
     );
 
 // in word
-    String textData =
-        'Amount in Words: AED ${NumberToWord().convert('en-in', invoice.data!.grandTotal!.toInt()).toUpperCase()} ONLY';
+   String textData = _pdfSafe(_amountInWords(invoice.data!.grandTotal ?? 0));
 
 // Adjust the vertical position for the van details
     double vanDetailsTop = tableBottom + 20 + 100 + 10;
 
-// Construct the van details string.
-    String bottomVanDetails = '''
-Van: ${invoice.data!.van![0].name}
-Salesman: ${invoice.data!.user![0].name}
+String bottomVanDetails = '''
+Van: ${_pdfSafe(invoice.data!.van?.firstOrNull?.name)}
+Salesman: ${_pdfSafe(invoice.data!.user?.firstOrNull?.name)}
 ''';
 
 // Draw the word text above the van details
@@ -872,36 +895,50 @@ Salesman: ${invoice.data!.user![0].name}
         bytes, '${invoice.data!.invoiceNo!}.pdf', isPrint);
   }
 
-  Future<Uint8List> _readImageData(String? image) async {
-    try {
-      final response = await http
-          .get(Uri.parse('${RestDatasource().Image_URL}/uploads/store/$image'));
-
-      print('Response Data $response');
-
-      if (response.statusCode == 200) {
-        return response.bodyBytes;
-      } else {
-        throw Exception('Failed to load image');
-      }
-    } catch (e) {
-      // Log the error and return an empty Uint8List
-      print('Error loading image: $e');
-      return Uint8List(0);
-    }
+ Future<Uint8List> _readImageData(String? image) async {
+  if (image == null || image.isEmpty) return Uint8List(0);
+  try {
+    final response = await http
+        .get(Uri.parse('${RestDatasource().Image_URL}/uploads/store/$image'))
+        .timeout(const Duration(seconds: 10));
+    return response.statusCode == 200 ? response.bodyBytes : Uint8List(0);
+  } catch (e) {
+    debugPrint('Error loading image: $e');
+    return Uint8List(0);
   }
+}
 
-  Future<void> _getInvoiceData(int id, bool isPrint) async {
-    Invoice.InvoiceData invoice = Invoice.InvoiceData();
+ Future<void> _getInvoiceData(int id, bool isPrint) async {
+  try {
+    await AppState().loadTaxName();
+    pdfStage = 'quotation: fetch';
     RestDatasource api = RestDatasource();
     dynamic response = await api.getDetails(
         '/api/get_sales_quotation_invoice?id=$id', AppState().token);
-    print("ssdsdsdssds${id}");
-    if (response['data'] != null) {
-      invoice = Invoice.InvoiceData.fromJson(response);
-      _createPdf(invoice, isPrint);
+
+    if (response['data'] == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No data returned for this quotation')),
+        );
+      }
+      return;
+    }
+    final invoice = Invoice.InvoiceData.fromJson(response);
+    pdfStage = 'quotation: createPdf';
+    await _createPdf(invoice, isPrint);
+  } catch (e, st) {
+    debugPrint('Quotation PDF error: $e\n$st');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 8),
+          content: Text('PDF failed at [$pdfStage]: $e'),
+        ),
+      );
     }
   }
+}
 }
 
 class VanSalesOrderStatusResponse {

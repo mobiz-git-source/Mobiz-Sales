@@ -1382,7 +1382,8 @@ Salesman: ${invoice.data!.user?.firstOrNull?.name ?? ''}
     try {
       RestDatasource api = RestDatasource();
       dynamic response = await api.getDetails(
-          '/api/get_sales_order_invoice?id=$id', AppState().token);
+          '/api/get_sales_order_invoice?id=$id${_listType == 'proforma' ? '&type=proforma' : ''}',
+          AppState().token);
       debugPrint('PDF RESPONSE (id=$id, type=$_listType): $response');
 
       if (response['data'] == null) {
@@ -1434,8 +1435,15 @@ Future<void> _printMerch(int id) async {
       }
       return;
     }
-    final d = await _fetchMerchPrint(id);
-    if (d == null) return;
+  final d = await _fetchMerchPrint(id);
+    if (d == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No data returned for this order')),
+        );
+      }
+      return;
+    }
     final store = (d['store'] ?? {}) as Map;
     final cust = (d['customer'] ?? {}) as Map;
     final details = (d['detail'] as List?) ?? [];
@@ -1489,88 +1497,111 @@ Future<void> _printMerch(int id) async {
 }
 
 Future<void> _pdfMerch(int id) async {
-  final d = await _fetchMerchPrint(id);
-  if (d == null) return;
-  final store = (d['store'] ?? {}) as Map;
-  final cust = (d['customer'] ?? {}) as Map;
-  final details = (d['detail'] as List?) ?? [];
+  try {
+pdfStage = 'merch: fetch';
+    final d = await _fetchMerchPrint(id);
+    if (d == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No data returned for this order')),
+        );
+      }
+      return;
+    }
+    final store = (d['store'] ?? {}) as Map;
+    final cust = (d['customer'] ?? {}) as Map;
+    final details = (d['detail'] as List?) ?? [];
 
-  final document = PdfDocument();
-  final page = document.pages.add();
-  final Size ps = page.getClientSize();
+    final document = PdfDocument();
+    final page = document.pages.add();
+    final Size ps = page.getClientSize();
 
-  final img = await _readImageData(store['logo']?.toString());
-  if (img.isNotEmpty) {
-    page.graphics.drawImage(PdfBitmap(img),
-        Rect.fromLTWH(ps.width - 100, 30, 80, 80));
+    pdfStage = 'merch: logo';
+    final img = await _readImageData(store['logo']?.toString());
+    if (img.isNotEmpty) {
+      page.graphics.drawImage(PdfBitmap(img),
+          Rect.fromLTWH(ps.width - 100, 30, 80, 80));
+    }
+    page.graphics.drawString('${store['name'] ?? ''}',
+        PdfStandardFont(PdfFontFamily.helvetica, 18, style: PdfFontStyle.bold),
+        bounds: Rect.fromLTWH(30, 30, ps.width - 150, 30));
+    page.graphics.drawString('${store['address'] ?? ''}',
+        PdfStandardFont(PdfFontFamily.helvetica, 10),
+        bounds: Rect.fromLTWH(30, 60, ps.width - 150, 40));
+
+    final f15 = PdfStandardFont(PdfFontFamily.helvetica, 15);
+    const title = 'MERCHANDISE ORDER';
+    final tw = f15.measureString(title);
+    page.graphics.drawString(title, f15,
+        bounds: Rect.fromLTWH((ps.width - tw.width) / 2, 165, tw.width, tw.height));
+    page.graphics.drawLine(PdfPen(PdfColor(0, 0, 0)),
+        Offset(0, 195), Offset(ps.width, 195));
+
+    final left = [
+      'Customer: ${cust['code'] ?? ''} | ${cust['name'] ?? ''}',
+      if ((cust['contact_number'] ?? '').toString().isNotEmpty)
+        'Contact No: ${cust['contact_number']}',
+    ].join('\n');
+    final right = [
+      'Order No: ${d['invoice_no'] ?? ''}',
+      'Date: ${DateHelper.displayDate(d['in_date'])}',
+    ].join('\n');
+    final f12 = PdfStandardFont(PdfFontFamily.helvetica, 12);
+    page.graphics.drawString(left, f12,
+        bounds: Rect.fromLTWH(0, 205, ps.width / 2, 80));
+    page.graphics.drawString(right, f12,
+        bounds: Rect.fromLTWH(ps.width / 2, 205, ps.width / 2, 80),
+        format: PdfStringFormat(alignment: PdfTextAlignment.right));
+
+    pdfStage = 'merch: table';
+    final grid = PdfGrid();
+    grid.columns.add(count: 5);
+    grid.columns[0].width = 30;
+    grid.columns[1].width = 240;
+    grid.columns[2].width = 80;
+    grid.columns[3].width = 70;
+    grid.columns[4].width = 60;
+    final h = grid.headers.add(1)[0];
+    h.cells[0].value = 'Sl.No';
+    h.cells[1].value = 'Product';
+    h.cells[2].value = 'Type';
+    h.cells[3].value = 'Unit';
+    h.cells[4].value = 'Qty';
+    for (int k = 0; k < details.length; k++) {
+      final it = details[k];
+      final r = grid.rows.add();
+      r.cells[0].value = '${k + 1}';
+      r.cells[1].value = '${it['product_name'] ?? ''}';
+      r.cells[2].value = '${it['product_type_name'] ?? ''}';
+      r.cells[3].value = '${it['unit_name'] ?? ''}';
+      r.cells[4].value = '${it['quantity']}';
+    }
+    final res = grid.draw(
+        page: page,
+        bounds: Rect.fromLTWH(0, 300, ps.width, ps.height - 380))!;
+
+    final last = res.page;
+    final bottom = res.bounds.bottom;
+    last.graphics.drawString(
+        'Van: ${(d['van'] ?? {})['name'] ?? ''}\nSalesman: ${(d['user'] ?? {})['name'] ?? ''}',
+        f12,
+        bounds: Rect.fromLTWH(0, bottom + 20, ps.width / 2, 60));
+
+    pdfStage = 'merch: save';
+    final bytes = await document.save();
+    document.dispose();
+    await saveAndLaunchFile(bytes, '${d['invoice_no']}.pdf', false);
+  } catch (e, st) {
+    debugPrint('Merch PDF error: $e\n$st');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 8),
+          content: Text('PDF failed at [$pdfStage]: $e'),
+        ),
+      );
+    }
   }
-  page.graphics.drawString('${store['name'] ?? ''}',
-      PdfStandardFont(PdfFontFamily.helvetica, 18, style: PdfFontStyle.bold),
-      bounds: Rect.fromLTWH(30, 30, ps.width - 150, 30));
-  page.graphics.drawString('${store['address'] ?? ''}',
-      PdfStandardFont(PdfFontFamily.helvetica, 10),
-      bounds: Rect.fromLTWH(30, 60, ps.width - 150, 40));
-
-  final f15 = PdfStandardFont(PdfFontFamily.helvetica, 15);
-  const title = 'MERCHANDISE ORDER';
-  final tw = f15.measureString(title);
-  page.graphics.drawString(title, f15,
-      bounds: Rect.fromLTWH((ps.width - tw.width) / 2, 165, tw.width, tw.height));
-  page.graphics.drawLine(PdfPen(PdfColor(0, 0, 0)),
-      Offset(0, 195), Offset(ps.width, 195));
-
-   final left = [
-    'Customer: ${cust['code'] ?? ''} | ${cust['name'] ?? ''}',
-    if ((cust['contact_number'] ?? '').toString().isNotEmpty)
-      'Contact No: ${cust['contact_number']}',
-  ].join('\n');
-  final right = [
-    'Order No: ${d['invoice_no'] ?? ''}',
-    'Date: ${DateHelper.displayDate(d['in_date'])}',
-  ].join('\n');
-  final f12 = PdfStandardFont(PdfFontFamily.helvetica, 12);
-  page.graphics.drawString(left, f12,
-      bounds: Rect.fromLTWH(0, 205, ps.width / 2, 80));
-  page.graphics.drawString(right, f12,
-      bounds: Rect.fromLTWH(ps.width / 2, 205, ps.width / 2, 80),
-      format: PdfStringFormat(alignment: PdfTextAlignment.right));
-
-  final grid = PdfGrid();
-  grid.columns.add(count: 5);
-  grid.columns[0].width = 30;
-  grid.columns[1].width = 240;
-  grid.columns[2].width = 80;
-  grid.columns[3].width = 70;
-  grid.columns[4].width = 60;
-  final h = grid.headers.add(1)[0];
-  h.cells[0].value = 'Sl.No';
-  h.cells[1].value = 'Product';
-  h.cells[2].value = 'Type';
-  h.cells[3].value = 'Unit';
-  h.cells[4].value = 'Qty';
-  for (int k = 0; k < details.length; k++) {
-    final it = details[k];
-    final r = grid.rows.add();
-    r.cells[0].value = '${k + 1}';
-    r.cells[1].value = '${it['product_name'] ?? ''}';
-    r.cells[2].value = '${it['product_type_name'] ?? ''}';
-    r.cells[3].value = '${it['unit_name'] ?? ''}';
-    r.cells[4].value = '${it['quantity']}';
-  }
-  final res = grid.draw(
-      page: page,
-      bounds: Rect.fromLTWH(0, 300, ps.width, ps.height - 380))!;
-
-  final last = res.page;
-  final bottom = res.bounds.bottom;
-  last.graphics.drawString(
-      'Van: ${(d['van'] ?? {})['name'] ?? ''}\nSalesman: ${(d['user'] ?? {})['name'] ?? ''}',
-      f12,
-      bounds: Rect.fromLTWH(0, bottom + 20, ps.width / 2, 60));
-
-  final bytes = await document.save();
-  document.dispose();
-  await saveAndLaunchFile(bytes, '${d['invoice_no']}.pdf', false);
 }
 }
 

@@ -47,7 +47,7 @@ class _ExpenseAddState extends State<ExpenseAdd> {
   static const Color _uiFieldBorder = Color(0xFFD4D4D4);
   static const Color _uiText = Color(0xFF222222);
   static const Color _uiHint = Color(0xFF777777);
-  static const String _uiCurrency = 'AED';
+String get _uiCurrency => AppState().currencyCode;
 
   // Max digits allowed after the decimal point in Amount / Vat Amount.
   static const int _maxDecimalInput = 3;
@@ -101,7 +101,7 @@ class _ExpenseAddState extends State<ExpenseAdd> {
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: c, width: w),
         );
-
+// print('UI CURRENCY: $_uiCurrency | AppState code: ${AppState().code}');
     return InputDecoration(
       isDense: true,
       hintText: hint,
@@ -119,7 +119,7 @@ class _ExpenseAddState extends State<ExpenseAdd> {
       focusedErrorBorder: border(Colors.red.shade400, 1.5),
       border: border(_uiFieldBorder),
       suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-      suffixIcon: showCurrency
+    suffixIcon: showCurrency
           ? Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Container(
@@ -129,9 +129,9 @@ class _ExpenseAddState extends State<ExpenseAdd> {
                   color: _uiSoft,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text(
+                child: Text(
                   _uiCurrency,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: _uiHint,
                     fontWeight: FontWeight.w600,
                     fontSize: AppFontSizes.payInfoSub,

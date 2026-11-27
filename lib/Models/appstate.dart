@@ -66,6 +66,12 @@ String? validate_qtySO;
   double? roundOffNegative;
   bool roundOffAllowedInInvoice = true;
   String? code;
+
+  String get currencyCode {
+    final c = code?.trim(); print('CURRENCY CODE: "$c"');
+    return (c != null && c.isNotEmpty) ? c : 'AED';
+  }
+
   String? minor;
   String? appVersion;
   String? buildNumber;

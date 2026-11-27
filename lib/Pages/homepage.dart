@@ -1021,8 +1021,8 @@ InkWell(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                '$label (AED)',
+             Text(
+  '$label (${AppState().currencyCode})',
                 style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

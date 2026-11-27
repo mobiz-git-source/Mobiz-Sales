@@ -1206,6 +1206,7 @@ printAlignedText("", "${AppState().taxLabel}: $tax");
     }
   }
 Future<void> _createPdf(Invoice.InvoiceData invoice, bool isPrint) async {
+  pdfStage = 'createPdf: start';
   await AppState().loadTaxName();
   PdfDocument document = PdfDocument();
     final page = document.pages.add();
@@ -1267,7 +1268,8 @@ Future<void> _createPdf(Invoice.InvoiceData invoice, bool isPrint) async {
       return buffer.toString();
     }
 
-    // Load logo (right side)
+   pdfStage = 'createPdf: logo download';
+  // Load logo (right side)
     final Uint8List? imageData =
         await _readImageData(invoice.data!.store![0].logo);
     if (imageData != null && imageData.isNotEmpty) {
@@ -1292,14 +1294,15 @@ Future<void> _createPdf(Invoice.InvoiceData invoice, bool isPrint) async {
       bounds: Rect.fromLTWH(0, 30, pageWidth - 150, 30),
     );
     double currentY = 60;
-    print('companyNameAr value: "$companyNameAr"');
-// AFTER
+  print('companyNameAr value: "$companyNameAr"');
+  pdfStage = 'createPdf: arabic font';
+
     if (companyNameAr.trim().isNotEmpty) {
       try {
         final String cleanNameAr = _sanitizeArabicText(companyNameAr);
         final PdfFont arabicFont =
             await _loadArabicPdfFont(14, style: PdfFontStyle.bold);
-        // AFTER
+       
         page.graphics.drawString(
           cleanNameAr,
           arabicFont,
@@ -1517,7 +1520,8 @@ for (int r = 0; r < grid.rows.count; r++) {
 //       PdfPaddings(left: 10, right: 0, top: 0, bottom: 0);
 // }
 
-final PdfLayoutResult result = grid.draw(
+pdfStage = 'createPdf: table';
+  final PdfLayoutResult result = grid.draw(
       page: page,
       bounds: Rect.fromLTWH(0, secondLineY + 10, pageSize.width,
           pageSize.height - (secondLineY + 10) - 20),
@@ -1688,7 +1692,8 @@ Salesman: $salesmanName
       ),
       format: PdfStringFormat(alignment: PdfTextAlignment.left),
     );
-    List<int> bytes = await document.save();
+  pdfStage = 'createPdf: document.save';
+  List<int> bytes = await document.save();
     document.dispose();
 
     // AFTER (temporary test only)
@@ -2076,25 +2081,19 @@ Salesman: ${invoice.data!.user![0].name}
   }
 
   Future<void> _getInvoiceData(int id, bool isPrint) async {
-    // ── NEW: immediate feedback the moment the icon is tapped, so the
-    // network fetch + PDF build time doesn't feel like the app froze ──
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
     try {
+      pdfStage = 'api: get_sales_invoice';
       Invoice.InvoiceData invoice = Invoice.InvoiceData();
       RestDatasource api = RestDatasource();
-      dynamic response = await api.getDetails(
-          '/api/get_sales_invoice?id=$id', AppState().token);
-      print("IIDD$id");
-      debugPrint(jsonEncode(response));
+     dynamic response = await api
+          .getDetails('/api/get_sales_invoice?id=$id', AppState().token);
       if (response['data'] != null) {
-        print("DDDDDD${id}");
         invoice = Invoice.InvoiceData.fromJson(response);
-        print('VAN LIST LENGTH: ${invoice.data?.van?.length}');
-        print('VAN LIST: ${invoice.data?.van}');
         await _createPdf(invoice, isPrint);
       }
     } catch (e, st) {
@@ -2102,11 +2101,13 @@ Salesman: ${invoice.data!.user![0].name}
       print(st);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error generating PDF: $e')),
+          SnackBar(
+            duration: const Duration(seconds: 8),
+            content: Text('PDF failed at [$pdfStage]: $e'),
+          ),
         );
       }
     } finally {
-      // ── NEW: always close the spinner, success or failure ──
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
     }
   }
@@ -2142,27 +2143,32 @@ Salesman: ${invoice.data!.user![0].name}
     }
   }
 
-  Future<void> _getInvoiceDataprint(int id, bool isPrint) async {
+Future<void> _getInvoiceDataprint(int id, bool isPrint) async {
     try {
-      Invoice.InvoiceData invoice = Invoice.InvoiceData();
       RestDatasource api = RestDatasource();
       dynamic response = await api.getDetails(
           '/api/get_sales_invoice?id=$id', AppState().token);
-      print("IIDD$id");
-      if (response['data'] != null) {
-        print("IIDD$id");
-        invoice = Invoice.InvoiceData.fromJson(response);
+      if (response['data'] == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No data returned for this invoice')),
+          );
+        }
+        return;
       }
+      final invoice = Invoice.InvoiceData.fromJson(response);
       if (_selectedDevice == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Default device not found')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Default device not found')),
+          );
+        }
         return;
       }
       if (!_connected) {
         await _connect();
       }
-      _print(invoice, isPrint);
+      await _print(invoice, isPrint);
     } catch (e, st) {
       print('Error printing invoice: $e');
       print(st);

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' show Rect;
 
 import 'package:open_file/open_file.dart' as open_file;
 import 'package:path_provider/path_provider.dart' as path_provider;
@@ -7,49 +8,61 @@ import 'package:path_provider/path_provider.dart' as path_provider;
 import 'package:printing/printing.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
+/// PDF ethu step-il nilkkunnu ennu ariyaan (diagnostic)
+String pdfStage = 'start';
+
+/// File name-il "/" pole ulla invalid characters maatti "_" aakkunnu
+String _safeFileName(String name) =>
+    name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+
 Future<String> saveAndLaunchFile(
-    List<int> bytes, String fileName, bool _isPrint) async {
-  String? path;
+  List<int> bytes,
+  String fileName,
+  bool isPrint, {
+  Rect shareOrigin = const Rect.fromLTWH(0, 0, 10, 10),
+}) async {
+  final Uint8List data = Uint8List.fromList(bytes);
+  final String safeName = _safeFileName(fileName);
+
+  pdfStage = 'save: folder';
+  String path;
   if (Platform.isIOS) {
-    final Directory directory = await path_provider.getTemporaryDirectory();
-    path = directory.path;
+    path = (await path_provider.getTemporaryDirectory()).path;
   } else if (Platform.isAndroid || Platform.isLinux || Platform.isWindows) {
-    final Directory directory =
-        await path_provider.getApplicationSupportDirectory();
-    path = directory.path;
+    path = (await path_provider.getApplicationSupportDirectory()).path;
   } else {
-    path = await PathProviderPlatform.instance.getApplicationSupportPath();
+    path = (await PathProviderPlatform.instance.getApplicationSupportPath())!;
   }
 
-  final File file =
-      File(Platform.isWindows ? '$path\\$fileName' : '$path/$fileName');
-  await file.writeAsBytes(bytes, flush: true);
+  pdfStage = 'save: writing file';
+  final String fullPath =
+      Platform.isWindows ? '$path\\$safeName' : '$path/$safeName';
+  await File(fullPath).writeAsBytes(data, flush: true);
 
-  if (_isPrint) {
-    await Printing.layoutPdf(
-      name: fileName,
-      onLayout: (_) async => Uint8List.fromList(bytes),
-    );
+  pdfStage = 'save: opening';
+  if (isPrint) {
+    await Printing.layoutPdf(name: safeName, onLayout: (_) async => data);
   } else if (Platform.isIOS) {
-    final result = await open_file.OpenFile.open(
-      '$path/$fileName',
-      type: 'application/pdf',
-    );
-    if (result.type.toString() != 'ResultType.done') {
+    try {
       await Printing.sharePdf(
-        bytes: Uint8List.fromList(bytes),
-        filename: fileName,
+        bytes: data,
+        filename: safeName,
+        bounds: shareOrigin,
       );
+    } catch (_) {
+      // Share sheet failed to open: show native preview instead
+      await Printing.layoutPdf(name: safeName, onLayout: (_) async => data);
     }
   } else if (Platform.isAndroid) {
-    await open_file.OpenFile.open('$path/$fileName');
+    await open_file.OpenFile.open(fullPath);
   } else if (Platform.isWindows) {
-    await Process.run('start', <String>['$path\\$fileName'], runInShell: true);
+    await Process.run('start', <String>[fullPath], runInShell: true);
   } else if (Platform.isMacOS) {
-    await Process.run('open', <String>['$path/$fileName'], runInShell: true);
+    await Process.run('open', <String>[fullPath], runInShell: true);
   } else if (Platform.isLinux) {
-    await Process.run('xdg-open', <String>['$path/$fileName'],
-        runInShell: true);
+    await Process.run('xdg-open', <String>[fullPath], runInShell: true);
   }
-  return '$path/$fileName';
+
+  pdfStage = 'done';
+  return fullPath;
 }
